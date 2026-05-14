@@ -1,0 +1,20 @@
+{
+  "users": [
+    {"handle": "sama", "name": "Sam Altman"},
+    {"handle": "karpathy", "name": "Andrej Karpathy"},
+    {"handle": "gdb", "name": "Greg Brockman"},
+    {"handle": "JeffDean", "name": "Jeff Dean"},
+    {"handle": "simonw", "name": "Simon Willison"},
+    {"handle": "_akhaliq", "name": "AK"},
+    {"handle": "ylecun", "name": "Yann LeCun"},
+    {"handle": "kaboroeconomics", "name": "Kaboro"},
+    {"handle": "fchollet", "name": "Francois Chollet"},
+    {"handle": "aidan_mclau", "name": "Aidan McLau"},
+    {"handle": "steipete", "name": "Peter Steinberger"}
+  ],
+  "nitter_instances": [
+    "https://nitter.net",
+    "https://nitter.poast.org",
+    "https://nitter.privacydev.net"
+  ]
+}

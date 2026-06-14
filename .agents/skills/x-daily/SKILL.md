@@ -59,6 +59,8 @@ python /path/to/x-daily/scripts/fetch.py --project /path/to/project
 
 关注打印行：如果 `daily_picks: 0`，说明今日无推文，检查网络或 Nitter 实例可用性。
 
+同时注意 `⚠` 标记的账号，这些是所有 Nitter 实例均失败的账号。
+
 ### 2.2 清洗推文正文
 
 RSS 中的推文正文保留 HTML 标签（`<br>`、`<a>`），Agent 须用 `strip_html()` 逻辑清洗为纯文本后方可阅读分析。
@@ -77,7 +79,7 @@ ORDER BY u.id, t.created_at;
 统计信息：
 
 ```
-users_count ← SELECT COUNT(DISTINCT user_id) FROM daily_picks WHERE date = ?
+users_count ← SELECT COUNT(DISTINCT t.user_id) FROM daily_picks dp JOIN tweets t ON dp.tweet_id = t.id WHERE dp.date = ?
 tweets_count ← SELECT COUNT(*) FROM daily_picks WHERE date = ?
 model ← 当前 AI 模型名称
 generated_at ← 当前 UTC 时间（ISO 8601 格式）
@@ -85,7 +87,28 @@ generated_at ← 当前 UTC 时间（ISO 8601 格式）
 
 ### 2.4 撰写章节
 
-每个追踪账号输出一个独立的 `##` 标题章节，排序与 config/users.json 一致：
+#### 统一汇总（文件头之后紧接）
+
+按 config/users.json 顺序，将有推文的账号和其余账号分开。在文件头 `---` 分隔线之后，先输出汇总段落：
+
+```markdown
+**今日有推文的账号：** @gdb (1), @simonw (3)
+
+**今日暂无推文的账号：** @sama, @karpathy, @JeffDean, @_akhaliq, @ylecun, @fchollet, @aidan_mclau, @steipete
+
+**抓取失败的账号：** @kaboroeconomics
+```
+
+规则：
+- "暂无推文"行列出当天 RSS 返回 0 条的账号
+- "抓取失败"行列出所有 Nitter 实例均失败的账号（fetch.py 输出含 `⚠` 标记）。若全部成功，省略此行
+- "有推文"行列出当天至少有 1 条推文的账号，标注数量。若无任何推文，仅保留汇总、不生成后续章节
+- 三类之间空行分隔
+- 按 config/users.json 顺序排列，而非字母序
+
+#### 各账号章节
+
+仅为有推文的账号输出独立的 `##` 标题章节，排序与 config/users.json 一致：
 
 ```markdown
 ## 显示名 (@handle)
@@ -105,7 +128,7 @@ tweets: N
 
 #### 章节规则
 
-- 按账号分组，每个 `##` 标题一个账号
+- 仅为有推文的账号创建 `##` 章节，排序与 config/users.json 一致
 - 账号小标题格式：`显示名 (@handle)`
 - 标题下紧跟 `tweets: N` 标明该账号今日推文数
 - 每条推文以列表项 `- 中文摘要` 开头，缩进子项标注 `raw`、`time`、`url`
@@ -116,13 +139,12 @@ tweets: N
 - 正文用中文，链接/项目名保留原文
 - 账号之间用 `---` 分隔
 - 纯转推/灌水推文可忽略不写
-- 当天无推文的账号显示"今日暂无推文"
 
 ### 2.5 写入文件
 
-逐条追加写入 `feeds/YYYY-MM-DD/x-hot-HH-MM.md`（HH-MM 为生成时刻的时-分）。
+写入 `feeds/YYYY-MM-DD/x-hot-HH-MM.md`（HH-MM 为生成时刻的时-分，UTC）。
 
-首次写入先写 YAML frontmatter 和文件头：
+先写 YAML frontmatter 和文件头：
 
 ```markdown
 ---
@@ -137,10 +159,16 @@ model: "model-name"
 > 数据来源：X (Twitter) 公开推文 via Nitter RSS · 生成于 YYYY-MM-DD HH:MM UTC
 > 追踪账号：@{handle1}, @{handle2}, ...
 
+**今日有推文的账号：** ...
+
+**今日暂无推文的账号：** ...
+
+**抓取失败的账号：** ...（仅在有失败时出现）
+
 ---
 ```
 
-后续每条推文章节追加到文件末尾。
+然后在 `---` 分隔线之后，逐个写入有推文账号的章节。
 
 ### 2.6 收尾
 
@@ -154,7 +182,8 @@ model: "model-name"
 | 情况 | 处理 |
 |------|------|
 | `daily_picks` 为空 | 检查 fetch.py 输出，确认网络或实例可用 |
-| 某账号今日无推文 | 显示"今日暂无推文" |
+| 某账号今日无推文 | 列入顶部"今日暂无推文"汇总行，不创建章节 |
+| 某账号抓取失败 | 列入顶部"抓取失败"汇总行（仅在 `⚠` 标记时） |
 | 推文正文仍含 HTML | Agent 清洗为纯文本后再分析 |
 | Nitter 实例全部不可用 | 更新 `config/users.json` 中 `nitter_instances` 列表 |
 | 日报文件已存在 | 读取已有内容，跳过已完成条目 |

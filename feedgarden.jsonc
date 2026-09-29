@@ -7,7 +7,7 @@
     "effort": "off"
   },
   "publish": {
-    "auto": true
+    "auto": false
   },
   "sources": [
     {

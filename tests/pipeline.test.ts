@@ -50,6 +50,19 @@ test('collection persistence is atomic and versions exclude metric-only updates'
   } finally { store.close(); }
 });
 
+test('resumed collection records its actual attempt time separately from the fixed coverage endpoint', async () => {
+  const c = config(), store = new Store(':memory:');
+  const rangeEnd = '2026-01-01T00:00:00.000Z';
+  const before = Date.now();
+  try {
+    await collect(c, store, undefined, false, { ...adapters, 'hn-api': async () => ({ items: [], raw: [], cursor: '', coverage: { status: 'complete', to: rangeEnd, notes: [] } }) });
+    const state = store.channel('hackernews', 'main', 'primary')!;
+    assert.ok(Date.parse(state.last_attempt) >= before);
+    assert.equal(state.last_success, rangeEnd, 'incremental collection must still start from the covered range');
+    assert.ok(!select(c.sources[0]!, periodFor(c.sources[0]!, 'daily', '2026-01-01'), store, 50, new Date().toISOString()).coverage.notes.some(note => note.includes('unavailable')));
+  } finally { store.close(); }
+});
+
 test('HTTP recognizes challenge pages and conditional responses', async () => {
   const store = new Store(':memory:'); let count = 0;
   try {
@@ -62,6 +75,24 @@ test('HTTP recognizes challenge pages and conditional responses', async () => {
     assert.equal(http.raw.length, 2);
     await assert.rejects(new Http(store, async () => new Response('Verify you are human')).get('https://example.test/block'), HttpError);
     await assert.rejects(new Http(store, async () => new Response('wait', { status: 429, headers: { 'Retry-After': '30' } })).get('https://example.test/rate'), error => error instanceof HttpError && !!error.retryAt && Date.parse(error.retryAt) > Date.now());
+  } finally { store.close(); }
+});
+
+test('a host rate limit defers other streams without issuing another request', async () => {
+  const store = new Store(':memory:'); let requests = 0;
+  const http = new Http(store, async url => {
+    requests++;
+    return String(url).includes('limited.test') ? new Response('wait', { status: 429, headers: { 'Retry-After': '120' } }) : new Response('ok');
+  });
+  try {
+    let retryAt: string | undefined;
+    await assert.rejects(http.get('https://limited.test/first'), error => {
+      if (!(error instanceof HttpError)) return false;
+      retryAt = error.retryAt; return !!retryAt;
+    });
+    await assert.rejects(http.get('https://limited.test/second'), error => error instanceof HttpError && error.retryAt === retryAt);
+    assert.equal(requests, 1, 'streams sharing a host must share its cooldown');
+    assert.equal((await http.get('https://available.test/feed')).body, 'ok'); assert.equal(requests, 2);
   } finally { store.close(); }
 });
 

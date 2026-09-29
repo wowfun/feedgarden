@@ -16,6 +16,7 @@ export class HttpError extends Error {
 export class Http {
   readonly raw: RawResponse[] = [];
   private readonly hostNext = new Map<string, number>();
+  private readonly hostCooldown = new Map<string, HttpError>();
   private readonly sharedResponses = new Map<string, RawResponse>();
   private readonly robots = new Map<string, ReturnType<typeof robotsParser>>();
   constructor(private readonly store: Store, private readonly fetcher: typeof fetch = networkFetch) {}
@@ -39,9 +40,16 @@ export class Http {
   async get(url: string, spacingMs = 0, transport: 'fetch' | 'curl' = 'fetch'): Promise<RawResponse> {
     const host = new URL(url).host;
     const cached = this.store.cache(url);
+    const checkCooldown = () => {
+      const error = this.hostCooldown.get(host);
+      if (error?.retryAt && Date.parse(error.retryAt) > Date.now()) throw error;
+      this.hostCooldown.delete(host);
+    };
     for (let attempt = 0; attempt < 3; attempt++) {
+      checkCooldown();
       const wait = (this.hostNext.get(host) ?? 0) - Date.now();
       if (wait > 0) await sleep(wait);
+      checkCooldown();
       this.hostNext.set(host, Date.now() + spacingMs);
       try {
         const response = await (transport === 'curl' && this.fetcher === networkFetch ? curlFetch : this.fetcher)(url, { signal: AbortSignal.timeout(25000), headers: {
@@ -62,7 +70,9 @@ export class Http {
           const seconds = retry ? /^\d+$/.test(retry) ? Number(retry) : (Date.parse(retry) - Date.now()) / 1000
             : reset ? host === 'api.github.com' ? reset - Date.now() / 1000 : reset : 1800;
           const retryAt = new Date(Date.now() + Math.max(1, Number.isFinite(seconds) ? seconds : 1800) * 1000).toISOString();
-          throw new HttpError(`Rate limited by ${host}`, response.status, retryAt);
+          const error = new HttpError(`Rate limited by ${host}`, response.status, retryAt);
+          this.hostCooldown.set(host, error);
+          throw error;
         }
         if (response.status === 304 && !cached) throw new HttpError('304 response without a cached body');
         if (!response.ok && response.status !== 304) throw new HttpError(`HTTP ${response.status} from ${host}`, response.status);

@@ -51,7 +51,7 @@ export class Store {
   }
   cache(url: string): RawResponse | undefined { const row = this.db.prepare('SELECT response FROM http_cache WHERE url=?').get(url) as { response: string } | undefined; return row && JSON.parse(row.response); }
   saveCache(response: RawResponse): void { this.db.prepare('INSERT OR REPLACE INTO http_cache VALUES (?,?)').run(response.url, JSON.stringify(response)); }
-  saveCollection(source: string, stream: string, channel: string, result: Collection, nextAttempt: string): void {
+  saveCollection(source: string, stream: string, channel: string, result: Collection, nextAttempt: string, attemptedAt = result.coverage.to): void {
     this.db.transaction(() => {
       for (const raw of result.raw) this.db.prepare('INSERT INTO raw_responses(source,stream,channel,fetched_at,url,status,headers,body,hash) VALUES (?,?,?,?,?,?,?,?,?)').run(source, stream, channel, raw.fetchedAt, raw.url, raw.status, JSON.stringify(raw.headers), raw.body, hash(raw.body));
       for (const item of result.items) {
@@ -64,8 +64,8 @@ export class Store {
       const successful = result.coverage.status === 'complete' || result.coverage.status === 'partial';
       this.db.prepare('INSERT OR REPLACE INTO channel_state VALUES (?,?,?,?,?,?,?,?,?)').run(source, stream, channel,
         successful ? result.cursor ?? previous?.cursor ?? null : previous?.cursor ?? null,
-        successful ? result.coverage.to : previous?.last_success ?? null, result.coverage.to, nextAttempt, result.coverage.status, JSON.stringify(result.coverage.notes));
-      if (result.coverage.status !== 'complete') this.db.prepare('INSERT INTO gaps(source,stream,channel,at,details) VALUES (?,?,?,?,?)').run(source, stream, channel, result.coverage.to, JSON.stringify(result.coverage));
+        successful ? result.coverage.to : previous?.last_success ?? null, attemptedAt, nextAttempt, result.coverage.status, JSON.stringify(result.coverage.notes));
+      if (result.coverage.status !== 'complete') this.db.prepare('INSERT INTO gaps(source,stream,channel,at,details) VALUES (?,?,?,?,?)').run(source, stream, channel, attemptedAt, JSON.stringify(result.coverage));
     })();
   }
   items(source: string, start?: string, end?: string): Item[] {

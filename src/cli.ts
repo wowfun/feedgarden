@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import lockfile from 'proper-lockfile';
 import { loadConfig } from './config.js';
 import { Store } from './store.js';
-import { collect } from './collect.js';
+import { collect, type CollectionResult } from './collect.js';
 import { generateReport } from './reports.js';
 import { duePeriods, periodFor, reportKey } from './period.js';
 import { writeSite } from './site.js';
@@ -30,12 +30,19 @@ if (values.help || !command) {
   let store: Store | undefined;
   let run: number | undefined;
   let heartbeat: NodeJS.Timeout | undefined;
+  const failures: { kind: 'collection' | 'report'; key: string; error: string }[] = [];
+  const recordCollection = (results: CollectionResult[]) => {
+    console.log(JSON.stringify(results, null, 2));
+    for (const result of results) if (result.status === 'unavailable') {
+      failures.push({ kind: 'collection', key: `${result.source}/${result.stream}`, error: 'All enabled channels unavailable; see channel_state and gaps for details' });
+    }
+  };
   try {
     store = new Store(config.storage.database);
     store.acquireLease(owner);
     heartbeat = setInterval(() => store!.renewLease(owner), 30_000); heartbeat.unref();
     run = store.run(command);
-    if (command === 'collect') console.log(JSON.stringify(await collect(config, store, values.source, values.due, undefined, values.since), null, 2));
+    if (command === 'collect') recordCollection(await collect(config, store, values.source, values.due, undefined, values.since));
     else if (command === 'report') {
       const source = config.sources.find(source => source.id === values.source && source.enabled);
       if (!source || !values.date || !['daily', 'weekly'].includes(values.frequency ?? '')) throw new Error('report requires an enabled --source, --frequency daily|weekly and --date');
@@ -48,24 +55,29 @@ if (values.help || !command) {
     else if (command === 'doctor') {
       const executable = config.agent.command === 'dsh' ? resolve('node_modules/.bin/dsh') : config.agent.command;
       console.log(JSON.stringify({ node: process.version, database: store.db.pragma('quick_check'), agent: execFileSync(executable, ['--version'], { encoding: 'utf8' }).trim(), model: config.agent.model, channels: store.states(), reports: store.reports().length }, null, 2));
-      if (values.live) console.log(JSON.stringify(await collect(config, store, values.source), null, 2));
+      if (values.live) recordCollection(await collect(config, store, values.source));
     } else if (command === 'run') {
       if (!values.due) throw new Error('Scheduled runs require --due');
-      console.log(JSON.stringify(await collect(config, store, values.source, true)));
+      recordCollection(await collect(config, store, values.source, true));
       const at = nowIso();
       for (const source of config.sources.filter(source => source.enabled && (!values.source || source.id === values.source))) {
         const queued = store.reports().filter(report => report.state !== 'sealed' && report.snapshot.period.source === source.id && source.frequencies.includes(report.snapshot.period.frequency)).map(report => report.snapshot.period);
         const periods = new Map([...queued, ...duePeriods(source, at, config.reports.backfillDays, config.reports.sealHours)].map(period => [reportKey(period), period]));
         for (const period of [...periods.values()].filter(period => period.due <= at).sort((a, b) => a.due.localeCompare(b.due))) {
           try { console.log(JSON.stringify({ source: source.id, date: period.date, frequency: period.frequency, result: await generateReport(config, source, period, store) })); }
-          catch (error) { if (errorText(error).includes('MANUAL_ACTION:')) throw error; console.error(errorText(error)); }
+          catch (error) {
+            if (errorText(error).includes('MANUAL_ACTION:')) throw error;
+            failures.push({ kind: 'report', key: reportKey(period), error: errorText(error) });
+            console.error(errorText(error));
+          }
         }
       }
       await writeSite(config, store); await backup(store, config.storage.directory);
       if (config.publish.auto && !values['no-publish']) { const { publish } = await import('./publish.js'); await publish(config); }
     } else if (command === 'publish') { const { publish } = await import('./publish.js'); await publish(config); }
     else throw new Error('Unknown command: ' + command);
-    store.finishRun(run, 'succeeded', {});
+    store.finishRun(run, failures.length ? 'partial' : 'succeeded', { failures });
+    if (failures.length) { console.error(`Run incomplete: ${failures.length} collection/report task(s) failed; successful work was retained.`); process.exitCode = 1; }
   } catch (error) {
     if (run) store?.finishRun(run, 'failed', { error: errorText(error) });
     console.error(errorText(error)); process.exitCode = 1;

@@ -87,6 +87,8 @@ The generator writes reviewable files to `.local/scheduler/`. It **does not inst
 
 `run --due` collects due streams, generates due reports, renders both languages, backs up and (when `publish.auto` is true) publishes. Publishing fetches remote `main` into an isolated Git worktree, replaces only managed `reports/`, validates the full site, commits only those paths and pushes without force. A concurrent remote update rejects the push; local data/report files remain for retry. Code/configuration changes use normal Git review rather than this report publisher.
 
+Automatic publishing is disabled in the checked-in configuration. Keep `--no-publish` on local validation runs; enable `publish.auto` only when ready to publish. If every channel for a stream fails or a report cannot complete, the runner retains successful work, records a `partial` run with failure details and exits with code 1. A working fallback or a valid empty result is successful.
+
 The Pages workflow validates TypeScript/tests and the bilingual browser flows before deploying. It never collects data or uses model credentials. The Jekyll source is pinned by full commit in `.github/theme.lock.json`, using `.references/jekyll-obsidian` when it matches. Feedgarden's generated source/year indexes, compact search (latest 3,000 reports per locale), bounded Atom feed (100 entries) and disabled graph/relations keep browsing costs bounded. Jekyll still rebuilds all archived pages; full-build costs grow with the archive.
 
 ## Validation

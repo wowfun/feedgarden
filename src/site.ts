@@ -15,7 +15,10 @@ export function reportPath(report: ReportRecord): string { const p = report.snap
 export function renderReport(report: ReportRecord, source: Source, locale: 'en' | 'zh-CN'): string {
   const zh = locale === 'zh-CN', { period, items, coverage } = report.snapshot;
   const title = `${source.name} ${period.frequency === 'weekly' ? zh ? '周报' : 'Weekly' : zh ? '日报' : 'Daily'} — ${period.date}`;
-  const description = report.copies.slice(0, 3).map(copy => copy[locale].title).join('; ').slice(0, 240);
+  const preview = report.copies.slice(0, 3).map(copy => copy[locale].title).join('; ');
+  const characters = [...preview];
+  const excerpt = characters.slice(0, 239).join('');
+  const description = characters.length <= 240 ? preview : (zh ? excerpt : excerpt.replace(/\s+\S*$/, '')).trimEnd() + '…';
   const props = zh ? { title, description } : { publish: true, content_type: 'post', title, description, date: DateTime.fromISO(period.date, { zone: period.timezone }).toISO(), updated: report.snapshot.createdAt, tags: [period.source, period.frequency] };
   let output = frontmatter(props);
   output += `${zh ? '收录' : 'Includes'} ${items.length} ${zh ? '条内容' : 'items'}. ${period.date} – ${DateTime.fromISO(period.end).setZone(period.timezone).minus({ days: 1 }).toISODate()} (${period.timezone}).\n\n`;

@@ -36,6 +36,8 @@ try {
       const reportHref = await page.locator('main table tbody tr').filter({ hasText: 'OpenAI' }).locator('a').nth(1).getAttribute('href'); assert.ok(reportHref);
       const longReport = page.locator('main table tbody tr').filter({ hasText: 'Hacker News' }).locator('a').nth(1);
       const longReportHref = await longReport.count() ? await longReport.getAttribute('href') : undefined;
+      const redditWeekly = page.locator('main table tbody tr').filter({ hasText: 'Reddit' }).locator('a[href*="-Weekly/"]');
+      const redditWeeklyHref = await redditWeekly.count() ? await redditWeekly.getAttribute('href') : undefined;
       await page.screenshot({ path: join(output, 'home-' + locale + '-' + size + '.png'), fullPage: true });
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Home overflows viewport');
       const brand = page.locator('.site-mark__name');
@@ -71,8 +73,15 @@ try {
         assert.equal(await page.locator('.note-content [data-math-style]').count(), 0, 'Plain report punctuation became math');
         await page.screenshot({ path: join(output, 'weekly-' + locale + '-' + size + '.png') });
       }
+      if (redditWeeklyHref) {
+        assert.equal((await page.goto(origin + redditWeeklyHref))?.status(), 200);
+        const count = await page.locator('.note-content h2').count(); assert.ok(count > 0 && count <= 50);
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Reddit weekly report overflows viewport');
+        assert.equal(await page.locator('.note-content [data-math-style]').count(), 0);
+        await page.screenshot({ path: join(output, 'reddit-weekly-' + locale + '-' + size + '.png') });
+      }
       assert.deepEqual(errors, []);
-      checks.push({ locale, size, origin, search: 'passed', markdown: 'passed', languageSwitch: 'passed', archives: 'passed', feed: 'passed', overflow: 'none', scriptErrors: errors });
+      checks.push({ locale, size, origin, search: 'passed', markdown: 'passed', languageSwitch: 'passed', archives: 'passed', feed: 'passed', redditWeekly: redditWeeklyHref ? 'passed' : 'no report yet', overflow: 'none', scriptErrors: errors });
       await context.close();
     }
   }

@@ -1,0 +1,30 @@
+title: Feedgarden
+description: Daily discoveries and weekly digests from builders, research labs, and communities.
+lang: en
+url: https://sinputer.top
+baseurl: /feedgarden
+website:
+  source: reports
+  theme: minimal
+  repository: wowfun/feedgarden
+  edit_branch: main
+  i18n:
+    enabled: true
+    locales: [en, zh-CN]
+  features:
+    search: true
+    feed: true
+    tags: false
+    graph: false
+    relations: false
+    previews: false
+    outline: true
+  home:
+    recent_posts_limit: 0
+  search:
+    mode: summary
+    max_entries: 3000
+    excerpt_length: 240
+    content_types: [post]
+  feed:
+    max_entries: 100

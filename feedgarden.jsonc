@@ -1,0 +1,461 @@
+// English is canonical. Secrets are read from the environment or local DSH.
+{
+  "$schema": "./schemas/feedgarden.schema.json",
+  "version": 1,
+  "agent": {
+    "model": "deepseek/deepseek-flash",
+    "effort": "off"
+  },
+  "publish": {
+    "auto": true
+  },
+  "sources": [
+    {
+      "id": "hackernews",
+      "name": "Hacker News",
+      "intervalHours": 1,
+      "frequencies": [
+        "daily",
+        "weekly"
+      ],
+      "streams": [
+        {
+          "id": "frontpage",
+          "channels": [
+            {
+              "id": "firebase",
+              "kind": "hn-api"
+            },
+            {
+              "id": "rss",
+              "kind": "feed",
+              "url": "https://news.ycombinator.com/rss"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "intervalHours": 6,
+      "frequencies": [
+        "daily"
+      ],
+      "streams": [
+        {
+          "id": "news",
+          "channels": [
+            {
+              "id": "list",
+              "kind": "anthropic-html",
+              "url": "https://www.anthropic.com/news"
+            },
+            {
+              "id": "sitemap",
+              "kind": "sitemap",
+              "url": "https://www.anthropic.com/sitemap.xml"
+            }
+          ]
+        },
+        {
+          "id": "research",
+          "channels": [
+            {
+              "id": "list",
+              "kind": "anthropic-html",
+              "url": "https://www.anthropic.com/research"
+            },
+            {
+              "id": "sitemap",
+              "kind": "sitemap",
+              "url": "https://www.anthropic.com/sitemap.xml"
+            }
+          ]
+        },
+        {
+          "id": "engineering",
+          "channels": [
+            {
+              "id": "list",
+              "kind": "anthropic-html",
+              "url": "https://www.anthropic.com/engineering"
+            },
+            {
+              "id": "sitemap",
+              "kind": "sitemap",
+              "url": "https://www.anthropic.com/sitemap.xml"
+            }
+          ]
+        },
+        {
+          "id": "blog",
+          "channels": [
+            {
+              "id": "list",
+              "kind": "anthropic-html",
+              "url": "https://claude.com/blog"
+            },
+            {
+              "id": "sitemap",
+              "kind": "sitemap",
+              "url": "https://claude.com/sitemap.xml"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "intervalHours": 6,
+      "frequencies": [
+        "daily"
+      ],
+      "streams": [
+        {
+          "id": "news",
+          "channels": [
+            {
+              "id": "rss",
+              "kind": "feed",
+              "url": "https://openai.com/news/rss.xml"
+            },
+            {
+              "id": "sitemap",
+              "kind": "sitemap",
+              "url": "https://openai.com/sitemap.xml"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "intervalHours": 6,
+      "frequencies": [
+        "daily",
+        "weekly"
+      ],
+      "streams": [
+        {
+          "id": "trending",
+          "channels": [
+            {
+              "id": "trending",
+              "kind": "github-trending",
+              "url": "https://github.com/trending?since=daily"
+            },
+            {
+              "id": "search",
+              "kind": "github-search"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "x",
+      "name": "X",
+      "intervalHours": 4,
+      "frequencies": [
+        "daily",
+        "weekly"
+      ],
+      "streams": [
+        {
+          "id": "karpathy",
+          "channels": [
+            {
+              "id": "cookie",
+              "kind": "x-cli"
+            },
+            {
+              "id": "follow-builders",
+              "kind": "follow-builders",
+              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json"
+            }
+          ]
+        },
+        {
+          "id": "swyx",
+          "channels": [
+            {
+              "id": "cookie",
+              "kind": "x-cli"
+            },
+            {
+              "id": "follow-builders",
+              "kind": "follow-builders",
+              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json"
+            }
+          ]
+        },
+        {
+          "id": "joshwoodward",
+          "channels": [
+            {
+              "id": "cookie",
+              "kind": "x-cli"
+            },
+            {
+              "id": "follow-builders",
+              "kind": "follow-builders",
+              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json"
+            }
+          ]
+        },
+        {
+          "id": "bcherny",
+          "channels": [
+            {
+              "id": "cookie",
+              "kind": "x-cli"
+            },
+            {
+              "id": "follow-builders",
+              "kind": "follow-builders",
+              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json"
+            }
+          ]
+        },
+        {
+          "id": "zarazhangrui",
+          "channels": [
+            {
+              "id": "cookie",
+              "kind": "x-cli"
+            },
+            {
+              "id": "follow-builders",
+              "kind": "follow-builders",
+              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json"
+            }
+          ]
+        },
+        {
+          "id": "thsottiaux",
+          "channels": [
+            {
+              "id": "cookie",
+              "kind": "x-cli"
+            },
+            {
+              "id": "follow-builders",
+              "kind": "follow-builders",
+              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reddit",
+      "name": "Reddit",
+      "intervalHours": 12,
+      "frequencies": [
+        "daily",
+        "weekly"
+      ],
+      "streams": [
+        {
+          "id": "LocalLLaMA",
+          "channels": [
+            {
+              "id": "rss",
+              "kind": "feed",
+              "url": "https://www.reddit.com/r/LocalLLaMA/new.rss?limit=100",
+              "transport": "curl"
+            }
+          ]
+        },
+        {
+          "id": "MachineLearning",
+          "channels": [
+            {
+              "id": "rss",
+              "kind": "feed",
+              "url": "https://www.reddit.com/r/MachineLearning/new.rss?limit=100",
+              "transport": "curl"
+            }
+          ]
+        },
+        {
+          "id": "OpenAI",
+          "channels": [
+            {
+              "id": "rss",
+              "kind": "feed",
+              "url": "https://www.reddit.com/r/OpenAI/new.rss?limit=100",
+              "transport": "curl"
+            }
+          ]
+        },
+        {
+          "id": "ClaudeAI",
+          "channels": [
+            {
+              "id": "rss",
+              "kind": "feed",
+              "url": "https://www.reddit.com/r/ClaudeAI/new.rss?limit=100",
+              "transport": "curl"
+            }
+          ]
+        },
+        {
+          "id": "ClaudeCode",
+          "channels": [
+            {
+              "id": "rss",
+              "kind": "feed",
+              "url": "https://www.reddit.com/r/ClaudeCode/new.rss?limit=100",
+              "transport": "curl"
+            }
+          ]
+        },
+        {
+          "id": "ChatGPTCoding",
+          "channels": [
+            {
+              "id": "rss",
+              "kind": "feed",
+              "url": "https://www.reddit.com/r/ChatGPTCoding/new.rss?limit=100",
+              "transport": "curl"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "arxiv",
+      "name": "arXiv",
+      "intervalHours": 6,
+      "frequencies": [
+        "weekly"
+      ],
+      "topics": [
+        "large language model",
+        "LLM",
+        "agentic",
+        "coding agent",
+        "code generation",
+        "retrieval augmented",
+        "inference optimization",
+        "language model evaluation"
+      ],
+      "streams": [
+        {
+          "id": "cs.AI",
+          "channels": [
+            {
+              "id": "atom",
+              "kind": "arxiv-api"
+            },
+            {
+              "id": "rss",
+              "kind": "feed",
+              "url": "https://rss.arxiv.org/rss/cs.AI"
+            }
+          ]
+        },
+        {
+          "id": "cs.CL",
+          "channels": [
+            {
+              "id": "atom",
+              "kind": "arxiv-api"
+            },
+            {
+              "id": "rss",
+              "kind": "feed",
+              "url": "https://rss.arxiv.org/rss/cs.CL"
+            }
+          ]
+        },
+        {
+          "id": "cs.LG",
+          "channels": [
+            {
+              "id": "atom",
+              "kind": "arxiv-api"
+            },
+            {
+              "id": "rss",
+              "kind": "feed",
+              "url": "https://rss.arxiv.org/rss/cs.LG"
+            }
+          ]
+        },
+        {
+          "id": "cs.CV",
+          "channels": [
+            {
+              "id": "atom",
+              "kind": "arxiv-api"
+            },
+            {
+              "id": "rss",
+              "kind": "feed",
+              "url": "https://rss.arxiv.org/rss/cs.CV"
+            }
+          ]
+        },
+        {
+          "id": "cs.SE",
+          "channels": [
+            {
+              "id": "atom",
+              "kind": "arxiv-api"
+            },
+            {
+              "id": "rss",
+              "kind": "feed",
+              "url": "https://rss.arxiv.org/rss/cs.SE"
+            }
+          ]
+        },
+        {
+          "id": "stat.ML",
+          "channels": [
+            {
+              "id": "atom",
+              "kind": "arxiv-api"
+            },
+            {
+              "id": "rss",
+              "kind": "feed",
+              "url": "https://rss.arxiv.org/rss/stat.ML"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "producthunt",
+      "name": "Product Hunt",
+      "timezone": "America/Los_Angeles",
+      "intervalHours": 6,
+      "frequencies": [
+        "daily",
+        "weekly"
+      ],
+      "streams": [
+        {
+          "id": "daily",
+          "channels": [
+            {
+              "id": "leaderboard",
+              "kind": "ph-html"
+            },
+            {
+              "id": "atom",
+              "kind": "feed",
+              "url": "https://www.producthunt.com/feed"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

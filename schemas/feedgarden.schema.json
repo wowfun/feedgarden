@@ -1,0 +1,329 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "storage": {
+      "default": {
+        "database": ".local/feedgarden.sqlite",
+        "directory": ".local"
+      },
+      "type": "object",
+      "properties": {
+        "database": {
+          "default": ".local/feedgarden.sqlite",
+          "type": "string"
+        },
+        "directory": {
+          "default": ".local",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "reports": {
+      "default": {
+        "directory": "reports",
+        "maxItems": 50,
+        "sealHours": 48,
+        "backfillDays": 7
+      },
+      "type": "object",
+      "properties": {
+        "directory": {
+          "default": "reports",
+          "type": "string"
+        },
+        "maxItems": {
+          "default": 50,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "sealHours": {
+          "default": 48,
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "backfillDays": {
+          "default": 7,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30
+        }
+      },
+      "additionalProperties": false
+    },
+    "agent": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "default": "dsh",
+          "type": "string"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effort": {
+          "type": "string"
+        },
+        "version": {
+          "default": "0.1.7-rc.2",
+          "type": "string"
+        },
+        "timeoutSeconds": {
+          "default": 300,
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maxBatchItems": {
+          "default": 10,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "maxInputChars": {
+          "default": 24000,
+          "type": "integer",
+          "minimum": 4000,
+          "maximum": 9007199254740991
+        },
+        "maxItemChars": {
+          "default": 4000,
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 9007199254740991
+        },
+        "maxDailyCalls": {
+          "default": 80,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "runtimeDirectory": {
+          "default": ".local/dsh",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model"
+      ],
+      "additionalProperties": false
+    },
+    "publish": {
+      "default": {
+        "repository": "https://github.com/wowfun/feedgarden.git",
+        "branch": "main",
+        "auto": false
+      },
+      "type": "object",
+      "properties": {
+        "repository": {
+          "default": "https://github.com/wowfun/feedgarden.git",
+          "type": "string"
+        },
+        "branch": {
+          "default": "main",
+          "type": "string"
+        },
+        "auto": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "sources": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "enabled": {
+            "default": true,
+            "type": "boolean"
+          },
+          "timezone": {
+            "default": "Asia/Shanghai",
+            "type": "string"
+          },
+          "intervalHours": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "frequencies": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly"
+              ]
+            }
+          },
+          "streams": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_.-]+$"
+                },
+                "channels": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "hn-api",
+                          "feed",
+                          "sitemap",
+                          "anthropic-html",
+                          "github-trending",
+                          "github-search",
+                          "x-cli",
+                          "follow-builders",
+                          "arxiv-api",
+                          "ph-html"
+                        ]
+                      },
+                      "enabled": {
+                        "default": true,
+                        "type": "boolean"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "transport": {
+                        "default": "fetch",
+                        "type": "string",
+                        "enum": [
+                          "fetch",
+                          "curl"
+                        ]
+                      },
+                      "limit": {
+                        "default": 500,
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 2000
+                      },
+                      "authTokenEnv": {
+                        "default": "TWITTER_AUTH_TOKEN",
+                        "type": "string"
+                      },
+                      "csrfTokenEnv": {
+                        "default": "TWITTER_CT0",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "channels"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "topics": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 2
+            }
+          },
+          "agent": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string"
+              },
+              "effort": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "reportAgent": {
+            "type": "object",
+            "properties": {
+              "daily": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "effort": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "weekly": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "effort": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "intervalHours",
+          "frequencies",
+          "streams"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "version",
+    "agent",
+    "sources"
+  ],
+  "additionalProperties": false
+}

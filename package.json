@@ -1,0 +1,46 @@
+{
+  "name": "feedgarden",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <27"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "feedgarden": "tsx src/cli.ts",
+    "schema": "tsx scripts/schema.ts",
+    "site:build": "tsx scripts/site-build.ts",
+    "test:visual": "tsx scripts/visual-check.ts",
+    "setup:twitter": "tsx scripts/setup-twitter.ts",
+    "schedule:prepare": "tsx scripts/schedule.ts",
+    "verify:agent": "tsx scripts/live-agent.ts",
+    "verify:collect": "tsx scripts/live-collect.ts",
+    "verify:scale": "tsx scripts/scale-check.ts"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "1.5.1",
+    "@deepseek-ai/dsh": "0.1.7-rc.2",
+    "better-sqlite3": "13.0.3",
+    "cheerio": "1.2.0",
+    "fast-xml-parser": "5.5.9",
+    "jsonc-parser": "3.3.1",
+    "luxon": "3.7.2",
+    "proper-lockfile": "4.1.2",
+    "robots-parser": "3.0.1",
+    "undici": "7.30.0",
+    "yaml": "2.8.3",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@types/better-sqlite3": "7.6.13",
+    "@types/luxon": "3.7.1",
+    "@types/node": "24.12.0",
+    "@types/proper-lockfile": "4.1.4",
+    "tsx": "4.21.0",
+    "typescript": "6.0.2"
+  }
+}

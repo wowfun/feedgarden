@@ -1,0 +1,9 @@
+---
+publish: true
+content_type: "page"
+title: "X 2026"
+---
+
+# X 2026
+
+- [2026-09-28](../../x/2026/2026-09-28.md)

@@ -1,8 +1,10 @@
-.env
-
-.local
+.local/
+.references/
 node_modules/
 dist/
-__pycache__/
-
-feeds/
+.jekyll-obsidian-cache/
+.env
+*.sqlite*
+*.log
+playwright-report/
+test-results/

@@ -72,6 +72,7 @@ export async function writeSite(config: Config, store: Store): Promise<void> {
       for (const year of years) await write(`${prefix}${source.id}/${year}/index.md`, page(`${source.name} ${year}`, entries.filter(report => report.snapshot.period.date.startsWith(year)).map(report => `- ${link(report, '../../')}`).join('\n')));
       for (const report of entries) await write(`${prefix}${reportPath(report)}`, renderReport(report, source, locale));
     }
+    home += '\n[GitHub Trending](https://github.com/trending)\n';
     home += `\n${zh ? '搜索涵盖最近 3,000 份报告的标题、标签和摘要。完整历史见各来源归档。' : 'Search covers titles, tags, and summaries of the latest 3,000 reports. Full history is available in each source archive.'}\n`;
     await write(`${prefix}index.md`, page('Feedgarden', home));
   }

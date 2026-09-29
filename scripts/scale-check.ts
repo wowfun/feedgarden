@@ -12,6 +12,8 @@ import type { Item } from '../src/types.js';
 const root = resolve('.local/scale-workspace'), c = loadConfig(), started = Date.now();
 const inspect = process.argv.includes('--inspect');
 if (!inspect) {
+c.sources = c.sources.filter(source => source.enabled);
+assert.ok(c.sources.length, 'Scale validation requires an enabled source');
 c.storage.directory = join(root, '.local'); c.storage.database = join(c.storage.directory, 'fixture.sqlite'); c.reports.directory = join(root, 'reports');
 await mkdir(join(root, '.github'), { recursive: true });
 await cp('.github/jekyll-obsidian.yml', join(root, '.github/jekyll-obsidian.yml'));

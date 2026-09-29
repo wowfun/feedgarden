@@ -32,13 +32,22 @@ try {
       const response = await page.goto(origin + prefix); assert.equal(response?.status(), 200);
       assert.equal(await page.locator('html').getAttribute('lang'), locale);
       assert.equal(await page.locator('h1').count(), 1);
-      assert.equal(await page.locator('main table tbody tr').count(), 8);
+      assert.equal(await page.locator('main table tbody tr').count(), 7);
+      assert.equal(await page.locator('main table tbody tr').filter({ hasText: 'GitHub' }).count(), 0);
+      const github = page.locator('main a').filter({ hasText: /^GitHub Trending$/ });
+      assert.equal(await github.count(), 1);
+      assert.equal(await github.getAttribute('href'), 'https://github.com/trending');
+      assert.equal(await page.locator(`main a[href^="${prefix}github/"]`).count(), 0);
+      assert.equal((await page.request.get(origin + prefix + 'github/')).status(), 404);
       const reportHref = await page.locator('main table tbody tr').filter({ hasText: 'OpenAI' }).locator('a').nth(1).getAttribute('href'); assert.ok(reportHref);
       const longReport = page.locator('main table tbody tr').filter({ hasText: 'Hacker News' }).locator('a').nth(1);
       const longReportHref = await longReport.count() ? await longReport.getAttribute('href') : undefined;
       const redditWeekly = page.locator('main table tbody tr').filter({ hasText: 'Reddit' }).locator('a[href*="-Weekly/"]');
       const redditWeeklyHref = await redditWeekly.count() ? await redditWeekly.getAttribute('href') : undefined;
       await page.screenshot({ path: join(output, 'home-' + locale + '-' + size + '.png'), fullPage: true });
+      await github.evaluate(element => element.scrollIntoView({ block: 'center' }));
+      await github.click({ trial: true });
+      if (size === 'mobile') await page.screenshot({ path: join(output, 'github-link-' + locale + '-mobile.png') });
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Home overflows viewport');
       const brand = page.locator('.site-mark__name');
       assert.ok(await brand.evaluate(element => element.clientHeight < 24), 'Brand wraps onto a second line');
@@ -81,7 +90,7 @@ try {
         await page.screenshot({ path: join(output, 'reddit-weekly-' + locale + '-' + size + '.png') });
       }
       assert.deepEqual(errors, []);
-      checks.push({ locale, size, origin, search: 'passed', markdown: 'passed', languageSwitch: 'passed', archives: 'passed', feed: 'passed', redditWeekly: redditWeeklyHref ? 'passed' : 'no report yet', overflow: 'none', scriptErrors: errors });
+      checks.push({ locale, size, origin, githubExternalLink: 'passed', githubArchive: 'absent', search: 'passed', markdown: 'passed', languageSwitch: 'passed', archives: 'passed', feed: 'passed', redditWeekly: redditWeeklyHref ? 'passed' : 'no report yet', overflow: 'none', scriptErrors: errors });
       await context.close();
     }
   }

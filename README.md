@@ -28,11 +28,13 @@ Edit [feedgarden.jsonc](feedgarden.jsonc), validated against [the generated sche
 | Hacker News | Firebase top-story snapshot → front-page RSS | Daily + weekly / 1 h |
 | Anthropic | News, research, engineering and Claude Blog lists → sitemaps + dated detail pages | Daily / 6 h |
 | OpenAI | News RSS → sitemap + dated detail pages | Daily / 6 h |
-| GitHub | Trending HTML → recently pushed repositories by total stars | Daily + weekly / 6 h |
+| GitHub | Direct link to GitHub Trending on both homepages | Collection and reports disabled |
 | X | Optional explicit-cookie timeline → follow-builders daily sample | Daily + weekly / 4 h |
 | Reddit | Six communities' official new-post RSS, using curl transport | Daily + weekly / 12 h |
 | arXiv | Six categories' paginated Atom API → new-only category RSS | Weekly / 6 h |
 | Product Hunt | Dated leaderboard HTML → new-product Atom feed | Daily + weekly / 6 h |
+
+GitHub is an external homepage link, outside the seven-source report table. Its source is configured with `enabled: false`, so collection, report generation and queued report retries skip it. English and Chinese GitHub archive directories are removed during rendering. Existing local GitHub data, channel configuration and adapters are retained.
 
 HTML collection checks robots.txt. HTTP requests have timeouts, bounded retries, conditional caching and per-host spacing; rate limits retain a retry time. HTTP(S)_PROXY and NO_PROXY are honored. `transport: "curl"` uses the system HTTP client with the same Feedgarden user agent, useful for public RSS endpoints that reject Node's HTTP stack. Challenge pages and inaccessible responses remain failures.
 
@@ -58,7 +60,7 @@ Reports contain at most 50 items per source and period:
 
 Daily reports become due at 09:00 for the previous natural day. Weekly reports become due Monday at 09:00 for the preceding Monday–Sunday, and use that week's Monday in the filename. Default timezone is Asia/Shanghai; Product Hunt uses America/Los_Angeles. First runs consider the last seven days where history actually exists. Empty periods do not call the Agent or produce placeholder reports.
 
-HN uses the highest observed score available when selection is first frozen, with comments breaking ties. GitHub uses each day's last observed snapshot; weekly reports aggregate reciprocal daily ranks, not rolling star totals. Product Hunt uses dated daily order and maximum observed votes for weekly selection. X and Reddit rotate fairly across configured streams in publication order. arXiv deduplicates version-free paper IDs and scores configured phrases in titles (3) and abstracts (1), grouped by first submission date. Weekly selection reads stored raw-item observations independently of daily reports.
+HN uses the highest observed score available when selection is first frozen, with comments breaking ties. The retained GitHub adapter, currently disabled, uses each day's last observed snapshot; weekly reports aggregate reciprocal daily ranks, not rolling star totals. Product Hunt uses dated daily order and maximum observed votes for weekly selection. X and Reddit rotate fairly across configured streams in publication order. arXiv deduplicates version-free paper IDs and scores configured phrases in titles (3) and abstracts (1), grouped by first submission date. Weekly selection reads stored raw-item observations independently of daily reports.
 
 Initial publication freezes selection scores. At period end + 48 hours, one final evaluation admits late items using those frozen scores and then seals the report. Metrics alone do not request new summaries. Text is cached by content, model, effort and skill version; failed revisions preserve the previous valid bilingual report. Explicit `--rebuild` reselects, while still reusing matching text. Each model call contains at most 10 items and 24,000 input characters, with a maximum of 4,000 body characters per item. The default daily budget is 80 ACP batch attempts in UTC, including failed attempts; batches allow one retry. Each attempt can contain several model/tool exchanges, so this bounds work rather than currency spend. Title-only inputs have no invented summary.
 
@@ -67,7 +69,7 @@ npm run feedgarden -- report --source openai --frequency daily --date 2026-09-28
 npm run feedgarden -- report --source arxiv --frequency weekly --date 2026-09-21 --rebuild
 npm run feedgarden -- collect --source arxiv --since 2026-09-21
 npm run feedgarden -- doctor
-npm run feedgarden -- doctor --live --source github
+npm run feedgarden -- doctor --live --source openai
 npm run feedgarden -- render
 npm run feedgarden -- backup
 npm run feedgarden -- publish

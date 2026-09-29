@@ -133,6 +133,7 @@
     {
       "id": "github",
       "name": "GitHub",
+      "enabled": false,
       "intervalHours": 6,
       "frequencies": [
         "daily",

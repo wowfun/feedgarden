@@ -1,0 +1,36 @@
+{
+  "name": "English",
+  "hreflang": "en",
+  "dir": "ltr",
+  "messages": {
+    "sources": "Sources",
+    "clear_filters": "Clear filters",
+    "retry": "Retry",
+    "archive_loading": "Loading selected entries…",
+    "archive_unavailable": "Selected entries could not be loaded. Retry or clear the filters.",
+    "archive_results": "{count} entries",
+    "page_label": "Page {page} of {pages}",
+    "first_observed": "First observed",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "tag_labels": {
+    "source/hackernews": "Hacker News",
+    "source/anthropic": "Anthropic",
+    "source/openai": "OpenAI",
+    "source/github": "GitHub",
+    "source/x": "X",
+    "source/reddit": "Reddit",
+    "source/arxiv": "arXiv",
+    "source/producthunt": "Product Hunt",
+    "topics/agents": "Agents",
+    "topics/coding": "Coding",
+    "topics/models": "Models",
+    "topics/inference": "Inference",
+    "topics/evaluation": "Evaluation",
+    "topics/research": "Research",
+    "topics/products": "Products",
+    "topics/industry": "Industry"
+  },
+  "tag_aliases": {}
+}

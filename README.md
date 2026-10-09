@@ -1,109 +1,61 @@
 # Feedgarden
 
-An English-first, bilingual feed digest at **https://sinputer.top/feedgarden/**. Chinese translations live at `/feedgarden/zh-CN/`. A local TypeScript runner collects public sources into SQLite, generates grounded report copy through DSH ACP, and publishes Markdown to a static Jekyll Obsidian site.
+Feedgarden collects developer and AI sources into local SQLite and publishes a bilingual chronological feed. Each item has its own Markdown page, source tag, 1–3 topic tags, and a clickable original URL. The English site is at `/feedgarden/`, with Simplified Chinese at `/feedgarden/zh-CN/`.
 
-## Run locally
-
-Use Node 24, Ruby 4.0.6, Git, curl and an authenticated GitHub CLI/Git credential helper. The pinned Jekyll frontend also requires Node 26. On this WSL workspace, the backend uses `.local/runtime/node_modules/node/bin/node`; an ordinary installation can use `nvm use` with `.nvmrc`.
+Use Node 24–26 for the runner (`npm ci`), Node 26 and Ruby 4.0.6 for the pinned Jekyll Obsidian theme. The local DSH dependency is pinned to `0.1.7-rc.2`. Its model is `deepseek/deepseek-flash`, with effort `off`. Configure `DEEPSEEK_API_KEY` in local DSH credentials, or set `FEEDGARDEN_AGENT_API_KEY` / `DEEPSEEK_API_KEY`. Keys stay out of Git and generated content.
 
 ```sh
-npm ci
-npm run typecheck
-npm test
-npm run feedgarden -- collect
-npm run feedgarden -- run --due --no-publish
-npm run site:build
-```
-
-DSH `0.1.7-rc.2` is installed and locked as a project dependency. The configured model is `deepseek/deepseek-flash` with effort `off`. Set `FEEDGARDEN_AGENT_API_KEY` or `DEEPSEEK_API_KEY`, or provision `DEEPSEEK_API_KEY` in your local DSH credentials. Feedgarden reads only that credential and starts each batch in a private workspace. No credentials belong in JSONC, reports, Git or Pages. Existing OpenCode configuration is unused.
-
-The model has only two tools: read the fixed input and trusted skill, and write a fixed JSON artifact. Other tools are disabled and denied by a native DSH tool guard. The ACP client rejects permission requests, explicitly selects the advertised model and effort, enforces a timeout, and validates matching English/Chinese IDs and order. DSH's native provider name is `deepseek-official`; the user-facing model alias maps to that route. Extending model providers requires an explicit change to this adapter.
-
-## Configuration and sources
-
-Edit [feedgarden.jsonc](feedgarden.jsonc), validated against [the generated schema](schemas/feedgarden.schema.json). Strict JSON is also supported; if both files exist, supply `--config`. Source → stream → ordered channels is the collection hierarchy. A failed or stale channel falls through; a valid empty response stops. Partial coverage is retained and explained. Each channel has its own cursor, health and retry time.
-
-| Source | Default channels | Frequency / interval |
-| --- | --- | --- |
-| Hacker News | Firebase top-story snapshot → front-page RSS | Daily + weekly / 1 h |
-| Anthropic | News, research, engineering and Claude Blog lists → sitemaps + dated detail pages | Daily / 6 h |
-| OpenAI | News RSS → sitemap + dated detail pages | Daily / 6 h |
-| GitHub | Direct link to GitHub Trending on both homepages | Collection and reports disabled |
-| X | Optional explicit-cookie timeline → follow-builders daily sample | Daily + weekly / 4 h |
-| Reddit | Six communities' official new-post RSS, using curl transport | Daily + weekly / 12 h |
-| arXiv | Six categories' paginated Atom API → new-only category RSS | Weekly / 6 h |
-| Product Hunt | Dated leaderboard HTML → new-product Atom feed | Daily + weekly / 6 h |
-
-GitHub is an external homepage link, outside the seven-source report table. Its source is configured with `enabled: false`, so collection, report generation and queued report retries skip it. English and Chinese GitHub archive directories are removed during rendering. Existing local GitHub data, channel configuration and adapters are retained.
-
-HTML collection checks robots.txt. HTTP requests have timeouts, bounded retries, conditional caching and per-host spacing; rate limits retain a retry time. HTTP(S)_PROXY and NO_PROXY are honored. `transport: "curl"` uses the system HTTP client with the same Feedgarden user agent, useful for public RSS endpoints that reject Node's HTTP stack. Challenge pages and inaccessible responses remain failures.
-
-X's public fallback is an independent daily sample: up to three posts per configured account, without complete replies or threads. It cannot establish that an absent account had no activity. Cookie collection is optional and unofficial. To prepare its pinned environment-only CLI:
-
-```sh
-npm run setup:twitter
-```
-
-This requires `uv` and installs twitter-cli at commit `7c634e0d396b1e7af9f63315b414925fe4f29ae7` with its lockfile. A local patch prevents browser extraction even when explicit cookies expire. Set `TWITTER_AUTH_TOKEN` and `TWITTER_CT0` yourself to enable that channel. Feedgarden does not extract browser credentials. Without cookies the public fallback remains usable.
-
-Reddit has no known score/comment metrics in RSS. Neither RSS ordering, GitHub Search nor Product Hunt's fallback feed is presented as the platform's popularity ranking. Historical coverage is bounded by the actual source: HN and GitHub begin with observed snapshots; X/Reddit feeds cannot reconstruct missed history. arXiv resumes its fixed query range after pagination interruptions or retrieval limits. Articles without a verifiable publication date are excluded, with a gap recorded.
-
-To add accounts/categories, add streams. To add a source, configure its streams and implement a channel adapter only if none exists. Channel adapters return raw responses, normalized items, coverage and a cursor; `Store.saveCollection` commits these together. Extend the channel enum, adapter registry and meaningful parser/behavior tests, then run `npm run schema`. Source `agent` overrides model/effort; `reportAgent.daily` and `reportAgent.weekly` override those per frequency.
-
-## Reports and selection
-
-Reports contain at most 50 items per source and period:
-
-- `reports/{source}/YYYY/YYYY-MM-DD.md`
-- `reports/{source}/YYYY/YYYY-MM-DD-Weekly.md`
-- Chinese mirrors beneath `reports/_translations/zh-CN/`.
-
-Daily reports become due at 09:00 for the previous natural day. Weekly reports become due Monday at 09:00 for the preceding Monday–Sunday, and use that week's Monday in the filename. Default timezone is Asia/Shanghai; Product Hunt uses America/Los_Angeles. First runs consider the last seven days where history actually exists. Empty periods do not call the Agent or produce placeholder reports.
-
-HN uses the highest observed score available when selection is first frozen, with comments breaking ties. The retained GitHub adapter, currently disabled, uses each day's last observed snapshot; weekly reports aggregate reciprocal daily ranks, not rolling star totals. Product Hunt uses dated daily order and maximum observed votes for weekly selection. X and Reddit rotate fairly across configured streams in publication order. arXiv deduplicates version-free paper IDs and scores configured phrases in titles (3) and abstracts (1), grouped by first submission date. Weekly selection reads stored raw-item observations independently of daily reports.
-
-Initial publication freezes selection scores. At period end + 48 hours, one final evaluation admits late items using those frozen scores and then seals the report. Metrics alone do not request new summaries. Text is cached by content, model, effort and skill version; failed revisions preserve the previous valid bilingual report. Explicit `--rebuild` reselects, while still reusing matching text. Each model call contains at most 10 items and 24,000 input characters, with a maximum of 4,000 body characters per item. The default daily budget is 80 ACP batch attempts in UTC, including failed attempts; batches allow one retry. Each attempt can contain several model/tool exchanges, so this bounds work rather than currency spend. Title-only inputs have no invented summary.
-
-```sh
-npm run feedgarden -- report --source openai --frequency daily --date 2026-09-28
-npm run feedgarden -- report --source arxiv --frequency weekly --date 2026-09-21 --rebuild
-npm run feedgarden -- collect --source arxiv --since 2026-09-21
-npm run feedgarden -- doctor
-npm run feedgarden -- doctor --live --source openai
+npm run feedgarden -- migrate
+npm run feedgarden -- collect --source openai
+npm run feedgarden -- summarize --source openai
 npm run feedgarden -- render
-npm run feedgarden -- backup
-npm run feedgarden -- publish
+npm run site:build
+npm run feedgarden -- run --due --no-publish
 ```
 
-## Storage, scheduling and publishing
+`migrate` is required for an existing schema 2 database. It makes a permanent online SQLite backup, preserving WAL data, reports, original configuration, dependency/theme locks, code revision and checksums under `.local/migrations/`. It then freezes the migration calendar day's **Asia/Shanghai midnight as one instant**, excludes every existing `(source,id)`, resets collection cursors, upgrades additively, and replaces the public report tree with item content. Old report URLs return 404. Existing items are retained privately and are not backfilled. Migration and content replacement use recoverable journals. Migration archives are excluded from normal backup retention.
 
-SQLite in `.local/feedgarden.sqlite` retains raw responses, item content versions, metric observations, cursors, gaps, fixed report snapshots, Agent usage and run state. WAL transactions protect cursor/data consistency. A filesystem lock and database lease prevent overlapping runners, including crash recovery after the 120-second lease expiry. SQLite online backups retain seven daily and four weekly copies under `.local/backups/`.
+For local rollback, stop the scheduler and runners, then run `feedgarden rollback ARCHIVE`. The command verifies archive checksums, preserves the new database/content, retires WAL/SHM after closing SQLite, restores the old data/configuration/reports, and clears the lease only in the restored copy. Continue with the recorded old code revision in an independent worktree. A remote rollback requires an ordinary Git revert and Pages rebuild.
 
-To restore: stop the scheduler and all runners, preserve the current database and its `-wal`/`-shm` sidecars together, copy a chosen backup to the configured database path, remove only the old database's sidecars after preserving them, wait for any copied lease to expire, and run `doctor`. `render` reconstructs Markdown from stored reports; failed report batches can reuse validated cached copy on retry. Raw data and scratch workspaces are private local files and are not uploaded by Pages.
+Configuration v2 uses `feed.directory`, `feed.topics` and `collection.backfillDays`. Sources retain their streams and ordered fallback channels. A valid empty response stops fallback; unavailable or stale channels permit the next channel. `source.agent` overrides model/effort. arXiv `includeKeywords` retains lexical relevance filtering; X reposts are excluded. There is no report frequency, seal period, ranking or Top 50 selection. GitHub collection remains disabled; its stored historical data and adapter remain available.
+
+All eligible new items enter the summary queue, FIFO per source and round-robin across sources. Dated items must meet the cutoff instant. Explicit offsets are honored; date-only and unzoned ISO/SQL dates use the source timezone (Shanghai by default, Los Angeles for Product Hunt). Undated items use their stable first observation and display “First observed”; a sample feed's generated timestamp is not a publication date.
+
+A batch contains at most 10 items, 4,000 normalized body characters each, and 24,000 characters for the complete JSON input including the topic registry. The default budget is 80 ACP attempts per UTC day, including failed/repair attempts (reset at Shanghai 08:00). Attempts time out after 300 seconds. One immediate artifact repair is allowed per visit; other retries back off from 15 minutes to six hours, up to five attempts per content version. Credential problems stop with a manual-action message; three consecutive runtime failures stop the run. Quota deferral leaves pending tasks and exits successfully. Other task failures produce a partial run and exit 1.
 
 ```sh
-npm run schedule:prepare
+npm run feedgarden -- summarize --retry-failed
+npm run feedgarden -- summarize --source openai --rebuild
+npm run feedgarden -- doctor
+npm run feedgarden -- backup
 ```
 
-The generator writes reviewable files to `.local/scheduler/`. It **does not install or enable** a task. For WSL, import `Feedgarden.xml` into Windows Task Scheduler under the owning Windows account; it invokes `wsl.exe` every 15 minutes and runs while that account is logged in. It restarts WSL when needed; it does not promise to wake a suspended Windows host. Native Linux can install the generated user service/timer with `Persistent=true`; user lingering must be enabled separately if required. Activate one scheduler only. Optional environment settings belong in a private `.local/runner.env` (mode 0600), read by the generated shell script. Native Windows/macOS behavior is not part of this Linux validation.
+Identity is `(source,native ID)`; filenames are the full SHA-256 of its JSON tuple, independent of unsafe native ID characters. Content lives in `content/items/<hash>.md`, with matching translations below `content/_translations/zh-CN/items/`. Frontmatter includes `date`, `updated`, `first_seen`, `date_basis`, `source_url`, and tags `source/<id>` plus `topics/<id>`. Summaries are cached by normalized input, source identity, model/effort, skill hash and contract version. Metrics, URL and date changes update presentation without regenerating text. Failed revisions retain the last accepted bilingual snapshot. No new item is published with only one language.
 
-`run --due` collects due streams, generates due reports, renders both languages, backs up and (when `publish.auto` is true) publishes. Publishing fetches remote `main` into an isolated Git worktree, replaces only managed `reports/`, validates the full site, commits only those paths and pushes without force. A concurrent remote update rejects the push; local data/report files remain for retry. Code/configuration changes use normal Git review rather than this report publisher.
+`config/topics.json` is the canonical bilingual vocabulary. The fixed-input DSH skill reads it, reuses active IDs and aliases, and may append reusable topics. Both the restricted plugin and client validate identities, bilingual copy, topic references and new-topic uniqueness. The registry is written with file/directory fsync before the summary transaction; an interrupted commit may leave an unused topic, but cannot leave a published dangling reference. Saved artifacts are recovered before another ACP call. Topic additions do not invalidate accepted summaries; `--rebuild` explicitly refreshes classification.
 
-Automatic publishing is disabled in the checked-in configuration. Keep `--no-publish` on local validation runs; enable `publish.auto` only when ready to publish. If every channel for a stream fails or a report cannot complete, the runner retains successful work, records a `partial` run with failure details and exits with code 1. A working fallback or a valid empty result is successful.
+For manual vocabulary changes, preserve IDs and old labels/aliases. Deprecate rather than delete; `replacedBy` must point directly to an active topic. Rendering remaps stored IDs, and old shared query links remain usable. Apply changes through the runner lock:
 
-The Pages workflow validates TypeScript/tests and the bilingual browser flows before deploying. It never collects data or uses model credentials. The Jekyll source is pinned by full commit in `.github/theme.lock.json`, using `.references/jekyll-obsidian` when it matches. Feedgarden's generated source/year indexes, compact search (latest 3,000 reports per locale), bounded Atom feed (100 entries) and disabled graph/relations keep browsing costs bounded. Jekyll still rebuilds all archived pages; full-build costs grow with the archive.
+```sh
+npm run feedgarden -- topics apply revised-topics.json
+```
 
-## Validation
+Directly editing the canonical registry while a job runs is unsupported and detected by its fingerprint. Topic/file and SQLite commits are separate durable steps; their recovery protocol does not claim a distributed atomic transaction.
+
+The feed shows 50 cards per page. Sources and topics support multiple selection: OR within a group, AND across groups and chronology. Query parameters preserve selection, page, language switching and browser history. Unknown IDs produce an empty result. Counts are global; matching counts are shown separately. The theme writes a small generation manifest, lazy per-facet bitmaps and 50-card chunks. A Worker evaluates queries, network concurrency is capped at four, and resource caching at 20 entries. Failed loads retain the last successful page and offer retry. Search includes the latest 3,000 item titles/tags/summary excerpts; Atom includes 100 items. Full static builds still render every item page.
+
+Publishing is disabled automatically by default. `publish` fetches the configured branch into an isolated worktree, merges topic registries with a three-way base, validates the site, commits only `content/` and `config/topics.json`, and pushes without force. Legacy `reports/` deletions are permitted only with the migration journal. Independent topic additions merge; conflicting IDs stop the entire publication and preserve local data, with `.local/publish-conflict.json` for resolution. Integrate the code/theme change into the publication branch before publishing item content. To resolve a registry conflict, fetch and merge the recorded versions, then run `topics apply FILE --remote-base <recorded-remote-SHA>`, render, and retry.
+
+SQLite retains raw responses, content versions, observations, collection cursors, gaps, summary jobs, accepted snapshots, fixed task inputs, ACP usage and run state. Historical report tables remain private for audit. A filesystem lock and renewable database lease prevent concurrent runners. Online backups retain seven daily and four weekly copies; private raw data, credentials and scratch workspaces are never deployed.
+
+Validation commands:
 
 ```sh
 npm run typecheck
 npm test
-npm run build
-npm run site:build
-npm run test:visual
-npm run verify:agent         # real DSH call; requires the configured credential
-npm run verify:collect       # real source requests
-npm run verify:scale         # isolated synthetic archive; never published
+npm run verify:scale
+FEEDGARDEN_VISUAL_ROOT=.local/notes/1009/fixture/.jekyll-obsidian-cache/site FEEDGARDEN_VISUAL_FIXTURE=1 npm run test:visual
+npm run verify:agent
 ```
 
-Visual checks cover desktop/mobile, English/Chinese, search, language switching, Markdown download, overflow and browser errors. Live evidence, screenshots, resolved issues and measured tradeoffs for this rebuild are retained in `.local/notes/0929/`; synthetic scale content is isolated under `.local/scale-workspace/`.
+The 101-item bilingual fixture exercises full static build and browser flows. The upstream index/query tests cover 100,000 records without generating 100,000 full Jekyll pages. `verify:agent` uses real OpenAI RSS items and the installed DSH ACP in an isolated database, registry and content tree. It performs no publication. Notes and validation artifacts for this refactor live in `.local/notes/1009/`.

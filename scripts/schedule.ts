@@ -12,7 +12,7 @@ const quote = (value: string) => "'" + value.replace(/'/g, "'\\''") + "'";
 const script = '#!/bin/bash\nset -euo pipefail\ncd ' + quote(root) + '\nif [[ -f .local/runner.env ]]; then\n  set -a\n  source .local/runner.env\n  set +a\nfi\nexec ' + quote(process.execPath) + ' --import tsx src/cli.ts run --due\n';
 await writeFile(join(output, 'run.sh'), script, { mode: 0o700 });
 const unitQuote = (value: string) => '"' + value.replace(/[%\\"]/g, char => char === '%' ? '%%' : '\\' + char) + '"';
-await writeFile(join(output, 'feedgarden.service'), '[Unit]\nDescription=Collect and publish Feedgarden reports\nAfter=network-online.target\n\n[Service]\nType=oneshot\nWorkingDirectory=' + root.replace(/%/g, '%%') + '\nExecStart=/bin/bash ' + unitQuote(join(output, 'run.sh')) + '\nTimeoutStartSec=2h\n');
+await writeFile(join(output, 'feedgarden.service'), '[Unit]\nDescription=Collect and publish Feedgarden items\nAfter=network-online.target\n\n[Service]\nType=oneshot\nWorkingDirectory=' + root.replace(/%/g, '%%') + '\nExecStart=/bin/bash ' + unitQuote(join(output, 'run.sh')) + '\nTimeoutStartSec=2h\n');
 await writeFile(join(output, 'feedgarden.timer'), '[Unit]\nDescription=Check Feedgarden tasks every 15 minutes\n\n[Timer]\nOnCalendar=*:0/15\nPersistent=true\nRandomizedDelaySec=30\n\n[Install]\nWantedBy=timers.target\n');
 const distro = values.distro ?? process.env.WSL_DISTRO_NAME;
 if (distro) {

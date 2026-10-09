@@ -43,11 +43,13 @@ jobs:
       - run: npm run site:build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:visual
+      - run: npm run verify:scale
+      - run: FEEDGARDEN_VISUAL_ROOT=.local/notes/1009/fixture/.jekyll-obsidian-cache/site FEEDGARDEN_VISUAL_FIXTURE=1 npm run test:visual
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
           name: visual-validation
-          path: .local/notes/0929/visual
+          path: .local/notes/1009/visual
           retention-days: 7
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
         if: github.event_name != 'pull_request'

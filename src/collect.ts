@@ -22,7 +22,7 @@ export async function collect(config: Config, store: Store, selected?: string, d
         const state = store.channel(source.id, stream.id, channel.id);
         if (state?.status === 'failed' && Date.parse(state.next_attempt) > Date.now() && due) continue;
         http.raw.length = 0;
-        const since = sinceOverride ? DateTime.fromISO(sinceOverride, { zone: source.timezone }).toUTC().toISO()! : DateTime.fromISO(state?.last_success ?? now).minus({ days: state?.last_success ? 1 : config.reports.backfillDays }).toUTC().toISO()!;
+        const since = sinceOverride ? DateTime.fromISO(sinceOverride, { zone: source.timezone }).toUTC().toISO()! : DateTime.fromISO(state?.last_success ?? now).minus({ days: state?.last_success ? 1 : config.collection.backfillDays }).toUTC().toISO()!;
         try {
           const result = await (registry[channel.kind] as Adapter)({ source, stream, channel, store, http, now, since, restartRange: !!sinceOverride });
           store.saveCollection(source.id, stream.id, channel.id, result, next(source, now), now);

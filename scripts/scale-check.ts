@@ -1,48 +1,40 @@
 import assert from 'node:assert/strict';
-import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { DateTime } from 'luxon';
-import { loadConfig } from '../src/config.js';
+import { configSchema } from '../src/config.js';
 import { Store } from '../src/store.js';
-import { periodFor, reportKey } from '../src/period.js';
+import { summarize, type Generator } from '../src/items.js';
 import { writeSite } from '../src/site.js';
 import { buildSite } from '../src/build-site.js';
 import type { Item } from '../src/types.js';
-
-const root = resolve('.local/scale-workspace'), c = loadConfig(), started = Date.now();
-const inspect = process.argv.includes('--inspect');
-if (!inspect) {
-c.sources = c.sources.filter(source => source.enabled);
-assert.ok(c.sources.length, 'Scale validation requires an enabled source');
-c.storage.directory = join(root, '.local'); c.storage.database = join(c.storage.directory, 'fixture.sqlite'); c.reports.directory = join(root, 'reports');
-await mkdir(join(root, '.github'), { recursive: true });
-await cp('.github/jekyll-obsidian.yml', join(root, '.github/jekyll-obsidian.yml'));
-await cp('.github/theme.lock.json', join(root, '.github/theme.lock.json'));
-const store = new Store(c.storage.database);
+const root = resolve('.local/notes/1009/fixture'), started = Date.now();
+await rm(root, {recursive:true,force:true}); await mkdir(join(root,'.github'),{recursive:true});
+await cp('.github/jekyll-obsidian.yml',join(root,'.github/jekyll-obsidian.yml'));
+await cp('.github/theme.lock.json',join(root,'.github/theme.lock.json'));
+await cp('config/topics.json',join(root,'topics.json'));
+const config = configSchema.parse({version:2,storage:{directory:join(root,'.local'),database:join(root,'.local/data.sqlite')},feed:{directory:join(root,'content'),topics:join(root,'topics.json')},agent:{model:'deepseek/deepseek-flash',maxDailyCalls:80,runtimeDirectory:join(root,'tasks')},sources:['openai','hackernews'].map(id=>({id,name:id==='openai'?'OpenAI':'Hacker News',intervalHours:1,streams:[{id:'main',channels:[{id:'rss',kind:'feed',url:'https://example.invalid/rss'}]}]}))});
+const generator: Generator = async (_agent,input,_repair,directory) => ({directory:directory!,events:[],usage:[],output:{contractVersion:2,newTopics:[],items:input.items.map((item,i)=>({source:item.source,id:item.id,topics:[Number(item.id.split('-').at(-1))%2===0?'coding':'models'],en:{title:item.title,summary:item.text},'zh-CN':{title:'用于构建验证的条目 '+item.id,summary:'这是分页、标签和双语内容验证使用的合成素材。'}}))}});
+const store = new Store(config.storage.database);
+store.setMeta('cutoff', '1970-01-01T00:00:00.000Z');
 try {
-  store.db.transaction(() => {
-    for (let index = 0; index < 3008; index++) {
-      const source = c.sources[index % c.sources.length]!;
-      const date = DateTime.fromISO('2025-01-01').plus({ days: Math.floor(index / c.sources.length) }).toISODate()!;
-      const period = periodFor(source, 'daily', date);
-      const items: Item[] = Array.from({ length: 50 }, (_, i) => ({ id: String(index) + '-' + i, source: source.id, stream: source.streams[0]!.id, channel: 'scale-fixture', title: 'Scale fixture item ' + i,
-        text: 'Synthetic fixture for build validation. No real announcement is represented. '.repeat(4), url: 'https://example.invalid/' + index + '/' + i,
-        publishedAt: period.start, observedAt: period.start, basis: 'published', metrics: {} }));
-      store.saveReport(reportKey(period), { period, items, createdAt: period.end, frozenScores: {}, coverage: { status: 'complete', from: period.start, to: period.end, notes: [] } }, items.map(item => ({ id: item.id, en: { title: item.title, summary: item.text }, 'zh-CN': { title: '构建测试条目 ' + item.id, summary: '用于检查站点构建的合成素材，不代表真实新闻。'.repeat(6) } })), 'sealed');
-    }
-  })();
-  await writeSite(c, store);
-} finally { store.close(); }
-}
-const output = inspect ? join(root, '.jekyll-obsidian-cache/site') : await buildSite(root), results: unknown[] = [];
+ for (let i=0;i<101;i++) {
+  const source=config.sources[i%2]!;
+  const date=DateTime.fromISO('2026-08-01T00:00:00Z').plus({days:i}).toUTC().toISO()!;
+  const item:Item={id:'fixture-'+i,source:source.id,stream:'main',channel:'rss',title:'Fixture '+i+' — Research and developer tools',text:'Synthetic fixture for archive validation. It does not represent a real announcement.',url:'https://example.invalid/'+i+'/a-long-source-path-to-check-url-wrapping-and-complete-clickable-text?reference='+('x'.repeat(80)),publishedAt:date,observedAt:date,basis:i===100?'observed':'published',metrics:{}};
+  store.saveCollection(source.id,'main','rss',{items:[item],raw:[],coverage:{status:'complete',to:date,notes:[]}},'');
+ }
+ const result=await summarize(config,store,{},generator); assert.equal(result.generated,101); await writeSite(config,store);
+} finally {store.close();}
+const output=await buildSite(root);
 for (const prefix of ['', 'zh-CN/']) {
-  const json = await readFile(join(output, 'assets/website', prefix ? 'i18n/zh-CN/search.v1.json' : 'search.v1.json'), 'utf8');
-  const documents = JSON.parse(json).documents as { text: string }[];
-  assert.equal(documents.length, 3000); assert.ok(documents.every(doc => doc.text.length <= 240));
-  const feed = await readFile(join(output, prefix, 'feed.xml'), 'utf8');
-  assert.equal((feed.match(/<entry>/g) ?? []).length, 100);
-  results.push({ locale: prefix || 'en', searchEntries: documents.length, searchBytes: Buffer.byteLength(json), feedEntries: 100, feedBytes: Buffer.byteLength(feed) });
+ const home=await readFile(join(output,prefix,'index.html'),'utf8');
+ assert.equal((home.match(/data-filter-item/g)??[]).length,50);
+ assert.match(home,/data-paged-archive/);
+ const search=JSON.parse(await readFile(join(output,'assets/website',prefix?'i18n/zh-CN/search.v1.json':'search.v1.json'),'utf8'));
+ assert.equal(search.documents.length,101);
+ assert.equal(((await readFile(join(output,prefix,'feed.xml'),'utf8')).match(/<entry>/g)??[]).length,100);
 }
-const evidence = { reportMarkdownFiles: 6016, itemsPerReport: 50, ...(inspect ? { inspectedExistingBuild: true, timingLog: '.local/notes/0929/scale-check.log' } : { elapsedSeconds: (Date.now() - started) / 1000 }), output, results };
-await writeFile('.local/notes/0929/scale-check.json', JSON.stringify(evidence, null, 2));
-console.log(JSON.stringify(evidence, null, 2));
+const evidence={items:101,bilingualMarkdown:202,SSRRows:50,searchEntries:101,feedEntries:100,elapsedSeconds:(Date.now()-started)/1000,output};
+await mkdir('.local/notes/1009/validation',{recursive:true});
+await writeFile('.local/notes/1009/validation/fixture-build.json',JSON.stringify(evidence,null,2));console.log(JSON.stringify(evidence,null,2));

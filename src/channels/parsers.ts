@@ -1,12 +1,20 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { load } from 'cheerio';
 import type { Item } from '../types.js';
+import { DateTime } from 'luxon';
 import { safeUrl } from '../util.js';
 
 export const array = <T>(value: T | T[] | undefined): T[] => value === undefined ? [] : Array.isArray(value) ? value : [value];
 export const plain = (value: unknown): string => load(typeof value === 'string' ? value : String(value ?? ''), {}, false).text().replace(/\s+/g, ' ').trim();
 export function text(value: any): string { return typeof value === 'object' && value ? String(value['#text'] ?? '') : String(value ?? ''); }
-export function date(value: unknown): string | undefined { const time = Date.parse(String(value ?? '')); return Number.isFinite(time) ? new Date(time).toISOString() : undefined; }
+export function date(value: unknown, timezone = 'Asia/Shanghai'): string | undefined {
+  const input = String(value ?? '').trim();
+  if (!input) return undefined;
+  for (const parsed of [DateTime.fromISO(input, { zone: timezone }), DateTime.fromRFC2822(input, { zone: timezone }), DateTime.fromSQL(input, { zone: timezone })]) {
+    if (parsed.isValid) return parsed.toUTC().toISO()!;
+  }
+  return undefined;
+}
 export function xml(body: string): any {
   if (/<!DOCTYPE/i.test(body)) throw new Error('DTD declarations are not accepted in feeds');
   if (XMLValidator.validate(body) !== true) throw new Error('Invalid XML response');
@@ -14,7 +22,7 @@ export function xml(body: string): any {
     processEntities: { enabled: true, maxTotalExpansions: 250_000, maxExpandedLength: 12_000_000 },
   }).parse(body);
 }
-export interface ParseContext { source: string; stream: string; channel: string; observedAt: string }
+export interface ParseContext { source: string; stream: string; channel: string; observedAt: string; timezone?: string }
 export function parseFollowBuilders(body: string, context: ParseContext): { generatedAt: string; items: Item[] } {
   const feed = JSON.parse(body);
   const generatedAt = date(feed.generatedAt);
@@ -25,7 +33,7 @@ export function parseFollowBuilders(body: string, context: ParseContext): { gene
     if (!/^\d+$/.test(String(row.id)) || typeof row.text !== 'string') throw new Error('Invalid sampled X post');
     return { ...context, id: String(row.id), title: plain(row.text).slice(0, 180), text: plain(row.text),
       url: safeUrl(row.url ?? `https://x.com/${context.stream}/status/${row.id}`), author: context.stream,
-      publishedAt: date(row.createdAt) ?? generatedAt, basis: 'published', metrics: { score: row.likes ?? null, comments: row.replies ?? null },
+      publishedAt: date(row.createdAt, context.timezone) ?? context.observedAt, basis: date(row.createdAt, context.timezone) ? 'published' : 'observed', metrics: { score: row.likes ?? null, comments: row.replies ?? null },
       kind: row.isQuote ? 'quote' : 'original', metadata: { feedGeneratedAt: generatedAt },
     } satisfies Item;
   });
@@ -46,7 +54,7 @@ export function parseFeed(body: string, context: ParseContext): Item[] {
     let id = text(entry.id ?? entry.guid) || url;
     if (context.source === 'arxiv') id = url.match(/(?:abs|pdf)\/([^?#]+)/)?.[1]?.replace(/v\d+$/, '') ?? id;
     if (context.source === 'hackernews') id = text(entry.comments).match(/[?&]id=(\d+)/)?.[1] ?? id;
-    const published = date(text(entry.published ?? entry.pubDate ?? entry.date));
+    const published = date(text(entry.published ?? entry.pubDate ?? entry.date), context.timezone);
     const rawSummary = text(entry.summary ?? entry.description ?? entry.content);
     const summary = context.source === 'reddit' ? plain(load(rawSummary)('div.md').text()) : plain(rawSummary);
     return [{ ...context, id, title: plain(text(entry.title)), url, publishedAt: published ?? context.observedAt,
@@ -80,7 +88,7 @@ export function parseProductHunt(body: string, context: ParseContext, dateKey: s
     if (!href || !title) return [];
     const voteText = row.find('[data-test="vote-button"], [data-test="vote-button-count"]').first().text();
     return [{ ...context, id: href.split('?')[0]!, title: title.replace(/^\d+\.\s*/, ''), url: safeUrl(href, 'https://www.producthunt.com'),
-      text: row.find('[data-test="post-tagline"]').text().trim() || anchor.parent().next('span').text().trim(), publishedAt: context.observedAt, basis: 'leaderboard' as const,
+      text: row.find('[data-test="post-tagline"]').text().trim() || anchor.parent().next('span').text().trim(), publishedAt: date(dateKey, context.timezone)!, basis: 'leaderboard' as const,
       metrics: { rank: index + 1, votes: /^\s*[\d,]+\s*$/.test(voteText) ? Number(voteText.replace(/,/g, '')) : null }, metadata: { leaderboardDate: dateKey } }];
   });
 }

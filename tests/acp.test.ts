@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { generateBatch } from '../src/agent.js';
-import { loadConfig } from '../src/config.js';
+import { configSchema } from '../src/config.js';
 import type { Item } from '../src/types.js';
 
 // Real stdio JSON-RPC exercises permission rejection and session cleanup without
@@ -22,7 +22,7 @@ createInterface({input:process.stdin}).on('line', line => {
  if(id==='permission-probe' && message.result){
    if(message.result.outcome.outcome!=='cancelled') process.exit(8);
    const input=JSON.parse(readFileSync('input.json','utf8'));
-   writeFileSync('result.json',JSON.stringify({items:input.items.map(item=>({id:item.id,en:{title:item.title,summary:''},'zh-CN':{title:'中文标题',summary:''}}))}));
+   writeFileSync('result.json',JSON.stringify({contractVersion:2,newTopics:[],items:input.items.map(item=>({source:item.source,id:item.id,topics:['coding'],en:{title:item.title,summary:''},'zh-CN':{title:'中文标题',summary:''}}))}));
    send({id:pending,result:{stopReason:mode==='refusal'?'refusal':'end_turn'}});return;
  }
  if(method==='initialize') send({id,result:{protocolVersion:1,agentCapabilities:{},agentInfo:{name:'deepseek-harness-acp',version:'0.0.1'}}});
@@ -42,9 +42,9 @@ test('ACP rejects permissions, accepts fixed artifacts, rejects refusal and time
   try {
     for (const mode of ['success', 'refusal', 'timeout']) {
       const command = join(root, mode + '.mjs'); await writeFile(command, peer, {mode:0o700});
-      const config = { ...loadConfig().agent, command, runtimeDirectory:root, timeoutSeconds:mode==='timeout'?0.6:5 };
-      if(mode==='success') assert.equal((await generateBatch(config,[item])).copies[0]?.id,'one');
-      else await assert.rejects(generateBatch(config,[item]), mode==='refusal'?/refusal/:/timed out|aborted/i);
+      const config = { ...configSchema.shape.agent.parse({ model: 'deepseek/deepseek-flash' }), command, runtimeDirectory:root, timeoutSeconds:mode==='timeout'?0.6:5 };
+      if(mode==='success') assert.equal((await generateBatch(config,{contractVersion:2,topics:{version:1,topics:[{id:'coding',name:{en:'Coding','zh-CN':'编程'},description:'Programming',aliases:[],deprecated:false}]},items:[item]})).output.items[0]?.id,'one');
+      else await assert.rejects(generateBatch(config,{contractVersion:2,topics:{version:1,topics:[{id:'coding',name:{en:'Coding','zh-CN':'编程'},description:'Programming',aliases:[],deprecated:false}]},items:[item]}), mode==='refusal'?/refusal/:/timed out|aborted/i);
     }
   } finally { if(previous===undefined) delete process.env.FEEDGARDEN_AGENT_API_KEY; else process.env.FEEDGARDEN_AGENT_API_KEY=previous; await rm(root,{recursive:true,force:true}); }
 });

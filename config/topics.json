@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "topics": [
+    {
+      "id": "agents",
+      "name": {
+        "en": "Agents",
+        "zh-CN": "智能体"
+      },
+      "description": "Agent design, orchestration and autonomous task execution.",
+      "aliases": [
+        "agentic systems"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "coding",
+      "name": {
+        "en": "Coding",
+        "zh-CN": "编程"
+      },
+      "description": "Software development, coding assistants and developer tools.",
+      "aliases": [
+        "code generation"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "models",
+      "name": {
+        "en": "Models",
+        "zh-CN": "模型"
+      },
+      "description": "AI model releases, architecture, training and capabilities.",
+      "aliases": [
+        "language models"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "inference",
+      "name": {
+        "en": "Inference",
+        "zh-CN": "推理部署"
+      },
+      "description": "Model serving, runtime efficiency, hardware and deployment.",
+      "aliases": [],
+      "deprecated": false
+    },
+    {
+      "id": "evaluation",
+      "name": {
+        "en": "Evaluation",
+        "zh-CN": "评测"
+      },
+      "description": "Benchmarks, measurement, reliability and model evaluation.",
+      "aliases": [
+        "evals"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "research",
+      "name": {
+        "en": "Research",
+        "zh-CN": "研究"
+      },
+      "description": "Research methods, papers and scientific advances.",
+      "aliases": [],
+      "deprecated": false
+    },
+    {
+      "id": "products",
+      "name": {
+        "en": "Products",
+        "zh-CN": "产品"
+      },
+      "description": "Product launches, applications and user-facing AI services.",
+      "aliases": [],
+      "deprecated": false
+    },
+    {
+      "id": "industry",
+      "name": {
+        "en": "Industry",
+        "zh-CN": "行业"
+      },
+      "description": "Organizations, funding, policy and the technology industry.",
+      "aliases": [],
+      "deprecated": false
+    }
+  ]
+}

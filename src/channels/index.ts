@@ -14,7 +14,7 @@ import { array, date, parseFeed, parseFollowBuilders, parseProductHunt, parseTre
 const exec = promisify(execFile);
 export interface ChannelContext { source: Source; stream: Stream; channel: Channel; store: Store; http: Http; now: string; since: string; restartRange?: boolean }
 export type Adapter = (context: ChannelContext) => Promise<Collection>;
-function base(c: ChannelContext): ParseContext { return { source: c.source.id, stream: c.stream.id, channel: c.channel.id, observedAt: c.now }; }
+function base(c: ChannelContext): ParseContext { return { source: c.source.id, stream: c.stream.id, channel: c.channel.id, observedAt: c.now, timezone: c.source.timezone }; }
 function collected(c: ChannelContext, items: Item[], notes: string[] = [], cursor?: string): Collection {
   return { items, raw: c.http.raw, cursor, coverage: { status: notes.length ? 'partial' : 'complete', from: c.since, to: c.now, notes } };
 }
@@ -81,7 +81,7 @@ async function xCli(c: ChannelContext): Promise<Collection> {
   const boundary = c.store.channel(c.source.id, c.stream.id, c.channel.id)?.cursor;
   if (boundary && !rows.some(row => String(row.id) === boundary) && rows.length >= 100) rows = await run(200);
   const items: Item[] = rows.map(row => {
-    const publishedAt = date(row.createdAtISO ?? row.createdAt);
+    const publishedAt = date(row.createdAtISO ?? row.createdAt, c.source.timezone);
     if (!/^\d+$/.test(String(row.id)) || !publishedAt || typeof row.text !== 'string') throw new Error('Invalid X timeline item');
     return { ...base(c), id: String(row.id), title: plain(row.text).slice(0, 180), text: plain(row.text) + (row.quotedTweet?.text ? ' Quoting @' + row.quotedTweet.author?.screenName + ': ' + plain(row.quotedTweet.text) : ''), author: row.author?.screenName ?? c.stream.id,
       url: safeUrl(row.url ?? `https://x.com/${c.stream.id}/status/${row.id}`), publishedAt, basis: 'published',
@@ -167,12 +167,11 @@ async function officialPages(c: ChannelContext): Promise<Collection> {
       $('script[type="application/ld+json"]').each((_i, element) => { try { objects.push(JSON.parse($(element).text())); } catch {} });
       const entities = objects.flatMap(object => array<any>(object['@graph'] ?? object));
       const article = entities.find(object => /Article|BlogPosting|NewsArticle/.test(text(object['@type'])));
-      const published = date(article?.datePublished ?? $('meta[property="article:published_time"]').attr('content') ?? $('time[datetime]').first().attr('datetime'));
-      if (!published) { failures++; continue; }
+      const published = date(article?.datePublished ?? $('meta[property="article:published_time"]').attr('content') ?? $('time[datetime]').first().attr('datetime'), c.source.timezone);
       const title = plain(article?.headline ?? $('h1').first().text());
       if (!title) { failures++; continue; }
       $('script,style,nav,footer,header').remove();
-      items.push({ ...base(c), id: safeUrl(url), title, url: safeUrl(url), publishedAt: published, basis: 'published', metrics: {},
+      items.push({ ...base(c), id: safeUrl(url), title, url: safeUrl(url), publishedAt: published ?? c.now, basis: published ? 'published' : 'observed', metrics: {},
         text: plain($('article').first().text() || $('main').first().text()).slice(0, 100000),
       });
     } catch { failures++; }

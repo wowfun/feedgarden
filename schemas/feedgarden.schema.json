@@ -7,7 +7,7 @@
     },
     "version": {
       "type": "number",
-      "const": 1
+      "const": 2
     },
     "storage": {
       "default": {
@@ -27,30 +27,30 @@
       },
       "additionalProperties": false
     },
-    "reports": {
+    "feed": {
       "default": {
-        "directory": "reports",
-        "maxItems": 50,
-        "sealHours": 48,
-        "backfillDays": 7
+        "directory": "content",
+        "topics": "config/topics.json"
       },
       "type": "object",
       "properties": {
         "directory": {
-          "default": "reports",
+          "default": "content",
           "type": "string"
         },
-        "maxItems": {
-          "default": 50,
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 50
-        },
-        "sealHours": {
-          "default": 48,
-          "type": "number",
-          "exclusiveMinimum": 0
-        },
+        "topics": {
+          "default": "config/topics.json",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "collection": {
+      "default": {
+        "backfillDays": 7
+      },
+      "type": "object",
+      "properties": {
         "backfillDays": {
           "default": 7,
           "type": "integer",
@@ -81,7 +81,8 @@
         "timeoutSeconds": {
           "default": 300,
           "type": "number",
-          "exclusiveMinimum": 0
+          "exclusiveMinimum": 0,
+          "maximum": 300
         },
         "maxBatchItems": {
           "default": 10,
@@ -93,19 +94,19 @@
           "default": 24000,
           "type": "integer",
           "minimum": 4000,
-          "maximum": 9007199254740991
+          "maximum": 24000
         },
         "maxItemChars": {
           "default": 4000,
           "type": "integer",
           "minimum": 100,
-          "maximum": 9007199254740991
+          "maximum": 4000
         },
         "maxDailyCalls": {
           "default": 80,
           "type": "integer",
           "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
+          "maximum": 80
         },
         "runtimeDirectory": {
           "default": ".local/dsh",
@@ -165,17 +166,6 @@
           "intervalHours": {
             "type": "number",
             "exclusiveMinimum": 0
-          },
-          "frequencies": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "daily",
-                "weekly"
-              ]
-            }
           },
           "streams": {
             "minItems": 1,
@@ -258,7 +248,7 @@
               "additionalProperties": false
             }
           },
-          "topics": {
+          "includeKeywords": {
             "default": [],
             "type": "array",
             "items": {
@@ -277,43 +267,12 @@
               }
             },
             "additionalProperties": false
-          },
-          "reportAgent": {
-            "type": "object",
-            "properties": {
-              "daily": {
-                "type": "object",
-                "properties": {
-                  "model": {
-                    "type": "string"
-                  },
-                  "effort": {
-                    "type": "string"
-                  }
-                },
-                "additionalProperties": false
-              },
-              "weekly": {
-                "type": "object",
-                "properties": {
-                  "model": {
-                    "type": "string"
-                  },
-                  "effort": {
-                    "type": "string"
-                  }
-                },
-                "additionalProperties": false
-              }
-            },
-            "additionalProperties": false
           }
         },
         "required": [
           "id",
           "name",
           "intervalHours",
-          "frequencies",
           "streams"
         ],
         "additionalProperties": false

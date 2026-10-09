@@ -1,10 +1,10 @@
 title: Feedgarden
-description: Daily discoveries and weekly digests from builders, research labs, and communities.
+description: Discoveries from builders, research labs, and communities.
 lang: en
 url: https://sinputer.top
 baseurl: /feedgarden
 website:
-  source: reports
+  source: content
   theme: minimal
   repository: wowfun/feedgarden
   edit_branch: main
@@ -20,7 +20,13 @@ website:
     previews: false
     outline: true
   home:
-    recent_posts_limit: 0
+    layout: archive
+  blog:
+    page_size: 50
+    utc_offset: "+08:00"
+    facets:
+      source: source/
+      topic: topics/
   search:
     mode: summary
     max_entries: 3000

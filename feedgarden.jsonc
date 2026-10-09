@@ -1,47 +1,75 @@
-// English is canonical. Secrets are read from the environment or local DSH.
 {
   "$schema": "./schemas/feedgarden.schema.json",
-  "version": 1,
+  "version": 2,
+  "storage": {
+    "database": ".local/feedgarden.sqlite",
+    "directory": ".local"
+  },
+  "feed": {
+    "directory": "content",
+    "topics": "config/topics.json"
+  },
+  "collection": {
+    "backfillDays": 7
+  },
   "agent": {
+    "command": "dsh",
     "model": "deepseek/deepseek-flash",
-    "effort": "off"
+    "effort": "off",
+    "version": "0.1.7-rc.2",
+    "timeoutSeconds": 300,
+    "maxBatchItems": 10,
+    "maxInputChars": 24000,
+    "maxItemChars": 4000,
+    "maxDailyCalls": 80,
+    "runtimeDirectory": ".local/dsh"
   },
   "publish": {
+    "repository": "https://github.com/wowfun/feedgarden.git",
+    "branch": "main",
     "auto": false
   },
   "sources": [
     {
       "id": "hackernews",
       "name": "Hacker News",
+      "enabled": true,
+      "timezone": "Asia/Shanghai",
       "intervalHours": 1,
-      "frequencies": [
-        "daily",
-        "weekly"
-      ],
       "streams": [
         {
           "id": "frontpage",
           "channels": [
             {
               "id": "firebase",
-              "kind": "hn-api"
+              "kind": "hn-api",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "rss",
               "kind": "feed",
-              "url": "https://news.ycombinator.com/rss"
+              "enabled": true,
+              "url": "https://news.ycombinator.com/rss",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         }
-      ]
+      ],
+      "includeKeywords": []
     },
     {
       "id": "anthropic",
       "name": "Anthropic",
+      "enabled": true,
+      "timezone": "Asia/Shanghai",
       "intervalHours": 6,
-      "frequencies": [
-        "daily"
-      ],
       "streams": [
         {
           "id": "news",
@@ -49,12 +77,22 @@
             {
               "id": "list",
               "kind": "anthropic-html",
-              "url": "https://www.anthropic.com/news"
+              "enabled": true,
+              "url": "https://www.anthropic.com/news",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "sitemap",
               "kind": "sitemap",
-              "url": "https://www.anthropic.com/sitemap.xml"
+              "enabled": true,
+              "url": "https://www.anthropic.com/sitemap.xml",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -64,12 +102,22 @@
             {
               "id": "list",
               "kind": "anthropic-html",
-              "url": "https://www.anthropic.com/research"
+              "enabled": true,
+              "url": "https://www.anthropic.com/research",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "sitemap",
               "kind": "sitemap",
-              "url": "https://www.anthropic.com/sitemap.xml"
+              "enabled": true,
+              "url": "https://www.anthropic.com/sitemap.xml",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -79,12 +127,22 @@
             {
               "id": "list",
               "kind": "anthropic-html",
-              "url": "https://www.anthropic.com/engineering"
+              "enabled": true,
+              "url": "https://www.anthropic.com/engineering",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "sitemap",
               "kind": "sitemap",
-              "url": "https://www.anthropic.com/sitemap.xml"
+              "enabled": true,
+              "url": "https://www.anthropic.com/sitemap.xml",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -94,24 +152,34 @@
             {
               "id": "list",
               "kind": "anthropic-html",
-              "url": "https://claude.com/blog"
+              "enabled": true,
+              "url": "https://claude.com/blog",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "sitemap",
               "kind": "sitemap",
-              "url": "https://claude.com/sitemap.xml"
+              "enabled": true,
+              "url": "https://claude.com/sitemap.xml",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         }
-      ]
+      ],
+      "includeKeywords": []
     },
     {
       "id": "openai",
       "name": "OpenAI",
+      "enabled": true,
+      "timezone": "Asia/Shanghai",
       "intervalHours": 6,
-      "frequencies": [
-        "daily"
-      ],
       "streams": [
         {
           "id": "news",
@@ -119,26 +187,34 @@
             {
               "id": "rss",
               "kind": "feed",
-              "url": "https://openai.com/news/rss.xml"
+              "enabled": true,
+              "url": "https://openai.com/news/rss.xml",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "sitemap",
               "kind": "sitemap",
-              "url": "https://openai.com/sitemap.xml"
+              "enabled": true,
+              "url": "https://openai.com/sitemap.xml",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         }
-      ]
+      ],
+      "includeKeywords": []
     },
     {
       "id": "github",
       "name": "GitHub",
       "enabled": false,
+      "timezone": "Asia/Shanghai",
       "intervalHours": 6,
-      "frequencies": [
-        "daily",
-        "weekly"
-      ],
       "streams": [
         {
           "id": "trending",
@@ -146,36 +222,55 @@
             {
               "id": "trending",
               "kind": "github-trending",
-              "url": "https://github.com/trending?since=daily"
+              "enabled": true,
+              "url": "https://github.com/trending?since=daily",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "search",
-              "kind": "github-search"
+              "kind": "github-search",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         }
-      ]
+      ],
+      "includeKeywords": []
     },
     {
       "id": "x",
       "name": "X",
+      "enabled": true,
+      "timezone": "Asia/Shanghai",
       "intervalHours": 4,
-      "frequencies": [
-        "daily",
-        "weekly"
-      ],
       "streams": [
         {
           "id": "karpathy",
           "channels": [
             {
               "id": "cookie",
-              "kind": "x-cli"
+              "kind": "x-cli",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "follow-builders",
               "kind": "follow-builders",
-              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json"
+              "enabled": true,
+              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -184,12 +279,22 @@
           "channels": [
             {
               "id": "cookie",
-              "kind": "x-cli"
+              "kind": "x-cli",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "follow-builders",
               "kind": "follow-builders",
-              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json"
+              "enabled": true,
+              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -198,12 +303,22 @@
           "channels": [
             {
               "id": "cookie",
-              "kind": "x-cli"
+              "kind": "x-cli",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "follow-builders",
               "kind": "follow-builders",
-              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json"
+              "enabled": true,
+              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -212,12 +327,22 @@
           "channels": [
             {
               "id": "cookie",
-              "kind": "x-cli"
+              "kind": "x-cli",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "follow-builders",
               "kind": "follow-builders",
-              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json"
+              "enabled": true,
+              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -226,12 +351,22 @@
           "channels": [
             {
               "id": "cookie",
-              "kind": "x-cli"
+              "kind": "x-cli",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "follow-builders",
               "kind": "follow-builders",
-              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json"
+              "enabled": true,
+              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -240,25 +375,34 @@
           "channels": [
             {
               "id": "cookie",
-              "kind": "x-cli"
+              "kind": "x-cli",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "follow-builders",
               "kind": "follow-builders",
-              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json"
+              "enabled": true,
+              "url": "https://raw.githubusercontent.com/zarazhangrui/follow-builders/main/feed-x.json",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         }
-      ]
+      ],
+      "includeKeywords": []
     },
     {
       "id": "reddit",
       "name": "Reddit",
+      "enabled": true,
+      "timezone": "Asia/Shanghai",
       "intervalHours": 12,
-      "frequencies": [
-        "daily",
-        "weekly"
-      ],
       "streams": [
         {
           "id": "LocalLLaMA",
@@ -266,8 +410,12 @@
             {
               "id": "rss",
               "kind": "feed",
+              "enabled": true,
               "url": "https://www.reddit.com/r/LocalLLaMA/new.rss?limit=100",
-              "transport": "curl"
+              "transport": "curl",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -277,8 +425,12 @@
             {
               "id": "rss",
               "kind": "feed",
+              "enabled": true,
               "url": "https://www.reddit.com/r/MachineLearning/new.rss?limit=100",
-              "transport": "curl"
+              "transport": "curl",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -288,8 +440,12 @@
             {
               "id": "rss",
               "kind": "feed",
+              "enabled": true,
               "url": "https://www.reddit.com/r/OpenAI/new.rss?limit=100",
-              "transport": "curl"
+              "transport": "curl",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -299,8 +455,12 @@
             {
               "id": "rss",
               "kind": "feed",
+              "enabled": true,
               "url": "https://www.reddit.com/r/ClaudeAI/new.rss?limit=100",
-              "transport": "curl"
+              "transport": "curl",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -310,8 +470,12 @@
             {
               "id": "rss",
               "kind": "feed",
+              "enabled": true,
               "url": "https://www.reddit.com/r/ClaudeCode/new.rss?limit=100",
-              "transport": "curl"
+              "transport": "curl",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -321,42 +485,46 @@
             {
               "id": "rss",
               "kind": "feed",
+              "enabled": true,
               "url": "https://www.reddit.com/r/ChatGPTCoding/new.rss?limit=100",
-              "transport": "curl"
+              "transport": "curl",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         }
-      ]
+      ],
+      "includeKeywords": []
     },
     {
       "id": "arxiv",
       "name": "arXiv",
+      "enabled": true,
+      "timezone": "Asia/Shanghai",
       "intervalHours": 6,
-      "frequencies": [
-        "weekly"
-      ],
-      "topics": [
-        "large language model",
-        "LLM",
-        "agentic",
-        "coding agent",
-        "code generation",
-        "retrieval augmented",
-        "inference optimization",
-        "language model evaluation"
-      ],
       "streams": [
         {
           "id": "cs.AI",
           "channels": [
             {
               "id": "atom",
-              "kind": "arxiv-api"
+              "kind": "arxiv-api",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "rss",
               "kind": "feed",
-              "url": "https://rss.arxiv.org/rss/cs.AI"
+              "enabled": true,
+              "url": "https://rss.arxiv.org/rss/cs.AI",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -365,12 +533,22 @@
           "channels": [
             {
               "id": "atom",
-              "kind": "arxiv-api"
+              "kind": "arxiv-api",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "rss",
               "kind": "feed",
-              "url": "https://rss.arxiv.org/rss/cs.CL"
+              "enabled": true,
+              "url": "https://rss.arxiv.org/rss/cs.CL",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -379,12 +557,22 @@
           "channels": [
             {
               "id": "atom",
-              "kind": "arxiv-api"
+              "kind": "arxiv-api",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "rss",
               "kind": "feed",
-              "url": "https://rss.arxiv.org/rss/cs.LG"
+              "enabled": true,
+              "url": "https://rss.arxiv.org/rss/cs.LG",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -393,12 +581,22 @@
           "channels": [
             {
               "id": "atom",
-              "kind": "arxiv-api"
+              "kind": "arxiv-api",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "rss",
               "kind": "feed",
-              "url": "https://rss.arxiv.org/rss/cs.CV"
+              "enabled": true,
+              "url": "https://rss.arxiv.org/rss/cs.CV",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -407,12 +605,22 @@
           "channels": [
             {
               "id": "atom",
-              "kind": "arxiv-api"
+              "kind": "arxiv-api",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "rss",
               "kind": "feed",
-              "url": "https://rss.arxiv.org/rss/cs.SE"
+              "enabled": true,
+              "url": "https://rss.arxiv.org/rss/cs.SE",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         },
@@ -421,42 +629,70 @@
           "channels": [
             {
               "id": "atom",
-              "kind": "arxiv-api"
+              "kind": "arxiv-api",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "rss",
               "kind": "feed",
-              "url": "https://rss.arxiv.org/rss/stat.ML"
+              "enabled": true,
+              "url": "https://rss.arxiv.org/rss/stat.ML",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         }
+      ],
+      "includeKeywords": [
+        "large language model",
+        "LLM",
+        "agentic",
+        "coding agent",
+        "code generation",
+        "retrieval augmented",
+        "inference optimization",
+        "language model evaluation"
       ]
     },
     {
       "id": "producthunt",
       "name": "Product Hunt",
+      "enabled": true,
       "timezone": "America/Los_Angeles",
       "intervalHours": 6,
-      "frequencies": [
-        "daily",
-        "weekly"
-      ],
       "streams": [
         {
           "id": "daily",
           "channels": [
             {
               "id": "leaderboard",
-              "kind": "ph-html"
+              "kind": "ph-html",
+              "enabled": true,
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             },
             {
               "id": "atom",
               "kind": "feed",
-              "url": "https://www.producthunt.com/feed"
+              "enabled": true,
+              "url": "https://www.producthunt.com/feed",
+              "transport": "fetch",
+              "limit": 500,
+              "authTokenEnv": "TWITTER_AUTH_TOKEN",
+              "csrfTokenEnv": "TWITTER_CT0"
             }
           ]
         }
-      ]
+      ],
+      "includeKeywords": []
     }
   ]
 }

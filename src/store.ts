@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3';
+import { DateTime } from 'luxon';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Collection, Copy, Item, RawResponse, ReportRecord, ReportSnapshot } from './types.js';
+import type { Collection, Item, RawResponse } from './types.js';
 import { hash, nowIso } from './util.js';
 
 export interface ChannelState { source: string; stream: string; channel: string; cursor: string | null; last_success: string | null; last_attempt: string; next_attempt: string; status: string; notes: string }
@@ -11,9 +12,10 @@ export class Store {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path);
     if (path !== ':memory:') chmodSync(path, 0o600);
-    this.db.pragma('journal_mode = WAL'); this.db.pragma('foreign_keys = ON'); this.db.pragma('busy_timeout = 5000');
     const version = this.db.pragma('user_version', { simple: true }) as number;
-    if (version > 2) { this.db.close(); throw new Error('Database schema is newer than this application'); }
+    if (version === 1 || version === 2) { this.db.close(); throw new Error('Migration required: run feedgarden migrate before opening the legacy database'); }
+    if (version > 3) { this.db.close(); throw new Error('Database schema is newer than this application'); }
+    this.db.pragma('journal_mode = WAL'); this.db.pragma('foreign_keys = ON'); this.db.pragma('busy_timeout = 5000');
     if (version < 1) this.db.transaction(() => {
       this.db.exec(`
         CREATE TABLE raw_responses(id INTEGER PRIMARY KEY, source TEXT NOT NULL, stream TEXT NOT NULL, channel TEXT NOT NULL, fetched_at TEXT NOT NULL, url TEXT NOT NULL, status INTEGER NOT NULL, headers TEXT NOT NULL, body TEXT NOT NULL, hash TEXT NOT NULL);
@@ -35,6 +37,7 @@ export class Store {
     if (version < 2) this.db.transaction(() => {
       this.db.exec('CREATE TABLE job_lease(id INTEGER PRIMARY KEY CHECK(id=1),owner TEXT NOT NULL,expires TEXT NOT NULL); PRAGMA user_version=2;');
     })();
+    if (version < 3) initializeFeedSchema(this.db, DateTime.now().setZone('Asia/Shanghai').startOf('day').toUTC().toISO()!, false);
   }
   acquireLease(owner: string): void {
     this.db.transaction(() => {
@@ -76,22 +79,13 @@ export class Store {
     return (this.db.prepare('SELECT data FROM observations WHERE source=? AND observed_at>=? AND observed_at<? ORDER BY observed_at,id').all(source, start, end) as { data: string }[]).map(row => JSON.parse(row.data) as Item);
   }
   states(): ChannelState[] { return this.db.prepare('SELECT * FROM channel_state ORDER BY source,stream,channel').all() as ChannelState[]; }
-  report(key: string): ReportRecord | undefined {
-    const row = this.db.prepare('SELECT * FROM reports WHERE key=?').get(key) as { key: string; snapshot: string; copies: string; state: ReportRecord['state']; revision: number; error: string | null } | undefined;
-    return row && { ...row, snapshot: JSON.parse(row.snapshot), copies: JSON.parse(row.copies) };
-  }
-  saveReport(key: string, snapshot: ReportSnapshot, copies: Copy[], state: ReportRecord['state'], error: string | null = null): void {
-    const previous = this.report(key);
-    this.db.prepare('INSERT OR REPLACE INTO reports VALUES (?,?,?,?,?,?,?,?,?,?)').run(key, snapshot.period.source, snapshot.period.frequency, snapshot.period.date, JSON.stringify(snapshot), JSON.stringify(copies), state, (previous?.revision ?? 0) + (state === 'ready' || state === 'sealed' ? 1 : 0), error, nowIso());
-  }
-  reports(): ReportRecord[] { return (this.db.prepare('SELECT key FROM reports ORDER BY date DESC,source').all() as { key: string }[]).map(row => this.report(row.key)!); }
-  copy(key: string): Copy | undefined { const row = this.db.prepare('SELECT copy FROM text_cache WHERE key=?').get(key) as { copy: string } | undefined; return row && JSON.parse(row.copy); }
-  saveCopy(key: string, copy: Copy): void { this.db.prepare('INSERT OR REPLACE INTO text_cache VALUES (?,?)').run(key, JSON.stringify(copy)); }
+  meta(key: string): string | undefined { return (this.db.prepare('SELECT value FROM feed_meta WHERE key=?').get(key) as { value: string } | undefined)?.value; }
+  setMeta(key: string, value: string): void { this.db.prepare('INSERT OR REPLACE INTO feed_meta VALUES (?,?)').run(key, value); }
   startCall(report: string, model: string, maxDaily: number): number {
     return this.db.transaction(() => {
       const day = nowIso().slice(0, 10);
       const { count } = this.db.prepare('SELECT count(*) AS count FROM agent_calls WHERE at>=?').get(day) as { count: number };
-      if (count >= maxDaily) throw new Error(`Agent daily call limit (${maxDaily}) reached; task retained`);
+      if (count >= maxDaily) throw new QuotaDeferred(`Agent daily call limit (${maxDaily}) reached; task retained`);
       return Number(this.db.prepare('INSERT INTO agent_calls(at,report_key,model,status) VALUES (?,?,?,?)').run(nowIso(), report, model, 'running').lastInsertRowid);
     })();
   }
@@ -99,4 +93,22 @@ export class Store {
   run(kind: string): number { return Number(this.db.prepare('INSERT INTO runs(kind,started_at,status) VALUES (?,?,?)').run(kind, nowIso(), 'running').lastInsertRowid); }
   finishRun(id: number, status: string, details: unknown): void { this.db.prepare('UPDATE runs SET finished_at=?,status=?,details=? WHERE id=?').run(nowIso(), status, JSON.stringify(details), id); }
   async backup(path: string): Promise<void> { mkdirSync(dirname(path), { recursive: true }); await this.db.backup(path); chmodSync(path, 0o600); }
+}
+export class QuotaDeferred extends Error {}
+export function initializeFeedSchema(db: Database.Database, cutoff: string, excludeExisting = true): void {
+  db.transaction(() => {
+    db.exec(`
+      CREATE TABLE feed_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE feed_excluded(source TEXT NOT NULL,id TEXT NOT NULL,PRIMARY KEY(source,id));
+      CREATE TABLE feed_jobs(source TEXT NOT NULL,id TEXT NOT NULL,cache_key TEXT NOT NULL,data TEXT NOT NULL,state TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,next_at TEXT NOT NULL DEFAULT '',error TEXT,PRIMARY KEY(source,id));
+      CREATE INDEX feed_jobs_queue ON feed_jobs(source,state,next_at);
+      CREATE TABLE feed_summaries(source TEXT NOT NULL,id TEXT NOT NULL,cache_key TEXT NOT NULL,accepted TEXT NOT NULL,updated TEXT NOT NULL,PRIMARY KEY(source,id));
+      CREATE TABLE feed_cache(key TEXT PRIMARY KEY,copy TEXT NOT NULL);
+      CREATE TABLE feed_batches(id TEXT PRIMARY KEY,input TEXT NOT NULL,jobs TEXT NOT NULL,workspace TEXT NOT NULL,state TEXT NOT NULL,created_at TEXT NOT NULL,error TEXT);
+      PRAGMA user_version=3;
+    `);
+    db.prepare('INSERT INTO feed_meta VALUES (?,?)').run('cutoff', cutoff);
+    db.prepare('INSERT INTO feed_meta VALUES (?,?)').run('round_robin', '');
+    if (excludeExisting) db.exec('INSERT INTO feed_excluded SELECT source,id FROM items; DELETE FROM channel_state;');
+  })();
 }

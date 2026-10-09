@@ -1,6 +1,6 @@
 import { readFile, writeFile, rename, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { validateCopies } from './report-contract.mjs';
+import { validateArtifact } from './topics-contract.mjs';
 
 export const name = 'feedgarden-report';
 export const inject = ['tools'];
@@ -25,7 +25,7 @@ export async function apply(ctx, config) {
       if (typeof json !== 'string' || Buffer.byteLength(json) > 256_000) throw new Error('Report artifact exceeds the byte limit');
       // Validate before acknowledging success so the model can repair its own
       // invalid draft within the same bounded turn. The client validates again.
-      validateCopies(JSON.parse(json), JSON.parse(input).items);
+      validateArtifact(JSON.parse(json), JSON.parse(input));
       const previous = await lstat(result).catch(error => { if (error.code === 'ENOENT') return undefined; throw error; });
       if (previous && !previous.isFile()) throw new Error('Output must be a regular file');
       const temporary = join(config.directory, 'result.pending');

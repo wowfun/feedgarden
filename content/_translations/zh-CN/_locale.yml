@@ -148,5 +148,24 @@
     "archive_results": "{count} 条内容",
     "page_label": "第 {page} 页，共 {pages} 页",
     "first_observed": "首次发现"
-  }
+  },
+  "tag_labels": {
+    "source/hackernews": "Hacker News",
+    "source/anthropic": "Anthropic",
+    "source/openai": "OpenAI",
+    "source/github": "GitHub",
+    "source/x": "X",
+    "source/reddit": "Reddit",
+    "source/arxiv": "arXiv",
+    "source/producthunt": "Product Hunt",
+    "topics/agents": "智能体",
+    "topics/coding": "编程",
+    "topics/models": "模型",
+    "topics/inference": "推理部署",
+    "topics/evaluation": "评测",
+    "topics/research": "研究",
+    "topics/products": "产品",
+    "topics/industry": "行业"
+  },
+  "tag_aliases": {}
 }

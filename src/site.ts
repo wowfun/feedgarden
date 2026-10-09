@@ -11,7 +11,13 @@ export function escapeMarkdown(value: string): string { return value.replace(/&/
 function frontmatter(properties: Record<string, unknown>): string { return `---\n${Object.entries(properties).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n')}\n---\n\n`; }
 export function renderItem(record: AcceptedItem, locale: 'en' | 'zh-CN', topics = record.copy.topics): string {
   const { item, copy } = record, translation = copy[locale];
-  return frontmatter({ publish: true, content_type: 'post', title: translation.title, description: [...translation.summary].slice(0, 240).join(''), date: record.date, updated: record.updated, first_seen: record.firstSeen, date_basis: record.dateBasis, source_url: safeUrl(item.url), tags: ['source/' + item.source, ...topics.map(id => 'topics/' + id)] }) + escapeMarkdown(translation.summary) + '\n';
+  const summary = translation.summary.trim().split(/\n\s*\n/).map(paragraph => paragraph.split('\n').map(line => /^\s*[-*]\s+/.test(line) ? '- ' + escapeMarkdown(line.replace(/^\s*[-*]\s+/, '')) : escapeMarkdown(line)).join('\n')).join('\n\n');
+  const media = (copy.media ?? []).map(id => item.media?.find(candidate => candidate.id === id)).filter(candidate => !!candidate).map(candidate => {
+    const type = locale === 'en' ? candidate.type === 'image' ? 'Image' : 'Video' : candidate.type === 'image' ? '图片' : '视频';
+    return '- [' + escapeMarkdown(type + (candidate.title ? ': ' + candidate.title : '')) + '](<' + safeUrl(candidate.url).replace(/[<>]/g, char => encodeURIComponent(char)) + '>)';
+  });
+  const body = summary + (media.length ? '\n\n## ' + (locale === 'en' ? 'Images and video' : '图片与视频') + '\n\n' + media.join('\n') : '');
+  return frontmatter({ publish: true, content_type: 'post', title: translation.title, description: [...translation.summary.replace(/\s+/g, ' ')].slice(0, 240).join(''), date: record.date, updated: record.updated, first_seen: record.firstSeen, date_basis: record.dateBasis, source_url: safeUrl(item.url), tags: ['source/' + item.source, ...topics.map(id => 'topics/' + id)] }) + body + '\n';
 }
 interface ContentJournal { destination: string; staging: string; previous: string }
 export async function recoverContent(config: Config): Promise<void> {

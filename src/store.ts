@@ -58,7 +58,7 @@ export class Store {
     this.db.transaction(() => {
       for (const raw of result.raw) this.db.prepare('INSERT INTO raw_responses(source,stream,channel,fetched_at,url,status,headers,body,hash) VALUES (?,?,?,?,?,?,?,?,?)').run(source, stream, channel, raw.fetchedAt, raw.url, raw.status, JSON.stringify(raw.headers), raw.body, hash(raw.body));
       for (const item of result.items) {
-        const contentHash = hash({ title: item.title, text: item.text, url: item.url, author: item.author });
+        const contentHash = hash({ title: item.title, text: item.text, url: item.url, author: item.author, ...(item.media?.length ? { media: item.media } : {}) });
         this.db.prepare(`INSERT INTO items VALUES (?,?,?,?,?,?,?) ON CONFLICT(source,id) DO UPDATE SET last_seen=excluded.last_seen,data=excluded.data,content_hash=excluded.content_hash`).run(source, item.id, item.publishedAt, item.observedAt, item.observedAt, JSON.stringify(item), contentHash);
         this.db.prepare('INSERT OR IGNORE INTO item_versions VALUES (?,?,?,?,?)').run(source, item.id, contentHash, JSON.stringify(item), item.observedAt);
         this.db.prepare('INSERT INTO observations(source,item_id,stream,channel,observed_at,data) VALUES (?,?,?,?,?,?)').run(source, item.id, stream, channel, item.observedAt, JSON.stringify(item));

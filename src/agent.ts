@@ -35,7 +35,7 @@ export function optionValues(option: SessionConfigOption | undefined): OptionVal
   if (!option || option.type !== 'select') return [];
   return option.options.flatMap(entry => 'options' in entry ? entry.options : [entry]);
 }
-export interface SummaryInput { contractVersion: 2; topics: Registry; items: Pick<Item, 'source' | 'id' | 'title' | 'text' | 'author'>[] }
+export interface SummaryInput { contractVersion: 2; topics: Registry; items: Pick<Item, 'source' | 'id' | 'title' | 'text' | 'author' | 'media'>[] }
 export interface AgentResult { output: ReturnType<typeof validateArtifact>['output']; usage: unknown[]; directory: string; events: unknown[] }
 
 export async function generateBatch(config: Config['agent'], input: SummaryInput, repair?: string, workspace?: string): Promise<AgentResult> {

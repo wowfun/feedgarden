@@ -3,6 +3,7 @@ import { load } from 'cheerio';
 import type { Item } from '../types.js';
 import { DateTime } from 'luxon';
 import { safeUrl } from '../util.js';
+import { extractMedia, mediaForUrl } from '../source-content.js';
 
 export const array = <T>(value: T | T[] | undefined): T[] => value === undefined ? [] : Array.isArray(value) ? value : [value];
 export const plain = (value: unknown): string => load(typeof value === 'string' ? value : String(value ?? ''), {}, false).text().replace(/\s+/g, ' ').trim();
@@ -55,10 +56,19 @@ export function parseFeed(body: string, context: ParseContext): Item[] {
     if (context.source === 'arxiv') id = url.match(/(?:abs|pdf)\/([^?#]+)/)?.[1]?.replace(/v\d+$/, '') ?? id;
     if (context.source === 'hackernews') id = text(entry.comments).match(/[?&]id=(\d+)/)?.[1] ?? id;
     const published = date(text(entry.published ?? entry.pubDate ?? entry.date), context.timezone);
-    const rawSummary = text(entry.summary ?? entry.description ?? entry.content);
+    const rawSummary = [entry.encoded, entry.content, entry.summary, entry.description].map(text).find(Boolean) ?? '';
     const summary = context.source === 'reddit' ? plain(load(rawSummary)('div.md').text()) : plain(rawSummary);
+    const media = extractMedia(rawSummary, url);
+    for (const enclosure of [...array(entry.enclosure), ...array(entry.content), ...array(entry.thumbnail)]) {
+      if (typeof enclosure !== 'object' || !enclosure?.['@url']) continue;
+      const kind = String(enclosure['@type'] ?? enclosure['@medium'] ?? '');
+      if (!/^(image|video)/.test(kind)) continue;
+      const candidate = mediaForUrl(kind.startsWith('image') ? 'image' : 'video', enclosure['@url'], text(enclosure.title), url);
+      if (candidate && !media.some(existing => existing.url === candidate.url) && media.length < 6) media.push(candidate);
+    }
     return [{ ...context, id, title: plain(text(entry.title)), url, publishedAt: published ?? context.observedAt,
       text: summary, author: plain(text(entry.author?.name ?? entry.creator ?? entry.author)),
+      media,
       metrics: { rank: index + 1 }, basis: published ? context.source === 'arxiv' && !announcementDate ? 'submitted' : 'published' : 'observed',
       metadata: { missingPublicationDate: !published, ...(announcementDate ? { announcementDate: true } : {}), ...(entry.announce_type ? { announceType: text(entry.announce_type) } : {}) },
     } satisfies Item];

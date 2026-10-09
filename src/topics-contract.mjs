@@ -20,8 +20,9 @@ export function validateRegistry(value) {
   }
   return registry;
 }
-const translation = z.object({ title: z.string().trim().min(1).max(240), summary: z.string().max(600) }).strict();
-export const outputSchema = z.object({ contractVersion: z.literal(2), items: z.array(z.object({ source: slug, id: z.string(), topics: z.array(slug).min(1).max(3), en: translation, 'zh-CN': translation }).strict()), newTopics: z.array(topicSchema) }).strict();
+const translation = z.object({ title: z.string().trim().min(1).max(240), summary: z.string().max(4000) }).strict();
+const mediaSchema = z.object({ id: slug, type: z.enum(['image', 'video']), url: z.url().max(2048).refine(value => { const url = new URL(value); return /^https?:$/.test(url.protocol) && !url.username && !url.password; }), title: z.string().max(240) }).strict();
+export const outputSchema = z.object({ contractVersion: z.literal(2), items: z.array(z.object({ source: slug, id: z.string(), topics: z.array(slug).min(1).max(3), media: z.array(slug).max(3).optional(), en: translation, 'zh-CN': translation }).strict()), newTopics: z.array(topicSchema) }).strict();
 function parseArtifact(value, input) {
   const output = outputSchema.parse(value);
   if (input.contractVersion !== 2 || output.items.length !== input.items.length || output.items.some((copy, i) => copy.id !== input.items[i]?.id || copy.source !== input.items[i]?.source)) throw new Error('Agent output identity/order differs from the fixed input');
@@ -32,6 +33,10 @@ function parseArtifact(value, input) {
     const copy = output.items[i];
     if (new Set(copy.topics).size !== copy.topics.length || copy.topics.some(id => !active.has(id))) throw new Error('Unknown, duplicate or deprecated item topics');
     if (!input.items[i].text && (copy.en.summary || copy['zh-CN'].summary)) throw new Error('Title-only input must have empty summaries');
+    const candidates = z.array(mediaSchema).max(6).parse(input.items[i].media ?? []);
+    const media = copy.media ?? [];
+    if (new Set(candidates.map(candidate => candidate.id)).size !== candidates.length) throw new Error('Duplicate input media IDs');
+    if (new Set(media).size !== media.length || media.some(id => !candidates.some(candidate => candidate.id === id))) throw new Error('Unknown or duplicate selected media');
   }
   return { output, registry };
 }

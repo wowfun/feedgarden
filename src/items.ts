@@ -8,8 +8,10 @@ import { applyTopics, loadTopics, type Registry } from './topics.js';
 import { Store, QuotaDeferred } from './store.js';
 import type { Item, Translation } from './types.js';
 import { atomicWrite, errorText, hash, nowIso, safeUrl } from './util.js';
+import { enrichItem } from './source-content.js';
+import { Http } from './http.js';
 
-export interface ItemCopy { source: string; id: string; topics: string[]; en: Translation; 'zh-CN': Translation }
+export interface ItemCopy { source: string; id: string; topics: string[]; media?: string[]; en: Translation; 'zh-CN': Translation }
 export interface AcceptedItem { item: Item; copy: ItemCopy; firstSeen: string; date: string; dateBasis: 'published' | 'observed'; updated: string }
 interface Job { source: string; id: string; cache_key: string; data: string; state: string; attempts: number; next_at: string; error: string | null }
 interface FixedJob { source: string; id: string; key: string; item: Item; firstSeen: string }
@@ -17,7 +19,7 @@ interface Batch { id: string; input: string; jobs: string; workspace: string; st
 export type Generator = (agent: Config['agent'], input: SummaryInput, repair?: string, workspace?: string) => Promise<AgentResult>;
 export function summaryItem(item: Item, maxChars: number): SummaryInput['items'][number] {
   const normalize = (value: string) => value.normalize('NFKC').replace(/\s+/g, ' ').trim();
-  return { source: item.source, id: item.id, title: normalize(item.title), text: normalize(item.text).slice(0, maxChars), ...(item.author ? { author: normalize(item.author) } : {}) };
+  return { source: item.source, id: item.id, title: normalize(item.title), text: normalize(item.text).slice(0, maxChars), ...(item.author ? { author: normalize(item.author) } : {}), ...(item.media?.length ? { media: item.media.slice(0, 6) } : {}) };
 }
 export const itemPath = (source: string, id: string): string => 'items/' + hash([source, id]) + '.md';
 export function eligible(item: Item, firstSeen: string, cutoff: string, source: Source): boolean {
@@ -28,11 +30,12 @@ export function eligible(item: Item, firstSeen: string, cutoff: string, source: 
 export function acceptedItems(store: Store): AcceptedItem[] {
   return (store.db.prepare('SELECT accepted FROM feed_summaries ORDER BY source,id').all() as { accepted: string }[]).map(row => JSON.parse(row.accepted));
 }
-export async function summarize(config: Config, store: Store, options: { source?: string; rebuild?: boolean; retryFailed?: boolean } = {}, generator: Generator = generateBatch, at = nowIso()): Promise<{ generated: number; pending: number; failed: number; deferred: boolean }> {
+export async function summarize(config: Config, store: Store, options: { source?: string; rebuild?: boolean; retryFailed?: boolean } = {}, generator: Generator = generateBatch, at = nowIso(), prepare: typeof enrichItem = enrichItem): Promise<{ generated: number; pending: number; failed: number; deferred: boolean }> {
   const sources = config.sources.filter(source => source.enabled && (!options.source || source.id === options.source));
   if (options.source && !sources.length) throw new Error('Unknown or disabled source: ' + options.source);
   const skillHash = hash(await readFile('.agents/skills/feedgarden-report/SKILL.md', 'utf8'));
   const cutoff = store.meta('cutoff')!;
+  const http = new Http(store);
   let registry = await loadTopics(config.feed.topics), generated = 0, deferred = false, runtimeFailures = 0;
   // Recover a saved artifact before spending another ACP attempt.
   async function accept(batch: Batch, result: unknown): Promise<void> {
@@ -73,10 +76,11 @@ export async function summarize(config: Config, store: Store, options: { source?
     const agent = { ...config.agent, ...source.agent };
     const rows = store.db.prepare('SELECT i.*,e.id AS excluded FROM items i LEFT JOIN feed_excluded e ON e.source=i.source AND e.id=i.id WHERE i.source=? ORDER BY i.first_seen,i.id').all(source.id) as { id: string; data: string; first_seen: string; excluded: string | null }[];
     for (const row of rows) {
-      const item = JSON.parse(row.data) as Item;
+      let item = JSON.parse(row.data) as Item;
       if (row.excluded !== null || !eligible(item, row.first_seen, cutoff, source)) continue;
       safeUrl(item.url);
-      const key = hash({ ...summaryItem(item, agent.maxItemChars), model: agent.model, effort: agent.effort, skillHash, contractVersion: 2 });
+      item = await prepare(item, store, http, !!options.rebuild);
+      const key = hash({ ...summaryItem(item, agent.maxItemChars), model: agent.model, effort: agent.effort, skillHash, contractVersion: 2, summaryRevision: 3 });
       const previous = store.db.prepare('SELECT * FROM feed_jobs WHERE source=? AND id=?').get(source.id, row.id) as Job | undefined;
       if (!previous || previous.cache_key !== key || options.rebuild) store.db.prepare("INSERT OR REPLACE INTO feed_jobs VALUES (?,?,?,?, 'pending',0,'',NULL)").run(source.id, row.id, key, JSON.stringify({ item, firstSeen: row.first_seen }));
       else {

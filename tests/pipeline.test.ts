@@ -159,6 +159,39 @@ test('arXiv resumes an interrupted fixed range from its committed page without l
   } finally { store.close(); }
 });
 
+test('Claude article discovery recognizes current resources paths while keeping a same-origin boundary', async () => {
+  const config = configSchema.parse({ version: 2, agent: { model: 'deepseek/deepseek-flash' }, sources: [{ id: 'anthropic', name: 'Anthropic', intervalHours: 6, streams: [{ id: 'blog', channels: [{ id: 'list', kind: 'anthropic-html', url: 'https://claude.com/blog' }] }] }] });
+  const source = config.sources[0]!, stream = source.streams[0]!, channel = stream.channels[0]!, store = new Store(':memory:'), http = new Http(store), requests: string[] = [];
+  const now = '2026-10-09T14:00:00Z';
+  http.page = async url => {
+    requests.push(url);
+    return { url, status: 200, headers: {}, fetchedAt: now, body: url.endsWith('/blog') ? '<main><a href="/resources/articles/current">Current</a><a href="https://evil.test/resources/articles/foreign">Other</a><a href="/resources/guides/guide">Guide</a></main>' : '<main><h1>Current article</h1><time datetime="2026-10-09T00:00:00Z">October 9</time><article>Supplied evidence</article></main>' };
+  };
+  try {
+    const result = await adapters['anthropic-html']({ source, stream, channel, store, http, now, since: '2026-10-08T16:00:00Z' });
+    assert.equal(result.items.length, 1);
+    assert.equal(result.items[0]?.url, 'https://claude.com/resources/articles/current');
+    assert.equal(result.items[0]?.basis, 'published');
+    assert.deepEqual(requests, ['https://claude.com/blog', 'https://claude.com/resources/articles/current']);
+  } finally { store.close(); }
+});
+
+test('Product Hunt collection includes the current source-local day and marks its ranking provisional', async () => {
+  const config = configSchema.parse({ version: 2, agent: { model: 'deepseek/deepseek-flash' }, sources: [{ id: 'producthunt', name: 'Product Hunt', intervalHours: 6, timezone: 'America/Los_Angeles', streams: [{ id: 'daily', channels: [{ id: 'leaderboard', kind: 'ph-html' }] }] }] });
+  const source = config.sources[0]!, stream = source.streams[0]!, channel = stream.channels[0]!, store = new Store(':memory:');
+  const now = '2026-10-09T14:00:00Z', requested: string[] = [];
+  const http = new Http(store);
+  http.page = async url => { requested.push(url); return { url, body: '<section><div><a href="/products/today">Today</a></div><button data-test="vote-button">20</button></section>', status: 200, fetchedAt: now, headers: {} }; };
+  try {
+    const result = await adapters['ph-html']({ source, stream, channel, store, http, now, since: '2026-10-09T00:00:00-07:00' });
+    assert.equal(requested.length, 1, 'a same-day range must issue a request rather than report a completed empty collection');
+    assert.ok(requested[0]?.endsWith('/2026/10/9'));
+    assert.equal(result.items[0]?.publishedAt, '2026-10-09T07:00:00.000Z');
+    assert.equal(result.coverage.status, 'partial');
+    assert.match(result.coverage.notes.join(' '), /still in progress/);
+  } finally { store.close(); }
+});
+
 test('dated Product Hunt cards retain their own votes and tagline; Reddit boilerplate is not article text', () => {
   const context = { source: 'producthunt', stream: 'daily', channel: 'leaderboard', observedAt: '2026-09-29T12:00:00Z' };
   const result = parseProductHunt('<section><div><span><a href="/products/test">1. Test</a></span><span>A provided tagline</span></div><button data-test="vote-button"><p>572</p></button></section>', context, '2026-09-28');

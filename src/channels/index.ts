@@ -125,17 +125,20 @@ async function arxiv(c: ChannelContext): Promise<Collection> {
 }
 async function productHunt(c: ChannelContext): Promise<Collection> {
   const from = DateTime.fromISO(c.since).setZone(c.source.timezone).startOf('day');
-  const to = DateTime.fromISO(c.now).setZone(c.source.timezone).minus({ days: 1 }).startOf('day');
+  const to = DateTime.fromISO(c.now).setZone(c.source.timezone).startOf('day');
   const items: Item[] = [];
   for (let day = from; day <= to; day = day.plus({ days: 1 })) {
     const url = `https://www.producthunt.com/leaderboard/daily/${day.year}/${day.month}/${day.day}`;
     const page = parseProductHunt((await c.http.page(url)).body, base(c), day.toISODate()!);
     items.push(...page.map(item => ({ ...item, publishedAt: day.toUTC().toISO()! })));
   }
-  return collected(c, items);
+  return collected(c, items, from <= to ? ['The current source-local day is still in progress; its leaderboard is a provisional snapshot.'] : []);
 }
 async function officialPages(c: ChannelContext): Promise<Collection> {
   const origin = new URL(c.channel.url!).origin;
+  const articlePath = (path: string) => c.source.id === 'anthropic'
+    ? path.startsWith(`/${c.stream.id}/`) || c.stream.id === 'blog' && origin === 'https://claude.com' && path.startsWith('/resources/articles/')
+    : /^\/(index|news|research)\//.test(path);
   const urls = new Set<string>();
   const first = await c.http.page(c.channel.url!);
   if (c.channel.kind === 'sitemap') {
@@ -147,13 +150,13 @@ async function officialPages(c: ChannelContext): Promise<Collection> {
       const url = text(entry.loc);
       if (new URL(url).origin !== origin) continue;
       const path = new URL(url).pathname;
-      if (c.source.id === 'anthropic' ? path.startsWith(`/${c.stream.id}/`) : /^\/(index|news|research)\//.test(path)) urls.add(url);
+      if (articlePath(path)) urls.add(url);
     }
   } else {
     const $ = load(first.body);
     $('a[href]').each((_index, element) => {
       const href = $(element).attr('href'); if (!href) return;
-      const url = new URL(href, origin); if (url.origin === origin && url.pathname.startsWith(`/${c.stream.id}/`)) urls.add(url.href);
+      const url = new URL(href, origin); if (url.origin === origin && articlePath(url.pathname)) urls.add(url.href);
     });
   }
   if (!urls.size) throw new Error('Official list/sitemap contained no recognizable article links');

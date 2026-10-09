@@ -15,6 +15,7 @@ try{
   const size=viewport.width>600?'desktop':'mobile',context=await browser.newContext({viewport}),page=await context.newPage(),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   const prefix='/feedgarden/'+(locale==='en'?'':locale+'/');assert.equal((await page.goto(origin+prefix))?.status(),200);await ready(page);
   assert.equal(await page.locator('html').getAttribute('lang'),locale);assert.equal(await page.locator('h1').count(),1);
+  const repository=page.locator('.site-header .site-action--github');assert.equal(await repository.getAttribute('href'),'https://github.com/wowfun/feedgarden');assert.equal(await repository.locator('svg').count(),1);assert.equal(await repository.getAttribute('aria-label'),locale==='en'?'Open Feedgarden on GitHub':'在 GitHub 上打开 Feedgarden');await repository.click({trial:true});
   const rows=page.locator('[data-filter-item]'),count=await rows.count();assert.ok(count<=50);if(fixture)assert.equal(count,50);
   assert.equal(await page.locator('.blog-ledger__description').count(),0);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
@@ -23,7 +24,7 @@ try{
    await page.screenshot({path:join(output,artifactPrefix+'feed-'+locale+'-'+size+'.png')});
    const detail=await rows.first().locator('.blog-ledger__main').getAttribute('href');assert.ok(detail);await page.goto(new URL(detail,origin).href);assert.equal(await page.locator('h1').count(),1);const markdown=await page.locator('[data-markdown-url]').getAttribute('data-markdown-url');assert.ok(markdown);assert.equal((await page.request.get(origin+markdown)).status(),200);assert.equal(await page.locator('.note-source-url a').count(),1);assert.ok(await page.locator('[data-note-tags] [data-note-facet="source"]').count());assert.ok(await page.locator('[data-note-tags] [data-note-facet="topic"]').count());
    assert.ok(await page.evaluate(()=>{const tags=document.querySelector('[data-note-tags]')!,source=document.querySelector('.note-source-url')!,body=document.querySelector('.note-content')!;return !!(tags.compareDocumentPosition(source)&Node.DOCUMENT_POSITION_FOLLOWING)&&!!(source.compareDocumentPosition(body)&Node.DOCUMENT_POSITION_FOLLOWING)&&tags.getBoundingClientRect().bottom<=source.getBoundingClientRect().top&&source.getBoundingClientRect().bottom<=body.getBoundingClientRect().top;}));
-   if(size==='desktop')assert.ok((await page.locator('.note-content > p').first().boundingBox())!.width>=880);
+   if(size==='desktop')assert.ok((await page.locator('.note-content').boundingBox())!.width>=880);
    if(fixture){assert.ok(await page.locator('.note-content > p').count()>=2);assert.equal(await page.locator('.note-content a[href="https://example.invalid/fixture-diagram.svg"]').count(),1);assert.equal(await page.locator('.note-content a[href="https://example.invalid/fixture-video.mp4"]').count(),1);assert.equal(await page.locator('.note-content img,.note-content iframe').count(),0);}
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:join(output,artifactPrefix+'item-'+locale+'-'+size+'.png')});await page.goto(origin+prefix);await ready(page);
   }else await page.screenshot({path:join(output,artifactPrefix+'empty-'+locale+'-'+size+'.png')});

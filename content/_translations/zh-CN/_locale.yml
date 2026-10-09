@@ -165,7 +165,11 @@
     "topics/evaluation": "评测",
     "topics/research": "研究",
     "topics/products": "产品",
-    "topics/industry": "行业"
+    "topics/industry": "行业",
+    "topics/energy": "能源",
+    "topics/security-privacy": "安全与隐私",
+    "topics/content-provenance": "内容溯源",
+    "topics/hardware": "硬件"
   },
   "tag_aliases": {}
 }

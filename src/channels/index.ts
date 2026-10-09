@@ -8,7 +8,7 @@ import type { Source, Stream, Channel } from '../config.js';
 import type { Collection, Item } from '../types.js';
 import { Http } from '../http.js';
 import { Store } from '../store.js';
-import { hash, mapLimit, safeUrl } from '../util.js';
+import { hash, mapLimit, safeUrl, errorText } from '../util.js';
 import { array, date, parseFeed, parseFollowBuilders, parseProductHunt, parseTrending, plain, text, xml, type ParseContext } from './parsers.js';
 
 const exec = promisify(execFile);
@@ -126,13 +126,18 @@ async function arxiv(c: ChannelContext): Promise<Collection> {
 async function productHunt(c: ChannelContext): Promise<Collection> {
   const from = DateTime.fromISO(c.since).setZone(c.source.timezone).startOf('day');
   const to = DateTime.fromISO(c.now).setZone(c.source.timezone).startOf('day');
-  const items: Item[] = [];
+  const items: Item[] = [], notes: string[] = []; let succeeded = false;
   for (let day = from; day <= to; day = day.plus({ days: 1 })) {
     const url = `https://www.producthunt.com/leaderboard/daily/${day.year}/${day.month}/${day.day}`;
-    const page = parseProductHunt((await c.http.page(url)).body, base(c), day.toISODate()!);
-    items.push(...page.map(item => ({ ...item, publishedAt: day.toUTC().toISO()! })));
+    try {
+      const page = parseProductHunt((await c.http.page(url)).body, base(c), day.toISODate()!);
+      items.push(...page.map(item => ({ ...item, publishedAt: day.toUTC().toISO()! })));
+      succeeded = true;
+    } catch (error) { notes.push(`${day.toISODate()}: ${errorText(error)}`); }
   }
-  return collected(c, items, from <= to ? ['The current source-local day is still in progress; its leaderboard is a provisional snapshot.'] : []);
+  if (!succeeded && notes.length) throw new Error(notes.join('; '));
+  if (from <= to) notes.push('The current source-local day is still in progress; its leaderboard is a provisional snapshot.');
+  return collected(c, items, notes);
 }
 async function officialPages(c: ChannelContext): Promise<Collection> {
   const origin = new URL(c.channel.url!).origin;

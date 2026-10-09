@@ -30,7 +30,11 @@
     "topics/evaluation": "Evaluation",
     "topics/research": "Research",
     "topics/products": "Products",
-    "topics/industry": "Industry"
+    "topics/industry": "Industry",
+    "topics/energy": "Energy",
+    "topics/security-privacy": "Security & Privacy",
+    "topics/content-provenance": "Content Provenance",
+    "topics/hardware": "Hardware"
   },
   "tag_aliases": {}
 }

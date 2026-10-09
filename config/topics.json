@@ -88,6 +88,46 @@
       "description": "Organizations, funding, policy and the technology industry.",
       "aliases": [],
       "deprecated": false
+    },
+    {
+      "id": "energy",
+      "name": {
+        "en": "Energy",
+        "zh-CN": "能源"
+      },
+      "description": "Electricity generation, storage, grids and the economics of power infrastructure.",
+      "aliases": [],
+      "deprecated": false
+    },
+    {
+      "id": "security-privacy",
+      "name": {
+        "en": "Security & Privacy",
+        "zh-CN": "安全与隐私"
+      },
+      "description": "Device and system security, surveillance capabilities, exploits and privacy protection.",
+      "aliases": [],
+      "deprecated": false
+    },
+    {
+      "id": "content-provenance",
+      "name": {
+        "en": "Content Provenance",
+        "zh-CN": "内容溯源"
+      },
+      "description": "Standards and techniques for proving the origin and authorship of text, images and media.",
+      "aliases": [],
+      "deprecated": false
+    },
+    {
+      "id": "hardware",
+      "name": {
+        "en": "Hardware",
+        "zh-CN": "硬件"
+      },
+      "description": "Physical devices, electronics, components and do-it-yourself hardware builds.",
+      "aliases": [],
+      "deprecated": false
     }
   ]
 }

@@ -63,6 +63,18 @@ test('expanded bilingual copy selects only known media and the renderer preserve
   assert.throws(() => validateArtifact(artifact, input));
 });
 
+test('source prose URL schemes stay text while validated media links stay clickable', () => {
+  const enriched = { ...item, media: [{ id: 'figure', type: 'image' as const, url: 'https://openai.com/figure.png', title: 'Diagram' }] };
+  const translation = { title: 'Setup', summary: 'Open chrome://extensions or file:///tmp. Read https://example.test/help.' };
+  const record: AcceptedItem = { item: enriched, copy: { source: item.source, id: item.id, topics: ['research'], media: ['figure'], en: translation, 'zh-CN': translation }, firstSeen: item.observedAt, date: item.publishedAt, dateBasis: 'published', updated: item.observedAt };
+  const markdown = renderItem(record, 'en');
+  const body = markdown.split('---\n\n')[1]!;
+  assert.match(body, /Open chrome&#58;\/\/extensions or file&#58;\/\/\/tmp/);
+  assert.match(body, /Read https&#58;\/\/example.test\/help/);
+  assert.match(body, /\[Image: Diagram\]\(<https:\/\/openai.com\/figure.png>\)/);
+  assert.match(markdown, /source_url: "https:\/\/openai.com\/index\/a"/);
+});
+
 test('official article cache avoids requests and failed refresh preserves accepted evidence without changing collection state', async () => {
   const store = new Store(':memory:');
   try {

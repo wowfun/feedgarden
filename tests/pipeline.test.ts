@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { configSchema, loadConfig } from '../src/config.js';
 import { Store } from '../src/store.js';
 import { collect } from '../src/collect.js';
+import { acceptedItems } from '../src/items.js';
 import { adapters } from '../src/channels/index.js';
 import { parseFeed, parseFollowBuilders, parseProductHunt } from '../src/channels/parsers.js';
 import { Http, HttpError } from '../src/http.js';
@@ -42,6 +43,16 @@ test('collection persistence is atomic and versions exclude metric-only updates'
     assert.throws(() => store.saveCollection('hackernews', 'main', 'primary', collection([item('b'), item('bad', { id: undefined as unknown as string })], 'bad'), ''));
     assert.equal(store.items('hackernews').length, 1);
     assert.equal(store.channel('hackernews', 'main', 'primary')?.cursor, 'checkpoint');
+  } finally { store.close(); }
+});
+
+test('excluded accepted identities stay in storage while published records omit them', () => {
+  const store = new Store(':memory:');
+  try {
+    for (const id of ['legacy', 'canonical']) store.db.prepare('INSERT INTO feed_summaries VALUES (?,?,?,?,?)').run('producthunt', id, id, JSON.stringify({ item: item(id, { source: 'producthunt' }) }), '2026-10-09T00:00:00Z');
+    store.db.prepare('INSERT INTO feed_excluded VALUES (?,?)').run('producthunt', 'legacy');
+    assert.deepEqual(acceptedItems(store).map(record => record.item.id), ['canonical']);
+    assert.equal((store.db.prepare('SELECT count(*) n FROM feed_summaries').get() as { n: number }).n, 2);
   } finally { store.close(); }
 });
 
@@ -189,6 +200,13 @@ test('Product Hunt collection includes the current source-local day and marks it
     assert.equal(result.items[0]?.publishedAt, '2026-10-09T07:00:00.000Z');
     assert.equal(result.coverage.status, 'partial');
     assert.match(result.coverage.notes.join(' '), /still in progress/);
+    const currentPage = http.page;
+    http.page = async url => { if (url.endsWith('/2026/10/8')) throw new Error('Historical leaderboard unavailable'); return currentPage(url); };
+    const overlapping = await adapters['ph-html']({ source, stream, channel, store, http, now, since: '2026-10-09T00:00:00+08:00' });
+    assert.equal(overlapping.items.length, 1, 'a prior-day failure must not prevent fetching the current day');
+    assert.equal(overlapping.items[0]?.publishedAt, '2026-10-09T07:00:00.000Z');
+    assert.equal(overlapping.coverage.status, 'partial');
+    assert.match(overlapping.coverage.notes.join(' '), /2026-10-08.*Historical leaderboard unavailable/);
   } finally { store.close(); }
 });
 
@@ -198,6 +216,19 @@ test('dated Product Hunt cards retain their own votes and tagline; Reddit boiler
   assert.equal(result[0]?.text, 'A provided tagline'); assert.equal(result[0]?.metrics.votes, 572); assert.equal(result[0]?.metadata?.leaderboardDate, '2026-09-28');
   const feed = '<feed><entry><id>id</id><title>Only title</title><link href="https://reddit.com/r/test/comments/123"/><content>&lt;span&gt;submitted by user&lt;/span&gt; [link] [comments]</content></entry></feed>';
   assert.equal(parseFeed(feed, { ...context, source: 'reddit' })[0]?.text, '');
+});
+
+test('Product Hunt native Post IDs align leaderboard and Atom identity without executing serialized code', () => {
+  const context = { source: 'producthunt', stream: 'daily', channel: 'leaderboard', timezone: 'America/Los_Angeles', observedAt: '2026-10-09T14:00:00Z' };
+  const card = '<section><a href="/products/test">Test</a><button data-test="vote-button">20</button></section>';
+  const state = { rehydrate: { feed: { data: { __typename: 'Post', id: '123', featuredAt: '2026-10-09T00:01:00-07:00', product: { slug: 'test' } } } } };
+  const serialized = '<script>(window[Symbol.for("ApolloSSRDataTransport")] ??= []).push(' + JSON.stringify(state).replace('"feed":', '"missing":undefined,"feed":') + ')</script>';
+  const result = parseProductHunt(card + serialized, context, '2026-10-09');
+  assert.equal(result[0]?.id, 'tag:www.producthunt.com,2005:Post/123');
+  assert.equal(result[0]?.metadata?.legacyId, '/products/test');
+  assert.equal(result[0]?.metadata?.nativePostId, '123');
+  assert.equal(parseProductHunt(card + serialized, context, '2026-10-08')[0]?.id, '/products/test', 'another launch day must not alias the current Post ID');
+  assert.equal(parseProductHunt(card + '<script>(window[Symbol.for("ApolloSSRDataTransport")] ??= []).push({bad:process.exit(1)})</script>', context, '2026-10-09')[0]?.id, '/products/test');
 });
 
 test('HTML respects robots rules and large real-style escaped RSS is bounded without accepting DTDs', async () => {

@@ -92,13 +92,37 @@ export function parseTrending(body: string, context: ParseContext): Item[] {
 export function parseProductHunt(body: string, context: ParseContext, dateKey: string): Item[] {
   const $ = load(body); const candidates = $('section:has(> [data-test="vote-button"]), [data-test="post-item"], [data-test^="post-item-"]');
   if (!candidates.length) throw new Error('Product Hunt leaderboard layout unavailable');
+  const posts = new Map<string, Set<string>>();
+  $('script').each((_i, element) => {
+    const script = $(element).text();
+    if (!script.startsWith('(window[Symbol.for("ApolloSSRDataTransport")]')) return;
+    const payload = script.match(/\.push\((\{[\s\S]*\})\)\s*;?$/)?.[1];
+    if (!payload) return;
+    const pending: unknown[] = [];
+    // The transport is JSON with bare undefined values. Decode data only;
+    // preserve string contents and never evaluate the source script.
+    try { pending.push(JSON.parse(payload.replace(/"(?:\\.|[^"\\])*"|\bundefined\b/g, token => token === 'undefined' ? 'null' : token))); } catch { return; }
+    for (let visited = 0; pending.length && visited < 100000; visited++) {
+      const node = pending.pop() as any;
+      if (!node || typeof node !== 'object') continue;
+      if (node.__typename === 'Post' && /^\d+$/.test(String(node.id)) && DateTime.fromISO(String(node.featuredAt)).setZone(context.timezone ?? 'Asia/Shanghai').toISODate() === dateKey) {
+        for (const [prefix, slug] of [['products', node.product?.slug], ['posts', node.slug]]) {
+          if (typeof slug !== 'string' || !/^[\w-]+$/.test(slug)) continue;
+          const path = '/' + prefix + '/' + slug, ids = posts.get(path) ?? new Set<string>();
+          ids.add(String(node.id)); posts.set(path, ids);
+        }
+      }
+      for (const child of Object.values(node)) pending.push(child);
+    }
+  });
   return candidates.toArray().flatMap((element, index) => {
     const row = $(element); const anchor = row.find('a[href^="/posts/"], a[href^="/products/"]').first();
     const href = anchor.attr('href'); const title = anchor.text().trim();
     if (!href || !title) return [];
+    const legacyId = href.split('?')[0]!, ids = posts.get(legacyId), nativePostId = ids?.size === 1 ? [...ids][0] : undefined;
     const voteText = row.find('[data-test="vote-button"], [data-test="vote-button-count"]').first().text();
-    return [{ ...context, id: href.split('?')[0]!, title: title.replace(/^\d+\.\s*/, ''), url: safeUrl(href, 'https://www.producthunt.com'),
+    return [{ ...context, id: nativePostId ? 'tag:www.producthunt.com,2005:Post/' + nativePostId : legacyId, title: title.replace(/^\d+\.\s*/, ''), url: safeUrl(href, 'https://www.producthunt.com'),
       text: row.find('[data-test="post-tagline"]').text().trim() || anchor.parent().next('span').text().trim(), publishedAt: date(dateKey, context.timezone)!, basis: 'leaderboard' as const,
-      metrics: { rank: index + 1, votes: /^\s*[\d,]+\s*$/.test(voteText) ? Number(voteText.replace(/,/g, '')) : null }, metadata: { leaderboardDate: dateKey } }];
+      metrics: { rank: index + 1, votes: /^\s*[\d,]+\s*$/.test(voteText) ? Number(voteText.replace(/,/g, '')) : null }, metadata: { leaderboardDate: dateKey, ...(nativePostId ? { nativePostId, legacyId } : {}) } }];
   });
 }

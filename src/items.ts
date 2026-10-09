@@ -28,7 +28,7 @@ export function eligible(item: Item, firstSeen: string, cutoff: string, source: 
   return (item.basis === 'observed' ? firstSeen : item.publishedAt) >= cutoff;
 }
 export function acceptedItems(store: Store): AcceptedItem[] {
-  return (store.db.prepare('SELECT accepted FROM feed_summaries ORDER BY source,id').all() as { accepted: string }[]).map(row => JSON.parse(row.accepted));
+  return (store.db.prepare('SELECT f.accepted FROM feed_summaries f LEFT JOIN feed_excluded e ON e.source=f.source AND e.id=f.id WHERE e.id IS NULL ORDER BY f.source,f.id').all() as { accepted: string }[]).map(row => JSON.parse(row.accepted));
 }
 export async function summarize(config: Config, store: Store, options: { source?: string; rebuild?: boolean; retryFailed?: boolean } = {}, generator: Generator = generateBatch, at = nowIso(), prepare: typeof enrichItem = enrichItem): Promise<{ generated: number; pending: number; failed: number; deferred: boolean }> {
   const sources = config.sources.filter(source => source.enabled && (!options.source || source.id === options.source));

@@ -3,7 +3,7 @@ import { resolve, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Config, Source } from './config.js';
 import { generateBatch, type AgentResult, type SummaryInput } from './agent.js';
-import { validateArtifact, validateRegistry, ArtifactError } from './topics-contract.mjs';
+import { validateArtifact, ArtifactError } from './topics-contract.mjs';
 import { applyTopics, loadTopics, type Registry } from './topics.js';
 import { Store, QuotaDeferred } from './store.js';
 import type { Item, Translation } from './types.js';
@@ -16,7 +16,7 @@ export interface AcceptedItem { item: Item; copy: ItemCopy; firstSeen: string; d
 interface Job { source: string; id: string; cache_key: string; data: string; state: string; attempts: number; next_at: string; error: string | null }
 interface FixedJob { source: string; id: string; key: string; item: Item; firstSeen: string }
 interface Batch { id: string; input: string; jobs: string; workspace: string; state: string }
-export type Generator = (agent: Config['agent'], input: SummaryInput, repair?: string, workspace?: string) => Promise<AgentResult>;
+export type Generator = (agent: Config['agent'], input: SummaryInput, repair?: string, workspace?: string, signal?: AbortSignal) => Promise<AgentResult>;
 export function summaryItem(item: Item, maxChars: number): SummaryInput['items'][number] {
   const normalize = (value: string) => value.normalize('NFKC').replace(/\s+/g, ' ').trim();
   return { source: item.source, id: item.id, title: normalize(item.title), text: normalize(item.text).slice(0, maxChars), ...(item.author ? { author: normalize(item.author) } : {}), ...(item.media?.length ? { media: item.media.slice(0, 6) } : {}) };
@@ -27,24 +27,35 @@ export function eligible(item: Item, firstSeen: string, cutoff: string, source: 
   if (item.source === 'arxiv' && source.includeKeywords.length && !source.includeKeywords.some(word => (item.title + ' ' + item.text).toLowerCase().includes(word.toLowerCase()))) return false;
   return (item.basis === 'observed' ? firstSeen : item.publishedAt) >= cutoff;
 }
-export function acceptedItems(store: Store): AcceptedItem[] {
-  return (store.db.prepare('SELECT f.accepted FROM feed_summaries f LEFT JOIN feed_excluded e ON e.source=f.source AND e.id=f.id WHERE e.id IS NULL ORDER BY f.source,f.id').all() as { accepted: string }[]).map(row => JSON.parse(row.accepted));
+export function* iterateAcceptedItems(store: Store): IterableIterator<AcceptedItem> {
+  const query = store.db.prepare('SELECT f.source,f.id,f.accepted FROM feed_summaries f LEFT JOIN feed_excluded e ON e.source=f.source AND e.id=f.id WHERE e.id IS NULL AND (f.source,f.id)>(?,?) ORDER BY f.source,f.id LIMIT 128');
+  let source = '', id = '';
+  while (true) {
+    const rows = query.all(source, id) as { source: string; id: string; accepted: string }[];
+    if (!rows.length) return;
+    for (const row of rows) yield JSON.parse(row.accepted) as AcceptedItem;
+    ({ source, id } = rows.at(-1)!);
+  }
 }
-export async function summarize(config: Config, store: Store, options: { source?: string; rebuild?: boolean; retryFailed?: boolean } = {}, generator: Generator = generateBatch, at = nowIso(), prepare: typeof enrichItem = enrichItem): Promise<{ generated: number; pending: number; failed: number; deferred: boolean }> {
+export function acceptedItems(store: Store): AcceptedItem[] { return [...iterateAcceptedItems(store)]; }
+export async function summarize(config: Config, store: Store, options: { source?: string; rebuild?: boolean; retryFailed?: boolean; signal?: AbortSignal } = {}, generator: Generator = generateBatch, at = nowIso(), prepare: typeof enrichItem = enrichItem): Promise<{ generated: number; pending: number; failed: number; deferred: boolean }> {
+  options.signal?.throwIfAborted();
   const sources = config.sources.filter(source => source.enabled && (!options.source || source.id === options.source));
   if (options.source && !sources.length) throw new Error('Unknown or disabled source: ' + options.source);
   const skillHash = hash(await readFile('.agents/skills/feedgarden-report/SKILL.md', 'utf8'));
   const cutoff = store.meta('cutoff')!;
-  const http = new Http(store);
+  const http = new Http(store, undefined, options.signal);
   let registry = await loadTopics(config.feed.topics), generated = 0, deferred = false, runtimeFailures = 0;
   // Recover a saved artifact before spending another ACP attempt.
   async function accept(batch: Batch, result: unknown): Promise<void> {
+    options.signal?.throwIfAborted();
     const input = JSON.parse(batch.input) as SummaryInput;
     const { output, registry: validatedRegistry } = validateArtifact(result, input);
     const previous = await loadTopics(config.feed.topics);
     if (hash(previous) !== hash(input.topics) && hash(previous) !== hash(validatedRegistry)) throw new Error('Topic registry changed while a task was running');
     const next = validatedRegistry as Registry;
-    await applyTopics(config.feed.topics, next, hash(previous));
+    await applyTopics(config.feed.topics, next, hash(previous), options.signal);
+    options.signal?.throwIfAborted();
     registry = next;
     const jobs = JSON.parse(batch.jobs) as FixedJob[];
     store.db.transaction(() => {
@@ -74,31 +85,43 @@ export async function summarize(config: Config, store: Store, options: { source?
   store.db.prepare("UPDATE feed_jobs SET state='failed',error=COALESCE(error,'Attempt limit reached after interruption') WHERE state='pending' AND attempts>=5").run();
   for (const source of sources) {
     const agent = { ...config.agent, ...source.agent };
-    const rows = store.db.prepare('SELECT i.*,e.id AS excluded FROM items i LEFT JOIN feed_excluded e ON e.source=i.source AND e.id=i.id WHERE i.source=? ORDER BY i.first_seen,i.id').all(source.id) as { id: string; data: string; first_seen: string; excluded: string | null }[];
-    for (const row of rows) {
-      let item = JSON.parse(row.data) as Item;
-      if (row.excluded !== null || !eligible(item, row.first_seen, cutoff, source)) continue;
-      safeUrl(item.url);
-      item = await prepare(item, store, http, !!options.rebuild);
-      const key = hash({ ...summaryItem(item, agent.maxItemChars), model: agent.model, effort: agent.effort, skillHash, contractVersion: 2, summaryRevision: 3 });
-      const previous = store.db.prepare('SELECT * FROM feed_jobs WHERE source=? AND id=?').get(source.id, row.id) as Job | undefined;
-      if (!previous || previous.cache_key !== key || options.rebuild) store.db.prepare("INSERT OR REPLACE INTO feed_jobs VALUES (?,?,?,?, 'pending',0,'',NULL)").run(source.id, row.id, key, JSON.stringify({ item, firstSeen: row.first_seen }));
-      else {
-        store.db.prepare('UPDATE feed_jobs SET data=? WHERE source=? AND id=?').run(JSON.stringify({ item, firstSeen: row.first_seen }), source.id, row.id);
-        if (options.retryFailed && previous.state === 'failed') store.db.prepare("UPDATE feed_jobs SET state='pending',attempts=0,next_at='',error=NULL WHERE source=? AND id=?").run(source.id, row.id);
-        if (previous.state === 'ready') {
-          const old = store.db.prepare('SELECT accepted FROM feed_summaries WHERE source=? AND id=?').get(source.id, row.id) as { accepted: string };
-          const accepted = JSON.parse(old.accepted) as AcceptedItem;
-          accepted.item = item; // Metrics/URL/date changes update presentation without another summary.
-          accepted.dateBasis = item.basis === 'observed' ? 'observed' : 'published';
-          accepted.date = accepted.dateBasis === 'observed' ? accepted.firstSeen : item.publishedAt;
-          store.db.prepare('UPDATE feed_summaries SET accepted=? WHERE source=? AND id=?').run(JSON.stringify(accepted), source.id, row.id);
+    // published_at retains the first stored date; source corrections live in data.
+    const query = store.db.prepare("SELECT i.id,i.data,i.first_seen FROM items i LEFT JOIN feed_excluded e ON e.source=i.source AND e.id=i.id WHERE i.source=? AND e.id IS NULL AND (i.first_seen>=? OR json_extract(i.data,'$.publishedAt')>=?) AND (i.first_seen,i.id)>(?,?) ORDER BY i.first_seen,i.id LIMIT 128");
+    let firstSeen = '', lastId = '';
+    while (true) {
+      options.signal?.throwIfAborted();
+      const rows = query.all(source.id, cutoff, cutoff, firstSeen, lastId) as { id: string; data: string; first_seen: string }[];
+      if (!rows.length) break;
+      for (const row of rows) {
+        options.signal?.throwIfAborted();
+        let item = JSON.parse(row.data) as Item;
+        if (!eligible(item, row.first_seen, cutoff, source)) continue;
+        safeUrl(item.url);
+        item = await prepare(item, store, http, !!options.rebuild);
+        options.signal?.throwIfAborted();
+        const key = hash({ ...summaryItem(item, agent.maxItemChars), model: agent.model, effort: agent.effort, skillHash, contractVersion: 2, summaryRevision: 3 });
+        const previous = store.db.prepare('SELECT * FROM feed_jobs WHERE source=? AND id=?').get(source.id, row.id) as Job | undefined;
+        if (!previous || previous.cache_key !== key || options.rebuild) store.db.prepare("INSERT OR REPLACE INTO feed_jobs VALUES (?,?,?,?, 'pending',0,'',NULL)").run(source.id, row.id, key, JSON.stringify({ item, firstSeen: row.first_seen }));
+        else {
+          store.db.prepare('UPDATE feed_jobs SET data=? WHERE source=? AND id=?').run(JSON.stringify({ item, firstSeen: row.first_seen }), source.id, row.id);
+          if (options.retryFailed && previous.state === 'failed') store.db.prepare("UPDATE feed_jobs SET state='pending',attempts=0,next_at='',error=NULL WHERE source=? AND id=?").run(source.id, row.id);
+          if (previous.state === 'ready') {
+            const old = store.db.prepare('SELECT accepted FROM feed_summaries WHERE source=? AND id=?').get(source.id, row.id) as { accepted: string };
+            const accepted = JSON.parse(old.accepted) as AcceptedItem;
+            accepted.item = item; // Metrics/URL/date changes update presentation without another summary.
+            accepted.dateBasis = item.basis === 'observed' ? 'observed' : 'published';
+            accepted.date = accepted.dateBasis === 'observed' ? accepted.firstSeen : item.publishedAt;
+            const updated = JSON.stringify(accepted);
+            if (updated !== old.accepted) store.db.prepare('UPDATE feed_summaries SET accepted=? WHERE source=? AND id=?').run(updated, source.id, row.id);
+          }
         }
       }
+      firstSeen = rows.at(-1)!.first_seen; lastId = rows.at(-1)!.id;
     }
   }
   let cursor = store.meta('round_robin') ?? '';
   while (sources.length) {
+    options.signal?.throwIfAborted();
     const start = (sources.findIndex(source => source.id === cursor) + 1) % sources.length;
     let chosen: Source | undefined, jobs: Job[] = [];
     for (let offset = 0; offset < sources.length; offset++) {
@@ -141,7 +164,8 @@ export async function summarize(config: Config, store: Store, options: { source?
       })();
       let persisting = false;
       try {
-        const result = await generator(agent, input, repair, workspace);
+        const result = await generator(agent, input, repair, workspace, options.signal);
+        options.signal?.throwIfAborted();
         validateArtifact(result.output, input);
         persisting = true;
         await atomicWrite(join(workspace, 'result.json'), JSON.stringify(result.output));
@@ -150,6 +174,7 @@ export async function summarize(config: Config, store: Store, options: { source?
         store.finishCall(call, 'succeeded', result.usage); runtimeFailures = 0; repair = undefined; break;
       } catch (error) {
         repair = errorText(error); store.finishCall(call, 'failed', { error: repair });
+        options.signal?.throwIfAborted();
         if (persisting || repair.includes('MANUAL_ACTION:')) throw error;
         const artifactFailure = error instanceof ArtifactError;
         runtimeFailures = artifactFailure ? 0 : runtimeFailures + 1;

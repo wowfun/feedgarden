@@ -15,10 +15,11 @@ export function assertTopicUpdate(previous: Registry, next: Registry): Registry 
   }
   return valid;
 }
-export async function applyTopics(path: string, next: Registry, expectedHash?: string): Promise<void> {
+export async function applyTopics(path: string, next: Registry, expectedHash?: string, signal?: AbortSignal): Promise<void> {
   const previous = await loadTopics(path);
   if (expectedHash && hash(previous) !== expectedHash) throw new Error('Topic registry changed while a task was running');
-  await atomicWrite(path, JSON.stringify(assertTopicUpdate(previous, next), null, 2) + '\n');
+  signal?.throwIfAborted();
+  await atomicWrite(path, JSON.stringify(assertTopicUpdate(previous, next), null, 2) + '\n', signal);
 }
 export const resolveTopic = (registry: Registry, id: string): string => {
   const topic = registry.topics.find(topic => topic.id === id);

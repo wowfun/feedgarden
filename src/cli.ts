@@ -27,7 +27,9 @@ else {
   await mkdir(config.storage.directory, { recursive: true, mode: 0o700 });
   const target = resolve(config.storage.directory, 'runner');
   await writeFile(target, '', { flag: 'a', mode: 0o600 });
-  const release = await lockfile.lock(target, { stale: 120_000, update: 10_000, retries: 0 });
+  const cancellation = new AbortController(), signal = cancellation.signal;
+  let lockCompromised = false;
+  const release = await lockfile.lock(target, { stale: 120_000, update: 10_000, retries: 0, onCompromised: error => { lockCompromised = true; cancellation.abort(error); } });
   const owner = randomUUID();
   let store: Store | undefined, run: number | undefined, heartbeat: NodeJS.Timeout | undefined;
   const failures: { kind: string; key: string; error: string }[] = [];
@@ -36,41 +38,45 @@ else {
     for (const result of results) if (result.status === 'unavailable') failures.push({ kind: 'collection', key: `${result.source}/${result.stream}`, error: 'All enabled channels unavailable; see channel_state and gaps' });
   };
   try {
-    if (command === 'migrate') console.log('Migration archive: ' + await migrate(configFile));
-    else if (command === 'rollback') { if (!positionals[1]) throw new Error('rollback requires an archive path'); await rollback(positionals[1]); }
+    if (command === 'migrate') console.log('Migration archive: ' + await migrate(configFile, undefined, signal));
+    else if (command === 'rollback') { if (!positionals[1]) throw new Error('rollback requires an archive path'); await rollback(positionals[1], signal); }
     else {
       store = new Store(config.storage.database); store.acquireLease(owner);
-      heartbeat = setInterval(() => store!.renewLease(owner), 30_000); heartbeat.unref();
+      heartbeat = store.watchLease(owner, cancellation);
       run = store.run(command); await recoverContent(config);
       async function summaries() {
-        const result = await summarize(config, store!, { source: values.source, rebuild: values.rebuild, retryFailed: values['retry-failed'] });
+        const result = await summarize(config, store!, { source: values.source, rebuild: values.rebuild, retryFailed: values['retry-failed'], signal });
         console.log(JSON.stringify(result));
         const errors = store!.db.prepare("SELECT source,id,error FROM feed_jobs WHERE error IS NOT NULL AND state!='ready'").all() as { source: string; id: string; error: string }[];
         const selected = new Set(config.sources.filter(source => source.enabled && (!values.source || source.id === values.source)).map(source => source.id));
         for (const error of errors.filter(error => selected.has(error.source))) failures.push({ kind: 'summary', key: error.source + '/' + error.id, error: error.error });
       }
-      if (command === 'collect') recordCollection(await collect(config, store, values.source, values.due, undefined, values.since));
-      else if (command === 'summarize') { await summaries(); await writeSite(config, store); }
-      else if (command === 'render') await writeSite(config, store);
+      if (command === 'collect') recordCollection(await collect(config, store, values.source, values.due, undefined, values.since, signal));
+      else if (command === 'summarize') { await summaries(); await writeSite(config, store, signal); }
+      else if (command === 'render') await writeSite(config, store, signal);
       else if (command === 'topics') { if (positionals[1] !== 'apply' || !positionals[2]) throw new Error('topics apply requires a JSON registry file');
-        if (values['remote-base'] && execFileSync('git', ['rev-parse', 'FETCH_HEAD'], {encoding:'utf8'}).trim() !== values['remote-base']) throw new Error('Remote base must equal the fetched remote commit');
-        await applyTopics(config.feed.topics, JSON.parse(await readFile(positionals[2], 'utf8'))); if (values['remote-base']) {
-        if (!/^[a-f0-9]{40}$/.test(values['remote-base'])) throw new Error('Remote base requires a full commit SHA');
+        if (values['remote-base']) {
+          if (!/^[a-f0-9]{40}$/.test(values['remote-base'])) throw new Error('Remote base requires a full commit SHA');
+          if (execFileSync('git', ['rev-parse', 'FETCH_HEAD'], {encoding:'utf8'}).trim() !== values['remote-base']) throw new Error('Remote base must equal the fetched remote commit');
+        }
+        await applyTopics(config.feed.topics, JSON.parse(await readFile(positionals[2], 'utf8')), undefined, signal); if (values['remote-base']) {
         const { remoteTopics } = await import('./publish.js');
         await atomicWrite(resolve(config.storage.directory, 'topic-remote-base.json'), JSON.stringify({ commit: values['remote-base'], registry: remoteTopics(values['remote-base']) }));
-      } await writeSite(config, store); }
+      } await writeSite(config, store, signal); }
       else if (command === 'backup') console.log(JSON.stringify(await backup(store, config.storage.directory)));
       else if (command === 'doctor') {
         const executable = config.agent.command === 'dsh' ? resolve('node_modules/.bin/dsh') : config.agent.command;
         console.log(JSON.stringify({ node: process.version, database: store.db.pragma('quick_check'), agent: execFileSync(executable, ['--version'], { encoding: 'utf8' }).trim(), model: config.agent.model, channels: store.states(), items: store.db.prepare('SELECT count(*) n FROM feed_summaries').get(), queue: store.db.prepare('SELECT state,count(*) n FROM feed_jobs GROUP BY state').all() }, null, 2));
-        if (values.live) recordCollection(await collect(config, store, values.source));
+        if (values.live) recordCollection(await collect(config, store, values.source, false, undefined, undefined, signal));
       } else if (command === 'run') {
         if (!values.due) throw new Error('Scheduled runs require --due');
-        recordCollection(await collect(config, store, values.source, true)); await summaries();
-        await writeSite(config, store); await backup(store, config.storage.directory);
-        if (config.publish.auto && !values['no-publish']) { const { publish } = await import('./publish.js'); await publish(config, store); }
-      } else if (command === 'publish') { const { publish } = await import('./publish.js'); await publish(config, store); }
+        recordCollection(await collect(config, store, values.source, true, undefined, undefined, signal)); await summaries();
+        await writeSite(config, store, signal); await backup(store, config.storage.directory);
+        signal.throwIfAborted();
+        if (config.publish.auto && !values['no-publish']) { const { publish } = await import('./publish.js'); await publish(config, store, undefined, signal); }
+      } else if (command === 'publish') { const { publish } = await import('./publish.js'); await publish(config, store, undefined, signal); }
       else throw new Error('Unknown command: ' + command);
+      signal.throwIfAborted();
       store.finishRun(run, failures.length ? 'partial' : 'succeeded', { failures });
       if (failures.length) { console.error(`Run incomplete: ${failures.length} task(s) failed; successful work retained.`); process.exitCode = 1; }
     }
@@ -79,6 +85,8 @@ else {
     console.error(errorText(error)); process.exitCode = 1;
   } finally {
     if (heartbeat) clearInterval(heartbeat);
-    store?.releaseLease(owner); store?.close(); await release();
+    store?.releaseLease(owner); store?.close();
+    try { await release(); }
+    catch (error) { if (!lockCompromised || (error as NodeJS.ErrnoException).code !== 'ERELEASED') throw error; }
   }
 }

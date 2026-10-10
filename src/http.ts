@@ -9,6 +9,31 @@ const robotsParser = robotsModule as unknown as typeof robotsModule.default;
 
 const dispatcher = new EnvHttpProxyAgent();
 const networkFetch: typeof fetch = (url, init) => fetch(url, { ...init, dispatcher } as RequestInit);
+const MAX_RESPONSE_BYTES = 12_000_000;
+
+async function boundedText(response: Response): Promise<string> {
+  if (Number(response.headers.get('content-length')) > MAX_RESPONSE_BYTES) {
+    await response.body?.cancel();
+    throw new HttpError('Response exceeds 12 MB limit');
+  }
+  if (!response.body) return '';
+  const reader = response.body.getReader(), decoder = new TextDecoder(), parts: string[] = [];
+  let bytes = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new HttpError('Response exceeds 12 MB limit');
+      }
+      parts.push(decoder.decode(value, { stream: true }));
+    }
+    parts.push(decoder.decode());
+    return parts.join('');
+  } finally { reader.releaseLock(); }
+}
 
 export class HttpError extends Error {
   constructor(message: string, readonly status = 0, readonly retryAt?: string) { super(message); }
@@ -19,7 +44,7 @@ export class Http {
   private readonly hostCooldown = new Map<string, HttpError>();
   private readonly sharedResponses = new Map<string, RawResponse>();
   private readonly robots = new Map<string, ReturnType<typeof robotsParser>>();
-  constructor(private readonly store: Store, private readonly fetcher: typeof fetch = networkFetch) {}
+  constructor(private readonly store: Store, private readonly fetcher: typeof fetch = networkFetch, readonly signal?: AbortSignal) {}
   async page(url: string, spacingMs = 1500): Promise<RawResponse> {
     const origin = new URL(url).origin, robotsUrl = origin + '/robots.txt';
     let rules = this.robots.get(origin);
@@ -38,6 +63,7 @@ export class Http {
     const response = await this.get(url); this.sharedResponses.set(url, response); return response;
   }
   async get(url: string, spacingMs = 0, transport: 'fetch' | 'curl' = 'fetch'): Promise<RawResponse> {
+    this.signal?.throwIfAborted();
     const host = new URL(url).host;
     const cached = this.store.cache(url);
     const checkCooldown = () => {
@@ -48,21 +74,21 @@ export class Http {
     for (let attempt = 0; attempt < 3; attempt++) {
       checkCooldown();
       const wait = (this.hostNext.get(host) ?? 0) - Date.now();
-      if (wait > 0) await sleep(wait);
+      if (wait > 0) await sleep(wait, this.signal);
       checkCooldown();
       this.hostNext.set(host, Date.now() + spacingMs);
       try {
-        const response = await (transport === 'curl' && this.fetcher === networkFetch ? curlFetch : this.fetcher)(url, { signal: AbortSignal.timeout(25000), headers: {
+        const response = await (transport === 'curl' && this.fetcher === networkFetch ? curlFetch : this.fetcher)(url, { headers: {
           'User-Agent': 'Feedgarden/0.1 (+https://sinputer.top/feedgarden/)',
           ...(cached?.headers.etag ? { 'If-None-Match': cached.headers.etag } : {}),
           ...(cached?.headers['last-modified'] ? { 'If-Modified-Since': cached.headers['last-modified'] } : {}),
-        } });
+        }, signal: AbortSignal.any([AbortSignal.timeout(25000), ...(this.signal ? [this.signal] : [])]) });
         const headers: Record<string, string> = {};
         for (const key of ['etag', 'last-modified', 'content-type', 'retry-after', 'x-ratelimit-remaining', 'x-ratelimit-reset']) {
           const value = response.headers.get(key); if (value) headers[key] = value;
         }
-        const body = response.status === 304 && cached ? cached.body : await response.text();
-        if (body.length > 12_000_000) throw new HttpError('Response exceeds 12 MB limit');
+        const body = response.status === 304 && cached ? cached.body : await boundedText(response);
+        if (Buffer.byteLength(body) > MAX_RESPONSE_BYTES) throw new HttpError('Response exceeds 12 MB limit');
         const raw = { url, status: response.status, body, headers: { ...cached?.headers, ...headers }, fetchedAt: nowIso() };
         this.raw.push(raw);
         if (response.status === 429 || (response.status === 403 && headers['x-ratelimit-remaining'] !== undefined && Number(headers['x-ratelimit-remaining']) === 0)) {
@@ -80,9 +106,10 @@ export class Http {
         this.store.saveCache(raw);
         return raw;
       } catch (error) {
+        this.signal?.throwIfAborted();
         if (error instanceof HttpError && (error.status < 500 || error.retryAt)) throw error;
         if (attempt === 2) throw error;
-        await sleep(500 * 2 ** attempt);
+        await sleep(500 * 2 ** attempt, this.signal);
       }
     }
     throw new Error('Unreachable HTTP attempt');

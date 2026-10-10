@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
-import { existsSync } from 'node:fs';
+import { existsSync, createReadStream } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { cp, mkdir, readFile, readdir, rm, copyFile } from 'node:fs/promises';
 import { resolve, join, dirname, relative } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -25,20 +26,27 @@ export function convertConfig(value: any): Config {
     return next;
   }) });
 }
-async function checksums(root: string): Promise<Record<string, string>> {
+async function checksums(root: string, signal?: AbortSignal): Promise<Record<string, string>> {
   const result: Record<string, string> = {};
   async function visit(directory: string) {
     for (const file of await readdir(directory, { withFileTypes: true })) {
       const path = join(directory, file.name);
       if (file.isSymbolicLink()) throw new Error('Migration archive must not contain symlinks');
       if (file.isDirectory()) await visit(path);
-      else if (file.name !== 'manifest.json' && !file.name.startsWith('new-state-') && !relative(root,path).split('/').some(part=>part.startsWith('new-content-'))) result[relative(root, path)] = hash((await readFile(path)).toString('base64'));
+      else if (file.name !== 'manifest.json' && !file.name.startsWith('new-state-') && !relative(root,path).split('/').some(part=>part.startsWith('new-content-'))) {
+        // Preserve the historical sha256(JSON.stringify(base64)) contract.
+        // Base64 has no JSON escapes; the stream decoder retains split triplets.
+        const checksum = createHash('sha256').update('"');
+        for await (const chunk of createReadStream(path, { encoding: 'base64' })) { signal?.throwIfAborted(); checksum.update(chunk as string); }
+        result[relative(root, path)] = checksum.update('"').digest('hex');
+      }
     }
   }
   await visit(root); return result;
 }
 const revision = (directory = process.cwd()) => execFileSync('git', ['-C', directory, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-export async function migrate(configFile = 'feedgarden.jsonc', at = nowIso()): Promise<string> {
+export async function migrate(configFile = 'feedgarden.jsonc', at = nowIso(), signal?: AbortSignal): Promise<string> {
+  signal?.throwIfAborted();
   const raw = await readFile(configFile, 'utf8'), legacy = parse(raw), config = convertConfig(legacy);
   await mkdir(config.storage.directory, { recursive: true, mode: 0o700 });
   const journalPath = resolve(config.storage.directory, 'migration.json');
@@ -70,12 +78,13 @@ export async function migrate(configFile = 'feedgarden.jsonc', at = nowIso()): P
         await atomicWrite(join(archive, 'code-base', file), original);
       }
       if (existsSync(legacy.reports?.directory ?? 'reports')) await cp(legacy.reports?.directory ?? 'reports', join(archive, 'reports'), { recursive: true });
-      const manifest = { createdAt: at, configFile: resolve(configFile), reportsDirectory: resolve(legacy.reports?.directory ?? 'reports'), database: resolve(config.storage.database), codeCommit: revision(), themeCommit: JSON.parse(await readFile(join(archive, 'code-base/.github/theme.lock.json'), 'utf8')).commit, workingThemeCommit: JSON.parse(await readFile('.github/theme.lock.json', 'utf8')).commit, counts, checksums: await checksums(archive), quickCheck: 'ok' };
+      const manifest = { createdAt: at, configFile: resolve(configFile), reportsDirectory: resolve(legacy.reports?.directory ?? 'reports'), database: resolve(config.storage.database), codeCommit: revision(), themeCommit: JSON.parse(await readFile(join(archive, 'code-base/.github/theme.lock.json'), 'utf8')).commit, workingThemeCommit: JSON.parse(await readFile('.github/theme.lock.json', 'utf8')).commit, counts, checksums: await checksums(archive, signal), quickCheck: 'ok' };
       await atomicWrite(join(archive, 'manifest.json'), JSON.stringify(manifest, null, 2));
       journal = { archive, cutoff: DateTime.fromISO(at).setZone('Asia/Shanghai').startOf('day').toUTC().toISO()!, configHash: hash(raw), state: 'archived' };
       await atomicWrite(journalPath, JSON.stringify(journal));
     }
     if (version === 2) {
+      signal?.throwIfAborted();
       if (hash(raw) !== journal.configHash) throw new Error('Original config changed during migration');
       initializeFeedSchema(db, journal.cutoff);
     }
@@ -83,19 +92,22 @@ export async function migrate(configFile = 'feedgarden.jsonc', at = nowIso()): P
     if (cutoff !== journal.cutoff) throw new Error('Migration cutoff differs from its durable journal');
     db.prepare('INSERT OR REPLACE INTO feed_meta VALUES (?,?)').run('migration_archive', journal.archive);
   } finally { db.close(); }
+  signal?.throwIfAborted();
   await atomicWrite(configFile, JSON.stringify(config, null, 2) + '\n');
   const store = new Store(config.storage.database);
-  try { await writeSite(config, store); } finally { store.close(); }
+  try { await writeSite(config, store, signal); } finally { store.close(); }
   const manifest = JSON.parse(await readFile(join(journal!.archive, 'manifest.json'), 'utf8'));
   if (manifest.reportsDirectory === resolve(config.feed.directory)) throw new Error('Legacy reports must have a different destination from item content');
+  signal?.throwIfAborted();
   await rm(manifest.reportsDirectory, { recursive: true, force: true });
   journal!.state = 'complete'; await atomicWrite(journalPath, JSON.stringify(journal));
   return journal!.archive;
 }
-export async function rollback(archive: string): Promise<void> {
+export async function rollback(archive: string, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted();
   archive = resolve(archive);
   const manifest = JSON.parse(await readFile(join(archive, 'manifest.json'), 'utf8'));
-  const actual = await checksums(archive);
+  const actual = await checksums(archive, signal);
   for (const [file, expected] of Object.entries(manifest.checksums)) if (actual[file] !== expected) throw new Error('Archive checksum mismatch: ' + file);
   const original = parse(await readFile(join(archive, 'config.original'), 'utf8'));
   const current = new Database(manifest.database);
@@ -107,6 +119,7 @@ export async function rollback(archive: string): Promise<void> {
   // Keep the new content as a recovery artifact before restoring the old tree.
   const newContent = resolve(parse(await readFile(manifest.configFile, 'utf8')).feed?.directory ?? 'content');
   if (existsSync(newContent)) await cp(newContent, join(archive, 'new-content-' + Date.now()), { recursive: true });
+  signal?.throwIfAborted();
   for (const suffix of ['-wal', '-shm']) await rm(manifest.database + suffix, { force: true });
   await copyFile(join(archive, 'legacy.sqlite'), manifest.database);
   const restored = new Database(manifest.database);

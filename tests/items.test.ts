@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { configSchema } from '../src/config.js';
 import { Store, initializeFeedSchema } from '../src/store.js';
-import { summarize, acceptedItems, itemPath, eligible, type Generator } from '../src/items.js';
+import { summarize, acceptedItems, iterateAcceptedItems, itemPath, eligible, type Generator } from '../src/items.js';
 import { writeSite, recoverContent } from '../src/site.js';
 import { loadTopics, applyTopics, mergeTopics, type Registry } from '../src/topics.js';
 import { validateArtifact, validateRegistry } from '../src/topics-contract.mjs';
@@ -84,6 +84,17 @@ test('cutoff uses Shanghai midnight as one instant; source dates and undated fir
  assert.equal(eligible(item('a','one',{basis:'observed'}),'2026-10-08T15:00:00.000Z','2026-10-08T16:00:00.000Z',source),false);
  const sampled=parseFollowBuilders(JSON.stringify({generatedAt:at,x:[{handle:'main',tweets:[{id:'1',text:'Undated sample'}]}]}),{source:'x',stream:'main',channel:'sample',observedAt:'2026-10-10T00:00:00.000Z'});assert.equal(sampled.items[0]?.basis,'observed');assert.equal(sampled.items[0]?.publishedAt,'2026-10-10T00:00:00.000Z');
 });
+test('bounded planning uses the current publication date after a source correction',async()=>{
+ const f=await fixture();try{
+  const cutoff='2026-10-08T16:00:00.000Z',old='2026-10-01T00:00:00.000Z';f.store.setMeta('cutoff',cutoff);
+  save(f.store,[item('corrected','one',{publishedAt:old,observedAt:old})]);
+  save(f.store,[item('corrected','one',{publishedAt:at})]);
+  const row=f.store.db.prepare('SELECT published_at,first_seen FROM items WHERE source=? AND id=?').get('one','corrected') as {published_at:string;first_seen:string};
+  assert.equal(row.published_at,old);assert.equal(row.first_seen,old);
+  const result=await summarize(f.config,f.store,{},generator,at);assert.equal(result.generated,1);
+  assert.equal(acceptedItems(f.store)[0]!.date,at);
+ }finally{await f.cleanup();}
+});
 test('content journal recovers the staged tree between its two renames',async()=>{
  const f=await fixture();try{const staging=join(f.root,'.content-stage-test'),previous=join(f.root,'content.previous-test');await mkdir(staging);await writeFile(join(staging,'index.md'),'new');await mkdir(previous);await writeFile(join(previous,'index.md'),'old');await writeFile(join(f.root,'content-journal.json'),JSON.stringify({destination:f.config.feed.directory,staging,previous}));await recoverContent(f.config);assert.equal(await readFile(join(f.config.feed.directory,'index.md'),'utf8'),'new');await assert.rejects(readFile(join(f.root,'content-journal.json')));
  }finally{await f.cleanup();}
@@ -112,4 +123,38 @@ test('source selection and disablement skip retained failed jobs and interrupted
  const selected=await summarize(f.config,f.store,{source:'one'},generator,at);assert.equal(selected.generated,1);assert.equal(selected.failed,0);assert.equal(selected.pending,0);
  f.config.sources.find(source=>source.id==='two')!.enabled=false;const result=await summarize(f.config,f.store,{},()=>{throw new Error('Disabled source must not run');},at);assert.equal(result.pending,0);assert.equal(acceptedItems(f.store).length,1);
  }finally{await f.cleanup();}
+});
+
+test('paged planning preserves every FIFO identity across page boundaries and interleaves lease writes with rendering', async () => {
+ const f=await fixture();
+ try {
+  const records=Array.from({length:270},(_,i)=>item(String(i).padStart(4,'0'),i<135?'one':'two'));
+  save(f.store,records);
+  f.store.db.prepare('INSERT INTO feed_excluded VALUES (?,?)').run('one','0001');
+  const result=await summarize(f.config,f.store,{},generator,at);
+  assert.equal(result.generated,269);
+  const actual=[];f.store.acquireLease('reader');
+  for(const record of iterateAcceptedItems(f.store)) { actual.push([record.item.source,record.item.id]);f.store.renewLease('reader'); }
+  assert.deepEqual(actual,records.filter(record=>record.id!=='0001').map(record=>[record.source,record.id]));
+  // No-op ready jobs must not rewrite accepted copies.
+  f.store.db.exec("CREATE TRIGGER reject_rewrite BEFORE UPDATE ON feed_summaries BEGIN SELECT RAISE(FAIL,'unexpected ready rewrite'); END;");
+  assert.equal((await summarize(f.config,f.store,{},()=>{throw new Error('unexpected model call');},at)).generated,0);
+  await writeSite(f.config,f.store);
+  assert.match(await readFile(join(f.config.feed.directory,itemPath('two','0269')),'utf8'),/Title 0269/);
+ } finally {await f.cleanup();}
+});
+
+test('cancellation refuses acceptance and recovers an already saved artifact without another model call', async () => {
+ const f=await fixture(), cancellation=new AbortController(), reason=new Error('Lost database job lease');
+ try {
+  save(f.store,[item('cancelled')]);
+  await assert.rejects(summarize(f.config,f.store,{signal:cancellation.signal},async(...args)=>{
+   const result=await generator(...args);
+   await writeFile(join(args[3]!,'result.json'),JSON.stringify(result.output));
+   cancellation.abort(reason);return result;
+  },at),error=>error===reason);
+  assert.equal(acceptedItems(f.store).length,0);
+  assert.deepEqual(await loadTopics(f.config.feed.topics),registry);
+  assert.equal((await summarize(f.config,f.store,{},()=>{throw new Error('Must replay saved artifact');},at)).generated,1);
+ } finally {await f.cleanup();}
 });

@@ -231,6 +231,36 @@ test('Product Hunt native Post IDs align leaderboard and Atom identity without e
   assert.equal(parseProductHunt(card + '<script>(window[Symbol.for("ApolloSSRDataTransport")] ??= []).push({bad:process.exit(1)})</script>', context, '2026-10-09')[0]?.id, '/products/test');
 });
 
+test('official discovery budgets count unseen identities and explicitly identify undated first observations', async () => {
+  const c = configSchema.parse({ version: 2, agent: { model: 'deepseek/deepseek-flash' }, sources: [{ id: 'anthropic', name: 'Anthropic', intervalHours: 6, streams: [{ id: 'news', channels: [{ id: 'list', kind: 'anthropic-html', url: 'https://www.anthropic.com/news' }] }] }] });
+  const source=c.sources[0]!, stream=source.streams[0]!, channel=stream.channels[0]!, store=new Store(':memory:'), http=new Http(store), now='2026-10-10T00:00:00.000Z';
+  const urls=Array.from({length:61},(_,i)=>'https://www.anthropic.com/news/item-'+i), requests:string[]=[];
+  try {
+    for(const url of urls.slice(0,60))store.saveCollection(source.id,stream.id,channel.id,{raw:[],coverage:{status:'complete',to:now,notes:[]},items:[item(url,{source:source.id,url})]},'');
+    http.page=async url=>{requests.push(url);return {url,status:200,headers:{},fetchedAt:now,body:url===channel.url?urls.map(url=>'<a href="'+url+'">Article</a>').join(''):'<article><h1>Undated article</h1><p>Source facts.</p></article>'};};
+    const result=await adapters['anthropic-html']({source,stream,channel,store,http,now,since:now});
+    assert.deepEqual(requests,[channel.url,urls[60]]);
+    assert.equal(result.items[0]?.basis,'observed');
+    assert.equal(result.items[0]?.publishedAt,now);
+    assert.match(result.coverage.notes.join(' '),/first observation/);
+    assert.ok(!result.coverage.notes.join(' ').includes('Discovery budget'));
+  } finally {store.close();}
+});
+
+test('Product Hunt long ranges are bounded and resume their fixed dates without omitting pages', async () => {
+ const c=configSchema.parse({version:2,agent:{model:'deepseek/deepseek-flash'},sources:[{id:'producthunt',name:'Product Hunt',timezone:'America/Los_Angeles',intervalHours:6,streams:[{id:'daily',channels:[{id:'leaderboard',kind:'ph-html'}]}]}]}),source=c.sources[0]!,stream=source.streams[0]!,channel=stream.channels[0]!,store=new Store(':memory:'),http=new Http(store),urls:string[]=[];
+ http.page=async url=>{urls.push(url);return {url,status:200,headers:{},fetchedAt:'2026-10-10T14:00:00Z',body:'<section><a href="/products/test">Test</a><button data-test="vote-button">1</button></section>'};};
+ try {
+  const context={source,stream,channel,store,http,now:'2026-10-10T14:00:00Z',since:'2026-09-01T07:00:00Z'};
+  let result=await adapters['ph-html'](context);
+  assert.equal(urls.length,7);assert.match(result.coverage.notes.join(' '),/continues/);
+  while(result.cursor){store.saveCollection(source.id,stream.id,channel.id,result,'');const count=urls.length;result=await adapters['ph-html']({...context,now:'2026-10-11T14:00:00Z'});assert.ok(urls.length-count<=7);assert.equal(result.coverage.to,context.now);}
+  assert.equal(urls.length,40);assert.equal(new Set(urls).size,40);
+  assert.ok(urls.at(-1)?.endsWith('/2026/10/10'));
+  assert.ok(!result.coverage.notes.join(' ').includes('current source-local day'),'the original range ended before the resumed current day');
+ }finally{store.close();}
+});
+
 test('HTML respects robots rules and large real-style escaped RSS is bounded without accepting DTDs', async () => {
   const store = new Store(':memory:'); let requests = 0;
   try {

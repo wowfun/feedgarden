@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { generateBatch } from '../src/agent.js';
@@ -30,10 +30,15 @@ createInterface({input:process.stdin}).on('line', line => {
  else if(method==='session/set_config_option') send({id,result:{configOptions:options}});
  else if(method==='session/prompt') {
   if(mode==='timeout') return;
+  if(mode==='cancel') {writeFileSync('prompt-started','ready');return;}
+  if(mode==='flood') {
+   for(let n=0;n<400;n++)send({method:'session/update',params:{sessionId:'fixture',update:{sessionUpdate:'tool_call',toolCallId:String(n),title:'Fixed tool',status:'in_progress',content:[{type:'content',content:{type:'text',text:'x'.repeat(n===0?70000:1024)}}]}}});
+  }
   pending=id;
   send({id:'permission-probe',method:'session/request_permission',params:{sessionId:'fixture',toolCall:{toolCallId:'shell',title:'Forbidden shell',kind:'execute',status:'pending'},options:[{optionId:'allow',name:'Allow',kind:'allow_once'}]}});
  } else if(method==='session/close') send({id,result:{}});
 });
+
 `;
 test('ACP rejects permissions, accepts fixed artifacts, rejects refusal and times out', async () => {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-acp-'));
@@ -47,4 +52,29 @@ test('ACP rejects permissions, accepts fixed artifacts, rejects refusal and time
       else await assert.rejects(generateBatch(config,{contractVersion:2,topics:{version:1,topics:[{id:'coding',name:{en:'Coding','zh-CN':'编程'},description:'Programming',aliases:[],deprecated:false}]},items:[item]}), mode==='refusal'?/refusal/:/timed out|aborted/i);
     }
   } finally { if(previous===undefined) delete process.env.FEEDGARDEN_AGENT_API_KEY; else process.env.FEEDGARDEN_AGENT_API_KEY=previous; await rm(root,{recursive:true,force:true}); }
+});
+
+test('ACP notification audit is bounded and exposes omitted counts', async () => {
+ const root=await mkdtemp(join(tmpdir(),'feedgarden-acp-log-')),previous=process.env.FEEDGARDEN_AGENT_API_KEY;process.env.FEEDGARDEN_AGENT_API_KEY='fixture-key';
+ try {
+  const command=join(root,'flood.mjs');await writeFile(command,peer,{mode:0o700});
+  const config={...configSchema.shape.agent.parse({model:'deepseek/deepseek-flash'}),command,runtimeDirectory:root};
+  const result=await generateBatch(config,{contractVersion:2,topics:{version:1,topics:[]},items:[]});
+  assert.ok(result.events.length>0 && result.events.length<=128);
+  assert.ok(Buffer.byteLength(JSON.stringify(result.events))<66000);
+  assert.equal(result.events.length+result.omittedNotifications!.events,400);
+ }finally{if(previous===undefined)delete process.env.FEEDGARDEN_AGENT_API_KEY;else process.env.FEEDGARDEN_AGENT_API_KEY=previous;await rm(root,{recursive:true,force:true});}
+});
+
+test('ACP runner cancellation stops an active prompt with the original lease failure', async () => {
+ const root=await mkdtemp(join(tmpdir(),'feedgarden-acp-cancel-')),previous=process.env.FEEDGARDEN_AGENT_API_KEY;process.env.FEEDGARDEN_AGENT_API_KEY='fixture-key';
+ try {
+  const command=join(root,'cancel.mjs');await writeFile(command,peer,{mode:0o700});
+  const config={...configSchema.shape.agent.parse({model:'deepseek/deepseek-flash'}),command,runtimeDirectory:root},cancellation=new AbortController(),reason=new Error('Lost database job lease');
+  const pending=generateBatch(config,{contractVersion:2,topics:{version:1,topics:[]},items:[]},undefined,root,cancellation.signal);
+  const deadline=Date.now()+5000;
+  while(!(await stat(join(root,'prompt-started')).catch(()=>undefined))){assert.ok(Date.now()<deadline,'ACP peer must reach its active prompt');await new Promise(done=>setTimeout(done,10));}
+  const rejected=assert.rejects(pending,error=>error===reason);
+  cancellation.abort(reason);await rejected;
+ }finally{if(previous===undefined)delete process.env.FEEDGARDEN_AGENT_API_KEY;else process.env.FEEDGARDEN_AGENT_API_KEY=previous;await rm(root,{recursive:true,force:true});}
 });

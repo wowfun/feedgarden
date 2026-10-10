@@ -60,8 +60,12 @@ export async function enrichItem(item: Item, store: Store, http: Http, refresh =
   } catch (error) { failure = errorText(error); }
   finally {
     const insert = store.db.prepare('INSERT INTO raw_responses(source,stream,channel,fetched_at,url,status,headers,body,hash) VALUES (?,?,?,?,?,?,?,?,?)');
-    for (const response of http.raw.slice(rawStart)) insert.run(item.source, item.stream, 'article', response.fetchedAt, response.url, response.status, JSON.stringify(response.headers), response.body, hash(response.body));
+    for (const response of http.raw.splice(rawStart)) {
+      http.signal?.throwIfAborted();
+      insert.run(item.source, item.stream, 'article', response.fetchedAt, response.url, response.status, JSON.stringify(response.headers), response.body, hash(response.body));
+    }
   }
+  http.signal?.throwIfAborted();
   const article = raw && parseArticle(raw.body, item.url);
   if (article && article.text.length > item.text.length) return { ...item, text: article.text, media: [...new Map([...article.media, ...(item.media ?? [])].map(candidate => [candidate.url, candidate])).values()].slice(0, 6), metadata: { ...item.metadata, enrichment: 'article', feedTextHash: feedHash, articleFetchedAt: raw!.fetchedAt, ...(failure ? { articleError: failure } : {}) } };
   // A transient fetch failure must not downgrade previously accepted full text.

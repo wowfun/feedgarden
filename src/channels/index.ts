@@ -71,7 +71,7 @@ async function xCli(c: ChannelContext): Promise<Collection> {
   const manifest = JSON.parse(readFileSync(marker, 'utf8'));
   if (hash(readFileSync(resolve(manifest.authFile), 'utf8')) !== manifest.authHash) throw new Error('X CLI authentication patch integrity check failed');
   const run = async (limit: number) => {
-    const result = await exec(executable, ['user-posts', c.stream.id, '--max', String(limit), '--json'], { timeout: 90000, maxBuffer: 8_000_000,
+    const result = await exec(executable, ['user-posts', c.stream.id, '--max', String(limit), '--json'], { timeout: 90000, maxBuffer: 8_000_000, signal: c.http.signal,
       env: { PATH: process.env.PATH, LANG: 'C.UTF-8', HOME: process.env.HOME, TWITTER_AUTH_TOKEN: auth, TWITTER_CT0: csrf, TWITTER_PROXY: process.env.TWITTER_PROXY, FEEDGARDEN_AUTH_ENV_ONLY: '1' }, cwd: resolve('.local/twitter-cli') });
     c.http.raw.push({ url: `cli:twitter/user-posts/${c.stream.id}`, status: 200, body: result.stdout, fetchedAt: c.now, headers: {} });
     const parsed = JSON.parse(result.stdout); if (!parsed.ok || !Array.isArray(parsed.data)) throw new Error('Invalid X CLI output');
@@ -124,20 +124,29 @@ async function arxiv(c: ChannelContext): Promise<Collection> {
   return result;
 }
 async function productHunt(c: ChannelContext): Promise<Collection> {
-  const from = DateTime.fromISO(c.since).setZone(c.source.timezone).startOf('day');
-  const to = DateTime.fromISO(c.now).setZone(c.source.timezone).startOf('day');
+  const checkpoint = c.restartRange ? undefined : c.store.channel(c.source.id, c.stream.id, c.channel.id)?.cursor;
+  const range: { from: string; to: string; next?: string } = checkpoint ? JSON.parse(checkpoint) : { from: c.since, to: c.now };
+  const from = range.next ? DateTime.fromISO(range.next, { zone: c.source.timezone }) : DateTime.fromISO(range.from).setZone(c.source.timezone).startOf('day');
+  const to = DateTime.fromISO(range.to).setZone(c.source.timezone).startOf('day');
+  if (!from.isValid || !to.isValid) throw new Error('Invalid Product Hunt range checkpoint');
   const items: Item[] = [], notes: string[] = []; let succeeded = false;
-  for (let day = from; day <= to; day = day.plus({ days: 1 })) {
+  let day = from;
+  for (let count = 0; day <= to && count < 7; count++, day = day.plus({ days: 1 })) {
+    c.http.signal?.throwIfAborted();
     const url = `https://www.producthunt.com/leaderboard/daily/${day.year}/${day.month}/${day.day}`;
     try {
       const page = parseProductHunt((await c.http.page(url)).body, base(c), day.toISODate()!);
       items.push(...page.map(item => ({ ...item, publishedAt: day.toUTC().toISO()! })));
       succeeded = true;
-    } catch (error) { notes.push(`${day.toISODate()}: ${errorText(error)}`); }
+    } catch (error) { c.http.signal?.throwIfAborted(); notes.push(`${day.toISODate()}: ${errorText(error)}`); }
   }
   if (!succeeded && notes.length) throw new Error(notes.join('; '));
-  if (from <= to) notes.push('The current source-local day is still in progress; its leaderboard is a provisional snapshot.');
-  return collected(c, items, notes);
+  const continuing = day <= to;
+  if (continuing) notes.push('Historical leaderboard range continues from ' + day.toISODate() + '; at most seven daily pages are fetched per run.');
+  else if (from <= to && to.hasSame(DateTime.fromISO(c.now).setZone(c.source.timezone), 'day')) notes.push('The current source-local day is still in progress; its leaderboard is a provisional snapshot.');
+  const result = collected(c, items, notes, continuing ? JSON.stringify({ ...range, next: day.toISODate()! }) : '');
+  result.coverage.from = range.from; result.coverage.to = range.to;
+  return result;
 }
 async function officialPages(c: ChannelContext): Promise<Collection> {
   const origin = new URL(c.channel.url!).origin;
@@ -167,8 +176,9 @@ async function officialPages(c: ChannelContext): Promise<Collection> {
   if (!urls.size) throw new Error('Official list/sitemap contained no recognizable article links');
   const items: Item[] = []; let failures = 0;
   // URLs already stored retain their original publication date; sitemap lastmod is never used as publication time.
-  const known = new Set(c.store.items(c.source.id).map(item => item.url));
-  for (const url of [...urls].filter(url => !known.has(url)).slice(0, 50)) {
+  const known = c.store.db.prepare('SELECT 1 FROM items WHERE source=? AND id=?');
+  const unseen = [...urls].filter(url => !known.get(c.source.id, safeUrl(url)));
+  for (const url of unseen.slice(0, 50)) {
     try {
       const raw = await c.http.page(url); const $ = load(raw.body);
       const objects: any[] = [];
@@ -184,6 +194,6 @@ async function officialPages(c: ChannelContext): Promise<Collection> {
       });
     } catch { failures++; }
   }
-  return collected(c, items, [...(failures ? [`${failures} official pages were inaccessible or lacked a verifiable publication date.`] : []), ...(urls.size > 50 ? ['Discovery budget is 50 previously unseen detail pages per run.'] : [])]);
+  return collected(c, items, [...(failures ? [`${failures} official pages were inaccessible or lacked an article title.`] : []), ...(items.some(item => item.basis === 'observed') ? ['Pages without a verifiable publication date use their first observation.'] : []), ...(unseen.length > 50 ? ['Discovery budget is 50 previously unseen detail pages per run.'] : [])]);
 }
 export const adapters: Record<Channel['kind'], Adapter> = { 'hn-api': hn, feed, sitemap: officialPages, 'anthropic-html': officialPages, 'github-trending': trending, 'github-search': githubSearch, 'x-cli': xCli, 'follow-builders': followBuilders, 'arxiv-api': arxiv, 'ph-html': productHunt };

@@ -20,7 +20,8 @@ export function remoteTopics(revision: string): Registry {
   catch { if (!git(['ls-tree', '--name-only', revision, '--', 'config/topics.json'])) return { version: 1, topics: [] }; throw new Error('Cannot read remote topic registry'); }
   return validateRegistry(JSON.parse(file)) as Registry;
 }
-export async function publish(config: Config, store?: Store, validate: (root: string) => Promise<unknown> = buildSite): Promise<void> {
+export async function publish(config: Config, store?: Store, validate: (root: string) => Promise<unknown> = buildSite, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted();
   if (config.feed.directory !== 'content' || config.feed.topics !== 'config/topics.json') throw new Error('Publishing requires the managed content/ and config/topics.json paths');
   const root = process.cwd();
   if (git(['remote', 'get-url', 'origin']) !== config.publish.repository) throw new Error('Origin differs from the configured publication repository');
@@ -35,9 +36,9 @@ export async function publish(config: Config, store?: Store, validate: (root: st
     await atomicWrite(resolve(config.storage.directory, 'publish-conflict.json'), JSON.stringify({ baseCommit, remoteCommit, base, local, remote, error: String(error) }, null, 2));
     throw new Error('MANUAL_ACTION: ' + String(error) + '. Merge config/topics.json, then topics apply FILE --remote-base ' + remoteCommit + ' and retry publication. Details: .local/publish-conflict.json');
   }
-  await applyTopics(config.feed.topics, merged, hash(local));
+  await applyTopics(config.feed.topics, merged, hash(local), signal);
   const opened = store ?? new Store(config.storage.database);
-  try { await writeSite(config, opened); } finally { if (!store) opened.close(); }
+  try { await writeSite(config, opened, signal); } finally { if (!store) opened.close(); }
   await mkdir(config.storage.directory, { recursive: true });
   const temporary = await mkdtemp(resolve(config.storage.directory, 'publish-')), worktree = join(temporary, 'checkout');
   let attached = false;
@@ -57,7 +58,9 @@ export async function publish(config: Config, store?: Store, validate: (root: st
     assertManagedPaths(paths, legacy.filter(path => deletions.includes(path)));
     if (!paths.length) { await atomicWrite(baseFile, JSON.stringify({ commit: remoteCommit, registry: merged })); console.log('No item changes to publish.'); return; }
     await validate(worktree);
+    signal?.throwIfAborted();
     await run('git', ['commit', '-m', 'Publish Feedgarden items and topics'], worktree);
+    signal?.throwIfAborted();
     await run('git', ['push', 'origin', 'HEAD:refs/heads/' + config.publish.branch], worktree);
     await atomicWrite(baseFile, JSON.stringify({ commit: git(['rev-parse', 'HEAD'], worktree), registry: merged }));
   } finally {

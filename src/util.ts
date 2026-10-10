@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import { mkdir, rename, open } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { setTimeout } from 'node:timers/promises';
 export const hash = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const nowIso = (): string => new Date().toISOString();
-export const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+export const sleep = (ms: number, signal?: AbortSignal): Promise<void> => setTimeout(ms, undefined, { signal });
 export function safeUrl(value: string, base?: string): string {
   const url = new URL(value, base);
   if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('Invalid public URL');
@@ -11,11 +12,13 @@ export function safeUrl(value: string, base?: string): string {
   url.hash = '';
   return url.href;
 }
-export async function atomicWrite(path: string, content: string): Promise<void> {
+export async function atomicWrite(path: string, content: string, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted();
   await mkdir(dirname(path), { recursive: true });
   const temporary = `${path}.${process.pid}.tmp`;
   const file = await open(temporary, 'w', 0o600);
   try { await file.writeFile(content); await file.sync(); } finally { await file.close(); }
+  signal?.throwIfAborted();
   await rename(temporary, path);
   const directory = await open(dirname(path), 'r');
   try { await directory.sync(); } finally { await directory.close(); }

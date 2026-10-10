@@ -38,6 +38,7 @@ export class Store {
       this.db.exec('CREATE TABLE job_lease(id INTEGER PRIMARY KEY CHECK(id=1),owner TEXT NOT NULL,expires TEXT NOT NULL); PRAGMA user_version=2;');
     })();
     if (version < 3) initializeFeedSchema(this.db, DateTime.now().setZone('Asia/Shanghai').startOf('day').toUTC().toISO()!, false);
+    this.db.exec('CREATE INDEX IF NOT EXISTS agent_calls_at ON agent_calls(at); CREATE INDEX IF NOT EXISTS items_first_seen ON items(source,first_seen,id);');
   }
   acquireLease(owner: string): void {
     this.db.transaction(() => {
@@ -47,6 +48,14 @@ export class Store {
     })();
   }
   renewLease(owner: string): void { if (this.db.prepare('UPDATE job_lease SET expires=? WHERE id=1 AND owner=?').run(new Date(Date.now() + 120_000).toISOString(), owner).changes !== 1) throw new Error('Lost database job lease'); }
+  watchLease(owner: string, cancellation: AbortController): NodeJS.Timeout {
+    const timer = setInterval(() => {
+      if (cancellation.signal.aborted) return;
+      try { this.renewLease(owner); } catch (error) { cancellation.abort(error); }
+    }, 30_000);
+    timer.unref();
+    return timer;
+  }
   releaseLease(owner: string): void { this.db.prepare('DELETE FROM job_lease WHERE id=1 AND owner=?').run(owner); }
   close(): void { this.db.close(); }
   channel(source: string, stream: string, channel: string): ChannelState | undefined {
@@ -55,13 +64,18 @@ export class Store {
   cache(url: string): RawResponse | undefined { const row = this.db.prepare('SELECT response FROM http_cache WHERE url=?').get(url) as { response: string } | undefined; return row && JSON.parse(row.response); }
   saveCache(response: RawResponse): void { this.db.prepare('INSERT OR REPLACE INTO http_cache VALUES (?,?)').run(response.url, JSON.stringify(response)); }
   saveCollection(source: string, stream: string, channel: string, result: Collection, nextAttempt: string, attemptedAt = result.coverage.to): void {
+    const insertRaw = this.db.prepare('INSERT INTO raw_responses(source,stream,channel,fetched_at,url,status,headers,body,hash) VALUES (?,?,?,?,?,?,?,?,?)');
+    const upsertItem = this.db.prepare('INSERT INTO items VALUES (?,?,?,?,?,?,?) ON CONFLICT(source,id) DO UPDATE SET last_seen=excluded.last_seen,data=excluded.data,content_hash=excluded.content_hash');
+    const insertVersion = this.db.prepare('INSERT OR IGNORE INTO item_versions VALUES (?,?,?,?,?)');
+    const insertObservation = this.db.prepare('INSERT INTO observations(source,item_id,stream,channel,observed_at,data) VALUES (?,?,?,?,?,?)');
     this.db.transaction(() => {
-      for (const raw of result.raw) this.db.prepare('INSERT INTO raw_responses(source,stream,channel,fetched_at,url,status,headers,body,hash) VALUES (?,?,?,?,?,?,?,?,?)').run(source, stream, channel, raw.fetchedAt, raw.url, raw.status, JSON.stringify(raw.headers), raw.body, hash(raw.body));
+      for (const raw of result.raw) insertRaw.run(source, stream, channel, raw.fetchedAt, raw.url, raw.status, JSON.stringify(raw.headers), raw.body, hash(raw.body));
       for (const item of result.items) {
+        const data = JSON.stringify(item);
         const contentHash = hash({ title: item.title, text: item.text, url: item.url, author: item.author, ...(item.media?.length ? { media: item.media } : {}) });
-        this.db.prepare(`INSERT INTO items VALUES (?,?,?,?,?,?,?) ON CONFLICT(source,id) DO UPDATE SET last_seen=excluded.last_seen,data=excluded.data,content_hash=excluded.content_hash`).run(source, item.id, item.publishedAt, item.observedAt, item.observedAt, JSON.stringify(item), contentHash);
-        this.db.prepare('INSERT OR IGNORE INTO item_versions VALUES (?,?,?,?,?)').run(source, item.id, contentHash, JSON.stringify(item), item.observedAt);
-        this.db.prepare('INSERT INTO observations(source,item_id,stream,channel,observed_at,data) VALUES (?,?,?,?,?,?)').run(source, item.id, stream, channel, item.observedAt, JSON.stringify(item));
+        upsertItem.run(source, item.id, item.publishedAt, item.observedAt, item.observedAt, data, contentHash);
+        insertVersion.run(source, item.id, contentHash, data, item.observedAt);
+        insertObservation.run(source, item.id, stream, channel, item.observedAt, data);
       }
       const previous = this.channel(source, stream, channel);
       const successful = result.coverage.status === 'complete' || result.coverage.status === 'partial';

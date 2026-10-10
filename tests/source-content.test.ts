@@ -87,6 +87,7 @@ test('official article cache avoids requests and failed refresh preserves accept
     store.db.prepare('INSERT INTO feed_summaries VALUES (?,?,?,?,?)').run(item.source, item.id, 'key', JSON.stringify({ item: enriched }), item.observedAt);
     store.db.prepare('DELETE FROM http_cache WHERE url=?').run(item.url);
     const retained = await enrichItem(item, store, http, true);
+    assert.equal(http.raw.length, 0, 'persisted article responses must be released between items');
     assert.equal(retained.text, enriched.text);
     assert.match(String(retained.metadata?.articleError), /403/);
     assert.equal(store.states().length, 0);

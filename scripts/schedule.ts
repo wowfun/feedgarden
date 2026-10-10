@@ -12,7 +12,7 @@ const quote = (value: string) => "'" + value.replace(/'/g, "'\\''") + "'";
 const script = '#!/bin/bash\nset -euo pipefail\ncd ' + quote(root) + '\nif [[ -f .local/runner.env ]]; then\n  set -a\n  source .local/runner.env\n  set +a\nfi\nexec ' + quote(process.execPath) + ' --import tsx src/cli.ts run --due\n';
 await writeFile(join(output, 'run.sh'), script, { mode: 0o700 });
 const unitQuote = (value: string) => '"' + value.replace(/[%\\"]/g, char => char === '%' ? '%%' : '\\' + char) + '"';
-await writeFile(join(output, 'feedgarden.service'), '[Unit]\nDescription=Collect and publish Feedgarden items\nAfter=network-online.target\n\n[Service]\nType=oneshot\nWorkingDirectory=' + root.replace(/%/g, '%%') + '\nExecStart=/bin/bash ' + unitQuote(join(output, 'run.sh')) + '\nTimeoutStartSec=2h\n');
+await writeFile(join(output, 'feedgarden.service'), '[Unit]\nDescription=Collect and publish Feedgarden items\nAfter=network-online.target\n\n[Service]\nType=oneshot\nWorkingDirectory=' + root.replace(/%/g, '%%') + '\nExecStart=/bin/bash ' + unitQuote(join(output, 'run.sh')) + '\nTimeoutStartSec=infinity\n');
 await writeFile(join(output, 'feedgarden.timer'), '[Unit]\nDescription=Check Feedgarden tasks every 15 minutes\n\n[Timer]\nOnCalendar=*:0/15\nPersistent=true\nRandomizedDelaySec=30\n\n[Install]\nWantedBy=timers.target\n');
 const distro = values.distro ?? process.env.WSL_DISTRO_NAME;
 if (distro) {
@@ -24,7 +24,7 @@ if (distro) {
   <RegistrationInfo><Description>Run Feedgarden in WSL every 15 minutes. Requires the owning Windows user to be logged in.</Description></RegistrationInfo>
   <Triggers><CalendarTrigger><Repetition><Interval>PT15M</Interval><Duration>P1D</Duration><StopAtDurationEnd>false</StopAtDurationEnd></Repetition><StartBoundary>2026-09-29T00:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger></Triggers>
   <Principals><Principal id="Author"><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
-  <Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><StartWhenAvailable>true</StartWhenAvailable><RunOnlyIfNetworkAvailable>true</RunOnlyIfNetworkAvailable><ExecutionTimeLimit>PT2H</ExecutionTimeLimit><Enabled>true</Enabled></Settings>
+  <Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><StartWhenAvailable>true</StartWhenAvailable><RunOnlyIfNetworkAvailable>true</RunOnlyIfNetworkAvailable><ExecutionTimeLimit>PT0S</ExecutionTimeLimit><Enabled>true</Enabled></Settings>
   <Actions Context="Author"><Exec><Command>wsl.exe</Command><Arguments>${xml(argumentsText)}</Arguments></Exec></Actions>
 </Task>
 `);

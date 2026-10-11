@@ -4,6 +4,7 @@ import type { Item } from '../types.js';
 import { DateTime } from 'luxon';
 import { safeUrl } from '../util.js';
 import { extractMedia, mediaForUrl } from '../source-content.js';
+import { productHuntObjects } from '../producthunt.js';
 
 export const array = <T>(value: T | T[] | undefined): T[] => value === undefined ? [] : Array.isArray(value) ? value : [value];
 export const plain = (value: unknown): string => load(typeof value === 'string' ? value : String(value ?? ''), {}, false).text().replace(/\s+/g, ' ').trim();
@@ -93,28 +94,15 @@ export function parseProductHunt(body: string, context: ParseContext, dateKey: s
   const $ = load(body); const candidates = $('section:has(> [data-test="vote-button"]), [data-test="post-item"], [data-test^="post-item-"]');
   if (!candidates.length) throw new Error('Product Hunt leaderboard layout unavailable');
   const posts = new Map<string, Set<string>>();
-  $('script').each((_i, element) => {
-    const script = $(element).text();
-    if (!script.startsWith('(window[Symbol.for("ApolloSSRDataTransport")]')) return;
-    const payload = script.match(/\.push\((\{[\s\S]*\})\)\s*;?$/)?.[1];
-    if (!payload) return;
-    const pending: unknown[] = [];
-    // The transport is JSON with bare undefined values. Decode data only;
-    // preserve string contents and never evaluate the source script.
-    try { pending.push(JSON.parse(payload.replace(/"(?:\\.|[^"\\])*"|\bundefined\b/g, token => token === 'undefined' ? 'null' : token))); } catch { return; }
-    for (let visited = 0; pending.length && visited < 100000; visited++) {
-      const node = pending.pop() as any;
-      if (!node || typeof node !== 'object') continue;
-      if (node.__typename === 'Post' && /^\d+$/.test(String(node.id)) && DateTime.fromISO(String(node.featuredAt)).setZone(context.timezone ?? 'Asia/Shanghai').toISODate() === dateKey) {
-        for (const [prefix, slug] of [['products', node.product?.slug], ['posts', node.slug]]) {
-          if (typeof slug !== 'string' || !/^[\w-]+$/.test(slug)) continue;
-          const path = '/' + prefix + '/' + slug, ids = posts.get(path) ?? new Set<string>();
-          ids.add(String(node.id)); posts.set(path, ids);
-        }
+  for (const node of productHuntObjects(body)) {
+    if (node.__typename === 'Post' && /^\d+$/.test(String(node.id)) && DateTime.fromISO(String(node.featuredAt)).setZone(context.timezone ?? 'Asia/Shanghai').toISODate() === dateKey) {
+      for (const [prefix, slug] of [['products', node.product?.slug], ['posts', node.slug]]) {
+        if (typeof slug !== 'string' || !/^[\w-]+$/.test(slug)) continue;
+        const path = '/' + prefix + '/' + slug, ids = posts.get(path) ?? new Set<string>();
+        ids.add(String(node.id)); posts.set(path, ids);
       }
-      for (const child of Object.values(node)) pending.push(child);
     }
-  });
+  }
   return candidates.toArray().flatMap((element, index) => {
     const row = $(element); const anchor = row.find('a[href^="/posts/"], a[href^="/products/"]').first();
     const href = anchor.attr('href'); const title = anchor.text().trim();

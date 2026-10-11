@@ -39,6 +39,7 @@ export class Store {
     })();
     if (version < 3) initializeFeedSchema(this.db, DateTime.now().setZone('Asia/Shanghai').startOf('day').toUTC().toISO()!, false);
     this.db.exec('CREATE INDEX IF NOT EXISTS agent_calls_at ON agent_calls(at); CREATE INDEX IF NOT EXISTS items_first_seen ON items(source,first_seen,id);');
+    this.db.exec('CREATE TABLE IF NOT EXISTS enrichment_extractions(key TEXT PRIMARY KEY,body_hash TEXT NOT NULL,data TEXT NOT NULL); CREATE INDEX IF NOT EXISTS raw_responses_fingerprint ON raw_responses(source,stream,channel,url,hash,status);');
   }
   acquireLease(owner: string): void {
     this.db.transaction(() => {
@@ -66,14 +67,30 @@ export class Store {
     const row = this.db.prepare("SELECT json_extract(response,'$.headers') headers FROM http_cache WHERE url=?").get(url) as { headers: string } | undefined;
     return row && JSON.parse(row.headers);
   }
+  extracted<T>(key: string, body: string, parse: () => T): T {
+    const digest = hash(body), row = this.db.prepare('SELECT body_hash,data FROM enrichment_extractions WHERE key=?').get(key) as { body_hash: string; data: string } | undefined;
+    if (row?.body_hash === digest) return JSON.parse(row.data) as T;
+    const result = parse();
+    this.db.prepare('INSERT OR REPLACE INTO enrichment_extractions VALUES (?,?,?)').run(key, digest, JSON.stringify(result));
+    return result;
+  }
   saveCache(response: RawResponse): void { this.db.prepare('INSERT OR REPLACE INTO http_cache VALUES (?,?)').run(response.url, JSON.stringify(response)); }
+  saveRaw(source: string, stream: string, channel: string, raw: RawResponse): void {
+    const headers = JSON.stringify(raw.headers), digest = hash(raw.body);
+    // Keep distinct representations and response metadata, without appending
+    // another full body for an identical response. Existing evidence stays intact.
+    this.db.prepare(`INSERT INTO raw_responses(source,stream,channel,fetched_at,url,status,headers,body,hash)
+      SELECT ?,?,?,?,?,?,?,?,? WHERE NOT EXISTS
+      (SELECT 1 FROM raw_responses WHERE source=? AND stream=? AND channel=? AND url=? AND hash=? AND status=? AND headers=?)`).run(
+      source, stream, channel, raw.fetchedAt, raw.url, raw.status, headers, raw.body, digest,
+      source, stream, channel, raw.url, digest, raw.status, headers);
+  }
   saveCollection(source: string, stream: string, channel: string, result: Collection, nextAttempt: string, attemptedAt = result.coverage.to): void {
-    const insertRaw = this.db.prepare('INSERT INTO raw_responses(source,stream,channel,fetched_at,url,status,headers,body,hash) VALUES (?,?,?,?,?,?,?,?,?)');
     const upsertItem = this.db.prepare('INSERT INTO items VALUES (?,?,?,?,?,?,?) ON CONFLICT(source,id) DO UPDATE SET last_seen=excluded.last_seen,data=excluded.data,content_hash=excluded.content_hash');
     const insertVersion = this.db.prepare('INSERT OR IGNORE INTO item_versions VALUES (?,?,?,?,?)');
     const insertObservation = this.db.prepare('INSERT INTO observations(source,item_id,stream,channel,observed_at,data) VALUES (?,?,?,?,?,?)');
     this.db.transaction(() => {
-      for (const raw of result.raw) insertRaw.run(source, stream, channel, raw.fetchedAt, raw.url, raw.status, JSON.stringify(raw.headers), raw.body, hash(raw.body));
+      for (const raw of result.raw) this.saveRaw(source, stream, channel, raw);
       for (const item of result.items) {
         const data = JSON.stringify(item);
         const contentHash = hash({ title: item.title, text: item.text, url: item.url, author: item.author, ...(item.media?.length ? { media: item.media } : {}) });

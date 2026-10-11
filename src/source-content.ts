@@ -1,8 +1,19 @@
 import { load } from 'cheerio';
 import type { Item, Media } from './types.js';
-import { hash, safeUrl, errorText } from './util.js';
+import { hash, safeUrl, errorText, nowIso } from './util.js';
 import { Http } from './http.js';
 import { Store } from './store.js';
+import { productHuntPage, parseProductHuntRepository, repositoryUrl } from './producthunt.js';
+import { enrichHackerNews } from './hackernews.js';
+
+// Only recent enriched items receive periodic refreshes; changed items and
+// explicit --refresh remain eligible regardless of age.
+export function enrichmentInterval(item: Item): number {
+  if (item.source === 'hackernews' && /^\d+$/.test(item.id)) return 3600_000;
+  if (item.source === 'producthunt' && productHuntPage(item.url)) return 6 * 3600_000;
+  const hosts = item.source === 'openai' ? ['openai.com'] : item.source === 'anthropic' ? ['www.anthropic.com', 'anthropic.com'] : [];
+  return hosts.includes(new URL(item.url).hostname) ? 6 * 3600_000 : 0;
+}
 
 export function mediaForUrl(type: Media['type'], value: string, title: string, base: string): Media | undefined {
   try {
@@ -48,9 +59,48 @@ export function parseArticle(html: string, url: string): { text: string; media: 
   return text.length >= 200 ? { text, media: extractMedia(root.html() ?? '', url) } : undefined;
 }
 
-// Only the official sources have a bounded, known origin. Other feeds retain
-// their supplied body/media; discovery links do not trigger arbitrary crawling.
+function saveEnrichmentResponses(item: Item, store: Store, http: Http, start: number, channel: string): void {
+  for (const response of http.raw.splice(start)) {
+    http.signal?.throwIfAborted();
+    store.saveRaw(item.source, item.stream, channel, response);
+  }
+}
+
+async function enrichProductHunt(item: Item, store: Store, http: Http, refresh: boolean): Promise<Item> {
+  if (!productHuntPage(item.url)) return item;
+  let raw = store.cache(item.url), failure: string | undefined;
+  let attemptedAt: string | undefined;
+  const start = http.raw.length;
+  try {
+    if (refresh || !raw || Date.now() - Date.parse(raw.fetchedAt) > 6 * 3600_000) { attemptedAt = nowIso(); raw = await http.page(item.url); }
+  } catch (error) { failure = errorText(error); }
+  finally { saveEnrichmentResponses(item, store, http, start, 'repository'); }
+  http.signal?.throwIfAborted();
+  const result = raw && store.extracted('producthunt/v1/' + item.url, raw.body, () => parseProductHuntRepository(raw!.body, item.url));
+  const { repoUrl: _oldRepo, ...rest } = item;
+  const metadata: NonNullable<Item['metadata']> = { ...item.metadata, ...(attemptedAt ? { repositoryLastAttemptAt: attemptedAt } : {}) };
+  if (!result?.matched && !failure) failure = 'Product Hunt repository data unavailable';
+  if (failure) {
+    const row = store.db.prepare('SELECT accepted FROM feed_summaries WHERE source=? AND id=?').get(item.source, item.id) as { accepted: string } | undefined;
+    const previous = row && (JSON.parse(row.accepted) as { item: Item }).item;
+    // A failed refresh retains only evidence belonging to the same product route.
+    const retained = previous?.url === item.url ? repositoryUrl(previous.repoUrl) : undefined;
+    const repoUrl = retained ?? repositoryUrl(item.repoUrl);
+    return { ...rest, ...(repoUrl ? { repoUrl } : {}), metadata: { ...metadata, ...(retained ? { repositorySourceUrl: item.url, repositoryCheckedAt: previous!.metadata?.repositoryCheckedAt ?? null } : {}), repositoryError: failure } };
+  }
+  const { repositoryError: _oldError, ...successful } = metadata;
+  return { ...rest, ...(result?.repoUrl ? { repoUrl: result.repoUrl } : {}), metadata: { ...successful, repositorySourceUrl: item.url, repositoryCheckedAt: raw!.fetchedAt } };
+}
+
+// Enrichment follows official article origins, Product Hunt product pages, and
+// HN's submitted public article URL and fixed comment API. Prose links aren't crawled.
 export async function enrichItem(item: Item, store: Store, http: Http, refresh = false): Promise<Item> {
+  if (item.source === 'hackernews') {
+    const start = http.raw.length;
+    try { return await enrichHackerNews(item, store, http, refresh, extractMedia); }
+    finally { saveEnrichmentResponses(item, store, http, start, 'hn-enrichment'); }
+  }
+  if (item.source === 'producthunt') return enrichProductHunt(item, store, http, refresh);
   const allowed = item.source === 'openai' ? ['openai.com'] : item.source === 'anthropic' ? ['www.anthropic.com', 'anthropic.com'] : [];
   if (!allowed.includes(new URL(item.url).hostname)) return item;
   const feedHash = hash(item.text), cache = store.cache(item.url), rawStart = http.raw.length;
@@ -59,14 +109,10 @@ export async function enrichItem(item: Item, store: Store, http: Http, refresh =
     if (refresh || !raw || Date.now() - Date.parse(raw.fetchedAt) > 6 * 3600_000) raw = await http.page(item.url);
   } catch (error) { failure = errorText(error); }
   finally {
-    const insert = store.db.prepare('INSERT INTO raw_responses(source,stream,channel,fetched_at,url,status,headers,body,hash) VALUES (?,?,?,?,?,?,?,?,?)');
-    for (const response of http.raw.splice(rawStart)) {
-      http.signal?.throwIfAborted();
-      insert.run(item.source, item.stream, 'article', response.fetchedAt, response.url, response.status, JSON.stringify(response.headers), response.body, hash(response.body));
-    }
+    saveEnrichmentResponses(item, store, http, rawStart, 'article');
   }
   http.signal?.throwIfAborted();
-  const article = raw && parseArticle(raw.body, item.url);
+  const article = raw && store.extracted('official/v1/' + item.url, raw.body, () => parseArticle(raw!.body, item.url) ?? null);
   if (article && article.text.length > item.text.length) return { ...item, text: article.text, media: [...new Map([...article.media, ...(item.media ?? [])].map(candidate => [candidate.url, candidate])).values()].slice(0, 6), metadata: { ...item.metadata, enrichment: 'article', feedTextHash: feedHash, articleFetchedAt: raw!.fetchedAt, ...(failure ? { articleError: failure } : {}) } };
   // A transient fetch failure must not downgrade previously accepted full text.
   const previous = store.db.prepare('SELECT accepted FROM feed_summaries WHERE source=? AND id=?').get(item.source, item.id) as { accepted: string } | undefined;

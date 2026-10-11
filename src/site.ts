@@ -9,15 +9,27 @@ import { atomicWrite, safeUrl } from './util.js';
 
 function escapeMarkdown(value: string): string { return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\\`*_[\]{}()#!|$~]/g, char => `&#${char.charCodeAt(0)};`).replace(/\b([a-z][a-z0-9+.-]*):(?=\/\/)/gi, '$1&#58;').replace(/[\r\n]+/g, ' ').trim(); }
 function frontmatter(properties: Record<string, unknown>): string { return `---\n${Object.entries(properties).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n')}\n---\n\n`; }
+function prose(value: string): string {
+  return value.trim().split(/\n\s*\n/).map(paragraph => paragraph.split('\n').map(line => /^\s*[-*]\s+/.test(line) ? '- ' + escapeMarkdown(line.replace(/^\s*[-*]\s+/, '')) : escapeMarkdown(line)).join('\n')).join('\n\n');
+}
 export function renderItem(record: AcceptedItem, locale: 'en' | 'zh-CN', topics = record.copy.topics): string {
   const { item, copy } = record, translation = copy[locale];
-  const summary = translation.summary.trim().split(/\n\s*\n/).map(paragraph => paragraph.split('\n').map(line => /^\s*[-*]\s+/.test(line) ? '- ' + escapeMarkdown(line.replace(/^\s*[-*]\s+/, '')) : escapeMarkdown(line)).join('\n')).join('\n\n');
+  const summary = prose(translation.summary);
+  const excerpt = item.articleQuote && item.articleQuote + (item.text.replace(/\s+/g, ' ').trim() === item.articleQuote ? '' : '…');
   const media = (copy.media ?? []).map(id => item.media?.find(candidate => candidate.id === id)).filter(candidate => !!candidate).map(candidate => {
     const type = locale === 'en' ? candidate.type === 'image' ? 'Image' : 'Video' : candidate.type === 'image' ? '图片' : '视频';
     return '- [' + escapeMarkdown(type + (candidate.title ? ': ' + candidate.title : '')) + '](<' + safeUrl(candidate.url).replace(/[<>]/g, char => encodeURIComponent(char)) + '>)';
   });
-  const body = summary + (media.length ? '\n\n## ' + (locale === 'en' ? 'Images and video' : '图片与视频') + '\n\n' + media.join('\n') : '');
-  return frontmatter({ publish: true, content_type: 'post', title: translation.title, description: [...translation.summary.replace(/\s+/g, ' ')].slice(0, 240).join(''), date: record.date, updated: record.updated, first_seen: record.firstSeen, date_basis: record.dateBasis, source_url: safeUrl(item.url), tags: ['source/' + item.source, ...topics.map(id => 'topics/' + id)] }) + body + '\n';
+  let body = item.source === 'hackernews' ? excerpt ? '## ' + (locale === 'en' ? 'Original excerpt' : '原文摘录') + '\n\n> ' + escapeMarkdown(excerpt) : summary ? '## ' + (locale === 'en' ? 'Article' : '正文提炼') + '\n\n' + summary : '' : summary;
+  if (copy.discussion && item.discussion) {
+    const links = copy.discussion.commentIds.map(id => item.discussion!.comments.find(comment => comment.id === id)).filter(comment => !!comment).map(comment => '[' + escapeMarkdown((comment.author || '#' + comment.id)) + '](https://news.ycombinator.com/item?id=' + encodeURIComponent(comment.id) + ')');
+    const sample = locale === 'en' ? 'Based on ' + item.discussion.comments.length + ' selected comments and replies.' : '根据 ' + item.discussion.comments.length + ' 条选取的评论与回复整理。';
+    body += (body ? '\n\n' : '') + '## ' + (locale === 'en' ? 'HN discussion' : 'HN 热门讨论') + '\n\n' + sample + '\n\n' + prose(copy.discussion[locale]);
+    body += '\n\n' + (locale === 'en' ? 'Selected comments: ' : '评论来源：') + links.join(' · ') + '\n\n[' + (locale === 'en' ? 'Read the full HN discussion' : '查看完整 HN 讨论') + '](<' + safeUrl(item.discussion.url) + '>)';
+  }
+  body += media.length ? '\n\n## ' + (locale === 'en' ? 'Images and video' : '图片与视频') + '\n\n' + media.join('\n') : '';
+  const description = translation.summary || excerpt || copy.discussion?.[locale] || '';
+  return frontmatter({ publish: true, content_type: 'post', title: translation.title, description: [...description.replace(/\s+/g, ' ')].slice(0, 240).join(''), date: record.date, updated: record.updated, first_seen: record.firstSeen, date_basis: record.dateBasis, source_url: safeUrl(item.url), ...(item.repoUrl ? { repo_url: safeUrl(item.repoUrl) } : {}), ...(item.discussion ? { discussion_url: safeUrl(item.discussion.url) } : {}), tags: ['source/' + item.source, ...topics.map(id => 'topics/' + id)] }) + body + '\n';
 }
 interface ContentJournal { destination: string; staging: string; previous: string }
 export async function recoverContent(config: Config): Promise<void> {

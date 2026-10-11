@@ -11,6 +11,7 @@ import type { Item } from './types.js';
 import { atomicWrite, errorText, hash, nowIso, safeUrl } from './util.js';
 import { enrichItem } from './source-content.js';
 import { Http } from './http.js';
+import { reportSkill } from './report-skill.js';
 
 export type ItemCopy = z.infer<typeof outputSchema>['items'][number];
 export interface AcceptedItem { item: Item; copy: ItemCopy; firstSeen: string; date: string; dateBasis: 'published' | 'observed'; updated: string }
@@ -20,7 +21,8 @@ interface Batch { id: string; input: string; jobs: string; workspace: string; st
 export type Generator = (agent: Config['agent'], input: SummaryInput, repair?: string, workspace?: string, signal?: AbortSignal) => Promise<AgentResult>;
 export function summaryItem(item: Item, maxChars: number): SummaryInput['items'][number] {
   const normalize = (value: string) => value.normalize('NFKC').replace(/\s+/g, ' ').trim();
-  return { source: item.source, id: item.id, title: normalize(item.title), text: normalize(item.text).slice(0, maxChars), ...(item.author ? { author: normalize(item.author) } : {}), ...(item.media?.length ? { media: item.media.slice(0, 6) } : {}) };
+  const comments = item.discussion?.comments.slice(0, 10).map(comment => ({ ...comment, text: normalize(comment.text).slice(0, 600), author: normalize(comment.author) }));
+  return { source: item.source, id: item.id, title: normalize(item.title), text: normalize(item.text).slice(0, maxChars), ...(item.author ? { author: normalize(item.author) } : {}), ...(item.media?.length ? { media: item.media.slice(0, 6) } : {}), ...(item.articleQuote ? { articleQuote: item.articleQuote } : {}), ...(comments?.length ? { discussion: { comments } } : {}) };
 }
 export const itemPath = (source: string, id: string): string => 'items/' + hash([source, id]) + '.md';
 export function eligible(item: Item, firstSeen: string, cutoff: string, source: Source): boolean {
@@ -43,7 +45,7 @@ export async function summarize(config: Config, store: Store, options: { source?
   options.signal?.throwIfAborted();
   const sources = config.sources.filter(source => source.enabled && (!options.source || source.id === options.source));
   if (options.source && !sources.length) throw new Error('Unknown or disabled source: ' + options.source);
-  const skillHash = hash(await readFile('.agents/skills/feedgarden-report/SKILL.md', 'utf8'));
+  const skillHashes = new Map(await Promise.all(sources.map(async source => [source.id, hash(await reportSkill([source.id]))] as const)));
   const cutoff = store.meta('cutoff')!;
   const http = new Http(store, undefined, options.signal);
   let registry = await loadTopics(config.feed.topics), generated = 0, deferred = false, runtimeFailures = 0;
@@ -91,6 +93,7 @@ export async function summarize(config: Config, store: Store, options: { source?
   }
   store.db.prepare("UPDATE feed_jobs SET state='failed',error=COALESCE(error,'Attempt limit reached after interruption') WHERE state='pending' AND attempts>=5").run();
   for (const source of sources) {
+    const skillHash = skillHashes.get(source.id)!;
     const agent = { ...config.agent, ...source.agent };
     // published_at retains the first stored date; source corrections live in data.
     const query = store.db.prepare("SELECT i.id,i.data,i.first_seen FROM items i LEFT JOIN feed_excluded e ON e.source=i.source AND e.id=i.id WHERE i.source=? AND e.id IS NULL AND (i.first_seen>=? OR json_extract(i.data,'$.publishedAt')>=?) AND (i.first_seen,i.id)>(?,?) ORDER BY i.first_seen,i.id LIMIT 128");
@@ -133,12 +136,16 @@ export async function summarize(config: Config, store: Store, options: { source?
     let chosen: Source | undefined, jobs: Job[] = [];
     for (let offset = 0; offset < sources.length; offset++) {
       const source = sources[(start + offset) % sources.length]!;
-      const candidates = store.db.prepare("SELECT * FROM feed_jobs WHERE source=? AND state='pending' AND next_at<=? AND attempts<5 ORDER BY json_extract(data,'$.firstSeen'),id LIMIT ?").all(source.id, at, config.agent.maxBatchItems) as Job[];
+      // HN produces both article and discussion copy in two languages. Its output
+      // can exceed the model's token limit even when a larger batch fits the input.
+      const batchLimit = source.id === 'hackernews' ? Math.min(2, config.agent.maxBatchItems) : config.agent.maxBatchItems;
+      const candidates = store.db.prepare("SELECT * FROM feed_jobs WHERE source=? AND state='pending' AND next_at<=? AND attempts<5 ORDER BY json_extract(data,'$.firstSeen'),id LIMIT ?").all(source.id, at, batchLimit) as Job[];
       if (candidates.length) { chosen = source; jobs = candidates; break; }
     }
     if (!chosen) break;
     cursor = chosen.id; store.setMeta('round_robin', cursor);
     const agent = { ...config.agent, ...chosen.agent };
+    const skillHash = skillHashes.get(chosen.id)!;
     checkRegistryBudget();
     const fixed: FixedJob[] = [], input: SummaryInput = { contractVersion: 2, topics: registry, items: [] };
     let oversizedChars = 0;

@@ -1,7 +1,7 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { Readable, Writable } from 'node:stream';
 import { existsSync } from 'node:fs';
-import { chmod, copyFile, lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { chmod, lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +12,7 @@ import type { Item } from './types.js';
 import type { Registry } from './topics.js';
 import { errorText } from './util.js';
 import { validateArtifact, ArtifactError } from './topics-contract.mjs';
+import { reportSkill } from './report-skill.js';
 
 function modelRoute(model: string): [string, string] {
   const [provider, ...parts] = model.split('/');
@@ -68,7 +69,7 @@ export async function generateBatch(config: Config['agent'], input: SummaryInput
   const directory = workspace ?? await mkdtemp(join(runtime, 'task-'));
   await mkdir(directory, { recursive: true, mode: 0o700 });
   await chmod(directory, 0o700);
-  await copyFile(resolve('.agents/skills/feedgarden-report/SKILL.md'), join(directory, 'SKILL.md'));
+  await writeFile(join(directory, 'SKILL.md'), await reportSkill(input.items.map(item => item.source)), { mode: 0o600 });
   await writeFile(join(directory, 'input.json'), JSON.stringify(input), { mode: 0o600 });
   // No stock tools. A monotonic plugin guard also denies every tool except the
   // fixed input/output pair; model arguments cannot choose paths or execute code.

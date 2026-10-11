@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, rm, cp, mkdir } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm, cp, mkdir, stat, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import Database from 'better-sqlite3';
@@ -177,9 +177,54 @@ test('topic file is durable before accepted DB commit, and saved artifact recove
  await summarize(f.config,f.store,{},()=>{throw new Error('Must replay artifact');},at);assert.equal(acceptedItems(f.store).length,1);
  }finally{await f.cleanup();}
 });
+test('retention prunes only expired runner-owned terminal workspaces and preserves legacy and active evidence', async () => {
+ const f=await fixture();
+ try {
+  save(f.store,[item('retention')]);await summarize(f.config,f.store,{},generator,at);
+  const batch=f.store.db.prepare('SELECT id,workspace FROM feed_batches').get() as {id:string;workspace:string};
+  const legacy=join(f.config.agent.runtimeDirectory,'task-legacy');await mkdir(legacy);await writeFile(join(legacy,'audit.json'),'historical evidence');
+  const external=join(f.root,'external-evidence');await mkdir(external);await writeFile(join(external,'keep'),'evidence');
+  const linked=join(f.config.agent.runtimeDirectory,'task-00000000-0000-0000-0000-000000000000');await symlink(external,linked);
+  f.store.db.prepare('INSERT INTO feed_batches VALUES (?,?,?,?,?,?,NULL)').run('linked','{}','[]',linked,'accepted',at);
+  f.store.db.prepare("UPDATE feed_batches SET state='deferred' WHERE id=?").run(batch.id);
+  const later='2026-11-01T00:00:00.000Z';await summarize(f.config,f.store,{},generator,later);
+  assert.ok(await stat(batch.workspace));
+  f.store.db.prepare("UPDATE feed_batches SET state='accepted' WHERE id=?").run(batch.id);
+  await summarize(f.config,f.store,{},generator,later);
+  await assert.rejects(stat(batch.workspace),{code:'ENOENT'});
+  assert.equal(await readFile(join(legacy,'audit.json'),'utf8'),'historical evidence');
+  assert.equal(await readFile(join(external,'keep'),'utf8'),'evidence');
+  assert.equal(acceptedItems(f.store).length,1);
+ } finally {await f.cleanup();}
+});
 test('canonical topic editing during an agent call stops without a dangling public reference',async()=>{
  const f=await fixture();try{save(f.store,[item('a')]);await assert.rejects(summarize(f.config,f.store,{},async(...args)=>{await writeFile(f.config.feed.topics,JSON.stringify({version:1,topics:[]}));return generator(...args);},at),/cannot be removed|Unknown|changed|topic/i);assert.equal(acceptedItems(f.store).length,0);
  }finally{await f.cleanup();}
+});
+test('lease takeover immediately before acceptance retains the artifact without accepting topics or copy', async () => {
+ const f=await fixture();let successor:Store|undefined;
+ try {
+  f.store.acquireLease('original');save(f.store,[item('lease')]);
+  await assert.rejects(summarize(f.config,f.store,{},async(...args)=>{
+   const result=await generator(...args);
+   result.output.newTopics=[{...topic,id:'new-topic',name:{en:'New topic','zh-CN':'新主题'}}];
+   f.store.db.prepare('UPDATE job_lease SET expires=?').run('1970-01-01T00:00:00.000Z');
+   successor=new Store(f.config.storage.database);successor.acquireLease('successor');
+   return result;
+  },at),/Lost database job lease/);
+  assert.equal(acceptedItems(f.store).length,0);assert.equal((await loadTopics(f.config.feed.topics)).topics.length,1);
+  assert.equal((f.store.db.prepare('SELECT owner FROM job_lease').get() as {owner:string}).owner,'successor');
+  const batch=f.store.db.prepare("SELECT workspace FROM feed_batches WHERE state='running'").get() as {workspace:string};
+  assert.ok(JSON.parse(await readFile(join(batch.workspace,'result.json'),'utf8')));
+  assert.equal((await summarize(f.config,successor!,{},()=>{throw new Error('Saved artifact should recover');},at)).generated,1);
+ } finally {successor?.close();await f.cleanup();}
+});
+test('an expired lease cannot be resurrected by its previous owner', async () => {
+ const f=await fixture();
+ try {
+  f.store.acquireLease('expired');f.store.db.prepare('UPDATE job_lease SET expires=?').run('1970-01-01T00:00:00.000Z');
+  assert.throws(()=>f.store.renewLease('expired'),/Lost database job lease/);
+ } finally {await f.cleanup();}
 });
 test('cutoff uses Shanghai midnight as one instant; source dates and undated first observations are stable',()=>{
  assert.equal(date('2026-10-09','Asia/Shanghai'),'2026-10-08T16:00:00.000Z');assert.equal(date('2026-10-09','America/Los_Angeles'),'2026-10-09T07:00:00.000Z');assert.equal(date('2026-10-09T00:00:00-07:00','Asia/Shanghai'),'2026-10-09T07:00:00.000Z');assert.equal(date('2026-10-09 00:30:00','Asia/Shanghai'),'2026-10-08T16:30:00.000Z');
@@ -194,10 +239,28 @@ test('bounded planning uses the current publication date after a source correcti
   save(f.store,[item('corrected','one',{publishedAt:old,observedAt:old})]);
   save(f.store,[item('corrected','one',{publishedAt:at})]);
   const row=f.store.db.prepare('SELECT published_at,first_seen FROM items WHERE source=? AND id=?').get('one','corrected') as {published_at:string;first_seen:string};
-  assert.equal(row.published_at,old);assert.equal(row.first_seen,old);
+  assert.equal(row.published_at,at);assert.equal(row.first_seen,old);
+  assert.equal(f.store.items('one',cutoff,'2026-10-10T00:00:00.000Z').length,1);
+  assert.equal(f.store.items('one',old,cutoff).length,0);
   const result=await summarize(f.config,f.store,{},generator,at);assert.equal(result.generated,1);
   assert.equal(acceptedItems(f.store)[0]!.date,at);
  }finally{await f.cleanup();}
+});
+test('legacy stale date indexes reconcile once without changing first observation or historical versions', async () => {
+ const f=await fixture();
+ try {
+  save(f.store,[item('date')]);
+  f.store.db.prepare('UPDATE items SET published_at=? WHERE id=?').run('2026-01-01T00:00:00.000Z','date');
+  f.store.db.prepare('DELETE FROM feed_meta WHERE key=?').run('items_date_revision');
+  const first=f.store.db.prepare('SELECT first_seen,data FROM items').get(),versions=f.store.db.prepare('SELECT * FROM item_versions').all();
+  const reopened=new Store(f.config.storage.database);
+  try {
+   assert.equal(reopened.items('one',at,'2026-10-10T00:00:00.000Z').length,1);
+   assert.deepEqual(reopened.db.prepare('SELECT first_seen,data FROM items').get(),first);
+   assert.deepEqual(reopened.db.prepare('SELECT * FROM item_versions').all(),versions);
+   assert.equal(reopened.meta('items_date_revision'),'1');
+  } finally {reopened.close();}
+ } finally {await f.cleanup();}
 });
 test('content journal recovers the staged tree between its two renames',async()=>{
  const f=await fixture();try{const staging=join(f.root,'.content-stage-test'),previous=join(f.root,'content.previous-test');await mkdir(staging);await writeFile(join(staging,'index.md'),'new');await mkdir(previous);await writeFile(join(previous,'index.md'),'old');await writeFile(join(f.root,'content-journal.json'),JSON.stringify({destination:f.config.feed.directory,staging,previous}));await recoverContent(f.config);assert.equal(await readFile(join(f.config.feed.directory,'index.md'),'utf8'),'new');await assert.rejects(readFile(join(f.root,'content-journal.json')));

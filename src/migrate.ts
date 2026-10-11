@@ -8,7 +8,7 @@ import { DateTime } from 'luxon';
 import { parse } from 'jsonc-parser';
 import { configSchema, type Config } from './config.js';
 import { initializeFeedSchema, Store } from './store.js';
-import { atomicWrite, hash, nowIso } from './util.js';
+import { atomicWrite, hash, nowIso, iso } from './util.js';
 import { writeSite } from './site.js';
 
 export function convertConfig(value: any): Config {
@@ -80,7 +80,7 @@ export async function migrate(configFile = 'feedgarden.jsonc', at = nowIso(), si
       if (existsSync(legacy.reports?.directory ?? 'reports')) await cp(legacy.reports?.directory ?? 'reports', join(archive, 'reports'), { recursive: true });
       const manifest = { createdAt: at, configFile: resolve(configFile), reportsDirectory: resolve(legacy.reports?.directory ?? 'reports'), database: resolve(config.storage.database), codeCommit: revision(), themeCommit: JSON.parse(await readFile(join(archive, 'code-base/.github/theme.lock.json'), 'utf8')).commit, workingThemeCommit: JSON.parse(await readFile('.github/theme.lock.json', 'utf8')).commit, counts, checksums: await checksums(archive, signal), quickCheck: 'ok' };
       await atomicWrite(join(archive, 'manifest.json'), JSON.stringify(manifest, null, 2));
-      journal = { archive, cutoff: DateTime.fromISO(at).setZone('Asia/Shanghai').startOf('day').toUTC().toISO()!, configHash: hash(raw), state: 'archived' };
+      journal = { archive, cutoff: iso(DateTime.fromISO(at).setZone('Asia/Shanghai').startOf('day').toUTC(), 'migration cutoff'), configHash: hash(raw), state: 'archived' };
       await atomicWrite(journalPath, JSON.stringify(journal));
     }
     if (version === 2) {

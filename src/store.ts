@@ -3,11 +3,12 @@ import { DateTime } from 'luxon';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Collection, Item, RawResponse } from './types.js';
-import { hash, nowIso } from './util.js';
+import { hash, nowIso, iso } from './util.js';
 
 export interface ChannelState { source: string; stream: string; channel: string; cursor: string | null; last_success: string | null; last_attempt: string; next_attempt: string; status: string; notes: string }
 export class Store {
   readonly db: Database.Database;
+  private leaseOwner?: string;
   constructor(readonly path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path);
@@ -37,9 +38,49 @@ export class Store {
     if (version < 2) this.db.transaction(() => {
       this.db.exec('CREATE TABLE job_lease(id INTEGER PRIMARY KEY CHECK(id=1),owner TEXT NOT NULL,expires TEXT NOT NULL); PRAGMA user_version=2;');
     })();
-    if (version < 3) initializeFeedSchema(this.db, DateTime.now().setZone('Asia/Shanghai').startOf('day').toUTC().toISO()!, false);
-    this.db.exec('CREATE INDEX IF NOT EXISTS agent_calls_at ON agent_calls(at); CREATE INDEX IF NOT EXISTS items_first_seen ON items(source,first_seen,id);');
-    this.db.exec('CREATE TABLE IF NOT EXISTS enrichment_extractions(key TEXT PRIMARY KEY,body_hash TEXT NOT NULL,data TEXT NOT NULL); CREATE INDEX IF NOT EXISTS raw_responses_fingerprint ON raw_responses(source,stream,channel,url,hash,status);');
+    if (version < 3) initializeFeedSchema(this.db, iso(DateTime.now().setZone('Asia/Shanghai').startOf('day').toUTC()), false);
+    this.db.transaction(() => {
+      this.db.exec('CREATE INDEX IF NOT EXISTS agent_calls_at ON agent_calls(at); CREATE INDEX IF NOT EXISTS items_first_seen ON items(source,first_seen,id);');
+      this.db.exec('CREATE INDEX IF NOT EXISTS raw_responses_fingerprint ON raw_responses(source,stream,channel,url,hash,status);');
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS feed_planning(source TEXT NOT NULL,id TEXT NOT NULL,due_at TEXT NOT NULL,PRIMARY KEY(source,id));
+        CREATE INDEX IF NOT EXISTS feed_planning_due ON feed_planning(source,due_at,id);
+        CREATE TABLE IF NOT EXISTS enrichment_extractions(key TEXT PRIMARY KEY,body_hash TEXT NOT NULL,data TEXT NOT NULL);
+        INSERT OR IGNORE INTO feed_meta VALUES ('content_version','0');
+        CREATE TRIGGER IF NOT EXISTS feed_plan_insert AFTER INSERT ON items BEGIN
+          INSERT INTO feed_planning VALUES (NEW.source,NEW.id,'') ON CONFLICT(source,id) DO UPDATE SET due_at='';
+        END;
+        CREATE TRIGGER IF NOT EXISTS feed_plan_update AFTER UPDATE ON items
+        WHEN OLD.content_hash IS NOT NEW.content_hash OR OLD.first_seen IS NOT NEW.first_seen
+          OR json_remove(OLD.data,'$.observedAt') IS NOT json_remove(NEW.data,'$.observedAt') BEGIN
+          INSERT INTO feed_planning VALUES (NEW.source,NEW.id,'') ON CONFLICT(source,id) DO UPDATE SET due_at='';
+        END;
+        CREATE TRIGGER IF NOT EXISTS feed_plan_job_delete AFTER DELETE ON feed_jobs BEGIN
+          INSERT INTO feed_planning VALUES (OLD.source,OLD.id,'') ON CONFLICT(source,id) DO UPDATE SET due_at='';
+        END;
+        CREATE TRIGGER IF NOT EXISTS feed_content_insert AFTER INSERT ON feed_summaries BEGIN
+          UPDATE feed_meta SET value=CAST(value AS INTEGER)+1 WHERE key='content_version';
+        END;
+        CREATE TRIGGER IF NOT EXISTS feed_content_update AFTER UPDATE ON feed_summaries WHEN OLD.accepted IS NOT NEW.accepted BEGIN
+          UPDATE feed_meta SET value=CAST(value AS INTEGER)+1 WHERE key='content_version';
+        END;
+        CREATE TRIGGER IF NOT EXISTS feed_content_delete AFTER DELETE ON feed_summaries BEGIN
+          UPDATE feed_meta SET value=CAST(value AS INTEGER)+1 WHERE key='content_version';
+          INSERT INTO feed_planning VALUES (OLD.source,OLD.id,'') ON CONFLICT(source,id) DO UPDATE SET due_at='';
+        END;
+        CREATE TRIGGER IF NOT EXISTS feed_excluded_insert AFTER INSERT ON feed_excluded BEGIN
+          UPDATE feed_meta SET value=CAST(value AS INTEGER)+1 WHERE key='content_version';
+        END;
+        CREATE TRIGGER IF NOT EXISTS feed_excluded_delete AFTER DELETE ON feed_excluded BEGIN
+          UPDATE feed_meta SET value=CAST(value AS INTEGER)+1 WHERE key='content_version';
+          INSERT INTO feed_planning VALUES (OLD.source,OLD.id,'') ON CONFLICT(source,id) DO UPDATE SET due_at='';
+        END;
+      `);
+      if (this.meta('items_date_revision') !== '1') {
+        this.db.exec("UPDATE items SET published_at=json_extract(data,'$.publishedAt') WHERE typeof(json_extract(data,'$.publishedAt'))='text' AND published_at IS NOT json_extract(data,'$.publishedAt');");
+        this.setMeta('items_date_revision', '1');
+      }
+    })();
   }
   acquireLease(owner: string): void {
     this.db.transaction(() => {
@@ -47,8 +88,10 @@ export class Store {
       if (lease && lease.expires > nowIso()) throw new Error('Another Feedgarden job holds the database lease');
       this.db.prepare('INSERT OR REPLACE INTO job_lease VALUES (1,?,?)').run(owner, new Date(Date.now() + 120_000).toISOString());
     })();
+    this.leaseOwner = owner;
   }
-  renewLease(owner: string): void { if (this.db.prepare('UPDATE job_lease SET expires=? WHERE id=1 AND owner=?').run(new Date(Date.now() + 120_000).toISOString(), owner).changes !== 1) throw new Error('Lost database job lease'); }
+  renewLease(owner: string): void { if (this.db.prepare('UPDATE job_lease SET expires=? WHERE id=1 AND owner=? AND expires>?').run(new Date(Date.now() + 120_000).toISOString(), owner, nowIso()).changes !== 1) throw new Error('Lost database job lease'); }
+  assertLease(): void { if (this.leaseOwner) this.renewLease(this.leaseOwner); }
   watchLease(owner: string, cancellation: AbortController): NodeJS.Timeout {
     const timer = setInterval(() => {
       if (cancellation.signal.aborted) return;
@@ -57,7 +100,7 @@ export class Store {
     timer.unref();
     return timer;
   }
-  releaseLease(owner: string): void { this.db.prepare('DELETE FROM job_lease WHERE id=1 AND owner=?').run(owner); }
+  releaseLease(owner: string): void { this.db.prepare('DELETE FROM job_lease WHERE id=1 AND owner=?').run(owner); if (this.leaseOwner === owner) this.leaseOwner = undefined; }
   close(): void { this.db.close(); }
   channel(source: string, stream: string, channel: string): ChannelState | undefined {
     return this.db.prepare('SELECT * FROM channel_state WHERE source=? AND stream=? AND channel=?').get(source, stream, channel) as ChannelState | undefined;
@@ -86,7 +129,7 @@ export class Store {
       source, stream, channel, raw.url, digest, raw.status, headers);
   }
   saveCollection(source: string, stream: string, channel: string, result: Collection, nextAttempt: string, attemptedAt = result.coverage.to): void {
-    const upsertItem = this.db.prepare('INSERT INTO items VALUES (?,?,?,?,?,?,?) ON CONFLICT(source,id) DO UPDATE SET last_seen=excluded.last_seen,data=excluded.data,content_hash=excluded.content_hash');
+    const upsertItem = this.db.prepare('INSERT INTO items VALUES (?,?,?,?,?,?,?) ON CONFLICT(source,id) DO UPDATE SET published_at=excluded.published_at,last_seen=excluded.last_seen,data=excluded.data,content_hash=excluded.content_hash');
     const insertVersion = this.db.prepare('INSERT OR IGNORE INTO item_versions VALUES (?,?,?,?,?)');
     const insertObservation = this.db.prepare('INSERT INTO observations(source,item_id,stream,channel,observed_at,data) VALUES (?,?,?,?,?,?)');
     this.db.transaction(() => {

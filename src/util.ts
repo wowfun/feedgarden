@@ -2,6 +2,17 @@ import { createHash } from 'node:crypto';
 import { mkdir, rename, open } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
+import { DateTime } from 'luxon';
+export function iso(value: DateTime, label = 'timestamp'): string {
+  const result = value.toISO();
+  if (!result) throw new Error('Invalid ' + label + ': ' + (value.invalidExplanation ?? 'cannot serialize ISO timestamp'));
+  return result;
+}
+export function isoDate(value: DateTime, label = 'date'): string {
+  const result = value.toISODate();
+  if (!result) throw new Error('Invalid ' + label + ': ' + (value.invalidExplanation ?? 'cannot serialize ISO date'));
+  return result;
+}
 export const hash = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const nowIso = (): string => new Date().toISOString();
 export const sleep = (ms: number, signal?: AbortSignal): Promise<void> => setTimeout(ms, undefined, { signal });

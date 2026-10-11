@@ -2,7 +2,7 @@ import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { load } from 'cheerio';
 import type { Item } from '../types.js';
 import { DateTime } from 'luxon';
-import { safeUrl } from '../util.js';
+import { safeUrl, iso } from '../util.js';
 import { extractMedia, mediaForUrl } from '../source-content.js';
 import { productHuntObjects } from '../producthunt.js';
 
@@ -13,7 +13,7 @@ export function date(value: unknown, timezone = 'Asia/Shanghai'): string | undef
   const input = String(value ?? '').trim();
   if (!input) return undefined;
   for (const parsed of [DateTime.fromISO(input, { zone: timezone }), DateTime.fromRFC2822(input, { zone: timezone }), DateTime.fromSQL(input, { zone: timezone })]) {
-    if (parsed.isValid) return parsed.toUTC().toISO()!;
+    if (parsed.isValid) return iso(parsed.toUTC());
   }
   return undefined;
 }

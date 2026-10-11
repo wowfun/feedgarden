@@ -18,10 +18,10 @@ import { reportSkill } from './report-skill.js';
 
 const { values, positionals } = parseArgs({ allowPositionals: true, options: {
   config: { type: 'string' }, source: { type: 'string' }, since: { type: 'string' },
-  due: { type: 'boolean' }, rebuild: { type: 'boolean' }, 'remote-base': { type: 'string' }, 'retry-failed': { type: 'boolean' }, live: { type: 'boolean' }, 'no-publish': { type: 'boolean' }, help: { type: 'boolean', short: 'h' },
+  due: { type: 'boolean' }, rebuild: { type: 'boolean' }, refresh: { type: 'boolean' }, 'remote-base': { type: 'string' }, 'retry-failed': { type: 'boolean' }, live: { type: 'boolean' }, 'no-publish': { type: 'boolean' }, help: { type: 'boolean', short: 'h' },
 } });
 const command = positionals[0];
-if (values.help || !command) console.log('Feedgarden: migrate | rollback ARCHIVE | collect [--since ISO] | summarize [--source ID] [--rebuild] [--retry-failed] | topics apply FILE | run --due | doctor [--live] | render | backup | publish\nOptions: --config FILE --no-publish');
+if (values.help || !command) console.log('Feedgarden: migrate | rollback ARCHIVE | collect [--since ISO] | summarize [--source ID] [--refresh] [--rebuild] [--retry-failed] | topics apply FILE | run --due | doctor [--live] | render | backup | publish\nOptions: --config FILE --no-publish');
 else {
   const configFile = values.config ?? 'feedgarden.jsonc';
   const config = command === 'migrate' || command === 'rollback' ? convertConfig(parse(await readFile(configFile, 'utf8'))) : loadConfig(values.config);
@@ -46,7 +46,7 @@ else {
       heartbeat = store.watchLease(owner, cancellation);
       run = store.run(command); await recoverContent(config);
       async function summaries() {
-        const result = await summarize(config, store!, { source: values.source, rebuild: values.rebuild, retryFailed: values['retry-failed'], signal });
+        const result = await summarize(config, store!, { source: values.source, rebuild: values.rebuild, refresh: values.refresh, retryFailed: values['retry-failed'], signal });
         console.log(JSON.stringify(result));
         const errors = store!.db.prepare("SELECT source,id,error FROM feed_jobs WHERE error IS NOT NULL AND state!='ready'").all() as { source: string; id: string; error: string }[];
         const selected = new Set(config.sources.filter(source => source.enabled && (!values.source || source.id === values.source)).map(source => source.id));
@@ -54,7 +54,7 @@ else {
       }
       if (command === 'collect') recordCollection(await collect(config, store, values.source, values.due, undefined, values.since, signal));
       else if (command === 'summarize') { await summaries(); await writeSite(config, store, signal); }
-      else if (command === 'render') await writeSite(config, store, signal);
+      else if (command === 'render') await writeSite(config, store, signal, true);
       else if (command === 'topics') { if (positionals[1] !== 'apply' || !positionals[2]) throw new Error('topics apply requires a JSON registry file');
         if (values['remote-base']) {
           if (!/^[a-f0-9]{40}$/.test(values['remote-base'])) throw new Error('Remote base requires a full commit SHA');

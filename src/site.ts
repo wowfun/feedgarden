@@ -4,8 +4,8 @@ import { join, resolve, dirname } from 'node:path';
 import type { Config } from './config.js';
 import { Store } from './store.js';
 import { iterateAcceptedItems, itemPath, type AcceptedItem } from './items.js';
-import { loadTopics, resolveTopic } from './topics.js';
-import { atomicWrite, safeUrl } from './util.js';
+import { loadTopics } from './topics.js';
+import { atomicWrite, safeUrl, hash } from './util.js';
 
 function escapeMarkdown(value: string): string { return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\\`*_[\]{}()#!|$~]/g, char => `&#${char.charCodeAt(0)};`).replace(/\b([a-z][a-z0-9+.-]*):(?=\/\/)/gi, '$1&#58;').replace(/[\r\n]+/g, ' ').trim(); }
 function frontmatter(properties: Record<string, unknown>): string { return `---\n${Object.entries(properties).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n')}\n---\n\n`; }
@@ -46,11 +46,16 @@ export async function recoverContent(config: Config): Promise<void> {
   await rm(journal.previous, { recursive: true, force: true });
   await rm(journalPath);
 }
-export async function writeSite(config: Config, store: Store, signal?: AbortSignal): Promise<void> {
+export async function writeSite(config: Config, store: Store, signal?: AbortSignal, force = false): Promise<boolean> {
   signal?.throwIfAborted();
   await recoverContent(config);
   const registry = await loadTopics(config.feed.topics);
   const destination = resolve(config.feed.directory);
+  const manifests = await Promise.all(['en', 'zh-CN'].map(locale => readFile('config/locales/' + locale + '.json', 'utf8')));
+  const signature = hash({ contentVersion: store.meta('content_version'), registry, sources: config.sources.map(({ id, name, timezone }) => ({ id, name, timezone })), manifests, renderRevision: 1 });
+  const signatureKey = 'render_signature:' + destination;
+  if (!force && existsSync(destination) && existsSync(join(destination, 'index.md')) && existsSync(join(destination, '_translations/zh-CN/index.md')) && store.meta(signatureKey) === signature) return false;
+  const topicIds = new Map(registry.topics.map(topic => [topic.id, topic.replacedBy ?? topic.id]));
   await mkdir(dirname(destination), { recursive: true });
   const staging = await mkdtemp(join(dirname(destination), '.content-stage-'));
   const paths = new Map<string, string>();
@@ -64,27 +69,36 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
     }
     for (const locale of ['en', 'zh-CN'] as const) {
       const prefix = locale === 'zh-CN' ? '_translations/zh-CN/' : '';
-      const manifest = JSON.parse(await readFile('config/locales/' + locale + '.json', 'utf8'));
+      const manifest = JSON.parse(manifests[locale === 'en' ? 0 : 1]!);
       manifest.tag_labels = Object.fromEntries([...config.sources.map(source => ['source/' + source.id, source.name]), ...registry.topics.map(topic => ['topics/' + topic.id, topic.name[locale]])]);
       manifest.tag_aliases = Object.fromEntries(registry.topics.filter(topic => topic.replacedBy).map(topic => ['topics/' + topic.id, 'topics/' + topic.replacedBy]));
       await write(prefix + '_locale.yml', JSON.stringify(manifest, null, 2));
       await write(prefix + 'index.md', frontmatter({ publish: true, content_type: 'page', title: 'Feedgarden' }));
-      for (const record of iterateAcceptedItems(store)) {
-        const path = itemPath(record.item.source, record.item.id), identity = JSON.stringify([record.item.source, record.item.id]);
+    }
+    for (const record of iterateAcceptedItems(store)) {
+        signal?.throwIfAborted();
+        const { source, id } = record.item;
+        const path = itemPath(source, id), identity = JSON.stringify([source, id]);
         const previous = paths.get(path);
-        if (previous && previous !== identity) throw new Error('Item path hash collision: ' + path);
+        if (previous && previous !== identity) throw new Error('Item path collision: ' + path);
         paths.set(path, identity);
-        await write(prefix + path, renderItem(record, locale, [...new Set(record.copy.topics.map(id => resolveTopic(registry, id)))]));
-      }
+        const topics = [...new Set(record.copy.topics.map(id => {
+          const resolved = topicIds.get(id); if (!resolved) throw new Error('Unknown stored topic: ' + id); return resolved;
+        }))];
+        for (const locale of ['en', 'zh-CN'] as const) await write((locale === 'zh-CN' ? '_translations/zh-CN/' : '') + path, renderItem(record, locale, topics));
     }
     signal?.throwIfAborted();
   } catch (error) { await rm(staging, { recursive: true, force: true }); throw error; }
   const previous = destination + '.previous-' + Date.now();
+  store.assertLease();
   await atomicWrite(resolve(config.storage.directory, 'content-journal.json'), JSON.stringify({ destination, staging, previous }), signal);
   signal?.throwIfAborted();
+  store.assertLease();
   if (existsSync(destination)) await rename(destination, previous);
   signal?.throwIfAborted();
   await rename(staging, destination);
   signal?.throwIfAborted();
   await recoverContent(config);
+  store.setMeta(signatureKey, signature);
+  return true;
 }

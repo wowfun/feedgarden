@@ -9,9 +9,10 @@ import { applyTopics, loadTopics, type Registry } from './topics.js';
 import { Store, QuotaDeferred } from './store.js';
 import type { Item } from './types.js';
 import { atomicWrite, errorText, hash, nowIso, safeUrl } from './util.js';
-import { enrichItem } from './source-content.js';
+import { enrichItem, enrichmentInterval } from './source-content.js';
 import { Http } from './http.js';
 import { reportSkill } from './report-skill.js';
+import { pruneWorkspaces } from './workspaces.js';
 
 export type ItemCopy = z.infer<typeof outputSchema>['items'][number];
 export interface AcceptedItem { item: Item; copy: ItemCopy; firstSeen: string; date: string; dateBasis: 'published' | 'observed'; updated: string }
@@ -41,7 +42,7 @@ export function* iterateAcceptedItems(store: Store): IterableIterator<AcceptedIt
   }
 }
 export function acceptedItems(store: Store): AcceptedItem[] { return [...iterateAcceptedItems(store)]; }
-export async function summarize(config: Config, store: Store, options: { source?: string; rebuild?: boolean; retryFailed?: boolean; signal?: AbortSignal } = {}, generator: Generator = generateBatch, at = nowIso(), prepare: typeof enrichItem = enrichItem): Promise<{ generated: number; pending: number; failed: number; deferred: boolean }> {
+export async function summarize(config: Config, store: Store, options: { source?: string; rebuild?: boolean; refresh?: boolean; retryFailed?: boolean; signal?: AbortSignal } = {}, generator: Generator = generateBatch, at = nowIso(), prepare: typeof enrichItem = enrichItem): Promise<{ generated: number; pending: number; failed: number; deferred: boolean }> {
   options.signal?.throwIfAborted();
   const sources = config.sources.filter(source => source.enabled && (!options.source || source.id === options.source));
   if (options.source && !sources.length) throw new Error('Unknown or disabled source: ' + options.source);
@@ -57,17 +58,20 @@ export async function summarize(config: Config, store: Store, options: { source?
   checkRegistryBudget();
   // Recover a saved artifact before spending another ACP attempt.
   async function accept(batch: Batch, result: unknown, validated?: ReturnType<typeof validateArtifact>): Promise<void> {
+    store.assertLease();
     options.signal?.throwIfAborted();
     const input = JSON.parse(batch.input) as SummaryInput;
     const { output, registry: validatedRegistry } = validated ?? validateArtifact(result, input);
     const previous = await loadTopics(config.feed.topics);
     if (hash(previous) !== hash(input.topics) && hash(previous) !== hash(validatedRegistry)) throw new Error('Topic registry changed while a task was running');
     const next = validatedRegistry as Registry;
+    store.assertLease();
     await applyTopics(config.feed.topics, next, hash(previous), options.signal);
     options.signal?.throwIfAborted();
     registry = next;
     const jobs = JSON.parse(batch.jobs) as FixedJob[];
     store.db.transaction(() => {
+      store.assertLease();
       jobs.forEach((job, i) => {
         const copy = output.items[i]! as ItemCopy;
         const accepted: AcceptedItem = { item: job.item, copy, firstSeen: job.firstSeen, date: job.item.basis === 'observed' ? job.firstSeen : job.item.publishedAt, dateBasis: job.item.basis === 'observed' ? 'observed' : 'published', updated: at };
@@ -92,28 +96,44 @@ export async function summarize(config: Config, store: Store, options: { source?
     else store.db.prepare("UPDATE feed_batches SET state='interrupted',error='Interrupted without valid artifact' WHERE id=?").run(batch.id);
   }
   store.db.prepare("UPDATE feed_jobs SET state='failed',error=COALESCE(error,'Attempt limit reached after interruption') WHERE state='pending' AND attempts>=5").run();
+  await pruneWorkspaces(config.agent, store, at);
   for (const source of sources) {
     const skillHash = skillHashes.get(source.id)!;
     const agent = { ...config.agent, ...source.agent };
-    // published_at retains the first stored date; source corrections live in data.
-    const query = store.db.prepare("SELECT i.id,i.data,i.first_seen FROM items i LEFT JOIN feed_excluded e ON e.source=i.source AND e.id=i.id WHERE i.source=? AND e.id IS NULL AND (i.first_seen>=? OR json_extract(i.data,'$.publishedAt')>=?) AND (i.first_seen,i.id)>(?,?) ORDER BY i.first_seen,i.id LIMIT 128");
-    let firstSeen = '', lastId = '';
+    const policy = hash({ cutoff, keywords: source.includeKeywords, model: agent.model, effort: agent.effort, maxItemChars: agent.maxItemChars, skillHash, summaryRevision: 3, planningRevision: 2, enrichmentRefreshDays: config.collection.enrichmentRefreshDays });
+    if (options.rebuild || options.refresh || store.meta('planning_policy:' + source.id) !== policy) {
+      // Policy changes revisit recent items and unfinished copies. Historical accepted
+      // items require changed source facts or an explicit refresh/rebuild.
+      const refreshSince = new Date(Date.parse(at) - config.collection.enrichmentRefreshDays * 86400_000).toISOString();
+      store.db.transaction(() => {
+        store.db.prepare("INSERT OR REPLACE INTO feed_planning SELECT i.source,i.id,'' FROM items i LEFT JOIN feed_excluded e ON e.source=i.source AND e.id=i.id LEFT JOIN feed_summaries f ON f.source=i.source AND f.id=i.id LEFT JOIN feed_jobs j ON j.source=i.source AND j.id=i.id WHERE i.source=? AND e.id IS NULL AND (i.first_seen>=? OR json_extract(i.data,'$.publishedAt')>=?) AND (? OR f.id IS NULL OR j.state!='ready' OR julianday(i.first_seen)>julianday(?))").run(source.id, cutoff, cutoff, options.rebuild || options.refresh ? 1 : 0, refreshSince);
+        store.setMeta('planning_policy:' + source.id, policy);
+      })();
+    }
+    if (options.retryFailed) store.db.prepare("INSERT OR REPLACE INTO feed_planning SELECT source,id,'' FROM feed_jobs WHERE source=? AND state='failed'").run(source.id);
+    const query = store.db.prepare('SELECT i.id,i.data,i.first_seen,p.due_at FROM feed_planning p JOIN items i ON i.source=p.source AND i.id=p.id WHERE p.source=? AND p.due_at<=? ORDER BY p.due_at,p.id LIMIT 128');
     while (true) {
       options.signal?.throwIfAborted();
-      const rows = query.all(source.id, cutoff, cutoff, firstSeen, lastId) as { id: string; data: string; first_seen: string }[];
+      const rows = query.all(source.id, at) as { id: string; data: string; first_seen: string; due_at: string }[];
       if (!rows.length) break;
       for (const row of rows) {
         options.signal?.throwIfAborted();
+        if (row.due_at && Date.parse(at) >= Date.parse(row.first_seen) + config.collection.enrichmentRefreshDays * 86400_000) {
+          store.db.prepare('DELETE FROM feed_planning WHERE source=? AND id=?').run(source.id, row.id); continue;
+        }
         let item = JSON.parse(row.data) as Item;
-        if (!eligible(item, row.first_seen, cutoff, source)) continue;
+        if (store.db.prepare('SELECT 1 FROM feed_excluded WHERE source=? AND id=?').get(source.id, row.id) || !eligible(item, row.first_seen, cutoff, source)) {
+          store.db.prepare('DELETE FROM feed_planning WHERE source=? AND id=?').run(source.id, row.id); continue;
+        }
         safeUrl(item.url);
-        item = await prepare(item, store, http, !!options.rebuild);
+        item = await prepare(item, store, http, !!(options.rebuild || options.refresh));
         options.signal?.throwIfAborted();
         const key = hash({ ...summaryItem(item, agent.maxItemChars), model: agent.model, effort: agent.effort, skillHash, contractVersion: 2, summaryRevision: 3 });
         const previous = store.db.prepare('SELECT * FROM feed_jobs WHERE source=? AND id=?').get(source.id, row.id) as Job | undefined;
         if (!previous || previous.cache_key !== key || options.rebuild) store.db.prepare("INSERT OR REPLACE INTO feed_jobs VALUES (?,?,?,?, 'pending',0,'',NULL)").run(source.id, row.id, key, JSON.stringify({ item, firstSeen: row.first_seen }));
         else {
-          store.db.prepare('UPDATE feed_jobs SET data=? WHERE source=? AND id=?').run(JSON.stringify({ item, firstSeen: row.first_seen }), source.id, row.id);
+          const data = JSON.stringify({ item, firstSeen: row.first_seen });
+          if (data !== previous.data) store.db.prepare('UPDATE feed_jobs SET data=? WHERE source=? AND id=?').run(data, source.id, row.id);
           if (options.retryFailed && previous.state === 'failed') store.db.prepare("UPDATE feed_jobs SET state='pending',attempts=0,next_at='',error=NULL WHERE source=? AND id=?").run(source.id, row.id);
           if (previous.state === 'ready') {
             const old = store.db.prepare('SELECT accepted FROM feed_summaries WHERE source=? AND id=?').get(source.id, row.id) as { accepted: string };
@@ -125,8 +145,10 @@ export async function summarize(config: Config, store: Store, options: { source?
             if (updated !== old.accepted) store.db.prepare('UPDATE feed_summaries SET accepted=? WHERE source=? AND id=?').run(updated, source.id, row.id);
           }
         }
+        const interval = enrichmentInterval(item), nextRefresh = Date.parse(at) + interval;
+        if (interval && nextRefresh < Date.parse(row.first_seen) + config.collection.enrichmentRefreshDays * 86400_000) store.db.prepare('UPDATE feed_planning SET due_at=? WHERE source=? AND id=?').run(new Date(nextRefresh).toISOString(), source.id, row.id);
+        else store.db.prepare('DELETE FROM feed_planning WHERE source=? AND id=?').run(source.id, row.id);
       }
-      firstSeen = rows.at(-1)!.first_seen; lastId = rows.at(-1)!.id;
     }
   }
   let cursor = store.meta('round_robin') ?? '';
@@ -163,6 +185,7 @@ export async function summarize(config: Config, store: Store, options: { source?
     const id = randomUUID(), workspace = resolve(agent.runtimeDirectory, 'task-' + id);
     const batch: Batch = { id, input: JSON.stringify(input), jobs: JSON.stringify(fixed), workspace, state: 'prepared' };
     await mkdir(workspace, { recursive: true, mode: 0o700 });
+    await atomicWrite(join(workspace, '.feedgarden-workspace.json'), JSON.stringify({ version: 1, batch: id }));
     store.db.prepare('INSERT INTO feed_batches VALUES (?,?,?,?,?,?,NULL)').run(id, batch.input, batch.jobs, workspace, 'prepared', at);
     if (!options.rebuild) {
       const cached = fixed.map(job => (store.db.prepare('SELECT copy FROM feed_cache WHERE key=?').get(job.key) as { copy: string } | undefined)?.copy);

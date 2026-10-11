@@ -61,8 +61,10 @@ export async function publish(config: Config, store?: Store, validate: (root: st
     if (!paths.length) { await atomicWrite(baseFile, JSON.stringify({ commit: remoteCommit, registry: merged })); console.log('No item changes to publish.'); return; }
     await validate(worktree);
     signal?.throwIfAborted();
+    store?.assertLease();
     await run('git', ['commit', '-m', 'Publish Feedgarden items and topics'], worktree);
     signal?.throwIfAborted();
+    store?.assertLease();
     await run('git', ['push', 'origin', 'HEAD:refs/heads/' + config.publish.branch], worktree);
     await atomicWrite(baseFile, JSON.stringify({ commit: git(['rev-parse', 'HEAD'], worktree), registry: merged }));
   } finally {

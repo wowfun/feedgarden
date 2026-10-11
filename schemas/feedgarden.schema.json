@@ -47,11 +47,18 @@
     },
     "collection": {
       "default": {
-        "backfillDays": 7
+        "backfillDays": 7,
+        "enrichmentRefreshDays": 7
       },
       "type": "object",
       "properties": {
         "backfillDays": {
+          "default": 7,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30
+        },
+        "enrichmentRefreshDays": {
           "default": 7,
           "type": "integer",
           "minimum": 0,
@@ -111,6 +118,12 @@
         "runtimeDirectory": {
           "default": ".local/dsh",
           "type": "string"
+        },
+        "workspaceRetentionDays": {
+          "default": 7,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 365
         }
       },
       "required": [

@@ -8,7 +8,7 @@ import type { Source, Stream, Channel } from '../config.js';
 import type { Collection, Item } from '../types.js';
 import { Http } from '../http.js';
 import { Store } from '../store.js';
-import { hash, mapLimit, safeUrl, errorText } from '../util.js';
+import { hash, mapLimit, safeUrl, errorText, iso, isoDate } from '../util.js';
 import { array, date, parseFeed, parseFollowBuilders, parseProductHunt, parseTrending, plain, text, xml, type ParseContext } from './parsers.js';
 
 const exec = promisify(execFile);
@@ -31,18 +31,20 @@ async function hn(c: ChannelContext): Promise<Collection> {
   const raw = await c.http.get(`${url}/topstories.json`); const ids: unknown = JSON.parse(raw.body);
   if (!Array.isArray(ids) || ids.some(id => typeof id !== 'number')) throw new Error('Invalid HN topstories response');
   const failures: string[] = [];
-  const items = await mapLimit(ids.slice(0, c.channel.limit) as number[], 8, async id => {
+  const attempted = ids.slice(0, c.channel.limit) as number[];
+  const ranks = new Map(attempted.map((id, index) => [id, index + 1]));
+  const items = await mapLimit(attempted, 8, async id => {
     try {
       const raw = await c.http.get(`${url}/item/${id}.json`); const row = JSON.parse(raw.body);
       if (!row || row.deleted || row.dead || row.type !== 'story') return undefined;
       if (!row.title || !Number.isFinite(row.time)) throw new Error('Malformed HN story');
       return { ...base(c), id: String(id), title: plain(row.title), url: safeUrl(row.url ?? `https://news.ycombinator.com/item?id=${id}`),
         publishedAt: new Date(row.time * 1000).toISOString(), author: row.by, text: plain(row.text ?? ''),
-        metrics: { score: row.score ?? null, comments: row.descendants ?? null, rank: ids.indexOf(id) + 1 }, basis: 'published',
+        metrics: { score: row.score ?? null, comments: row.descendants ?? null, rank: ranks.get(id)! }, basis: 'published',
         metadata: { discussionUrl: `https://news.ycombinator.com/item?id=${id}` } } satisfies Item;
     } catch { failures.push(String(id)); return undefined; }
   });
-  if (failures.length === ids.length && ids.length) throw new Error('All HN item requests failed');
+  if (attempted.length && failures.length === attempted.length) throw new Error('All HN item requests failed');
   return collected(c, items.filter((item): item is NonNullable<typeof item> => !!item), [
     ...(ids.length > c.channel.limit ? [`Candidate snapshot truncated to ${c.channel.limit} items.`] : []),
     ...(failures.length ? [`${failures.length} HN item requests failed.`] : []),
@@ -135,8 +137,8 @@ async function productHunt(c: ChannelContext): Promise<Collection> {
     c.http.signal?.throwIfAborted();
     const url = `https://www.producthunt.com/leaderboard/daily/${day.year}/${day.month}/${day.day}`;
     try {
-      const page = parseProductHunt((await c.http.page(url)).body, base(c), day.toISODate()!);
-      items.push(...page.map(item => ({ ...item, publishedAt: day.toUTC().toISO()! })));
+      const page = parseProductHunt((await c.http.page(url)).body, base(c), isoDate(day, 'Product Hunt day'));
+      items.push(...page.map(item => ({ ...item, publishedAt: iso(day.toUTC(), 'Product Hunt publication date') })));
       succeeded = true;
     } catch (error) { c.http.signal?.throwIfAborted(); notes.push(`${day.toISODate()}: ${errorText(error)}`); }
   }
@@ -144,7 +146,7 @@ async function productHunt(c: ChannelContext): Promise<Collection> {
   const continuing = day <= to;
   if (continuing) notes.push('Historical leaderboard range continues from ' + day.toISODate() + '; at most seven daily pages are fetched per run.');
   else if (from <= to && to.hasSame(DateTime.fromISO(c.now).setZone(c.source.timezone), 'day')) notes.push('The current source-local day is still in progress; its leaderboard is a provisional snapshot.');
-  const result = collected(c, items, notes, continuing ? JSON.stringify({ ...range, next: day.toISODate()! }) : '');
+  const result = collected(c, items, notes, continuing ? JSON.stringify({ ...range, next: isoDate(day, 'Product Hunt day') }) : '');
   result.coverage.from = range.from; result.coverage.to = range.to;
   return result;
 }

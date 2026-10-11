@@ -62,6 +62,10 @@ export class Store {
     return this.db.prepare('SELECT * FROM channel_state WHERE source=? AND stream=? AND channel=?').get(source, stream, channel) as ChannelState | undefined;
   }
   cache(url: string): RawResponse | undefined { const row = this.db.prepare('SELECT response FROM http_cache WHERE url=?').get(url) as { response: string } | undefined; return row && JSON.parse(row.response); }
+  cacheHeaders(url: string): Record<string, string> | undefined {
+    const row = this.db.prepare("SELECT json_extract(response,'$.headers') headers FROM http_cache WHERE url=?").get(url) as { headers: string } | undefined;
+    return row && JSON.parse(row.headers);
+  }
   saveCache(response: RawResponse): void { this.db.prepare('INSERT OR REPLACE INTO http_cache VALUES (?,?)').run(response.url, JSON.stringify(response)); }
   saveCollection(source: string, stream: string, channel: string, result: Collection, nextAttempt: string, attemptedAt = result.coverage.to): void {
     const insertRaw = this.db.prepare('INSERT INTO raw_responses(source,stream,channel,fetched_at,url,status,headers,body,hash) VALUES (?,?,?,?,?,?,?,?,?)');

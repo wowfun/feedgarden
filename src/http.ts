@@ -1,14 +1,16 @@
 import { Store } from './store.js';
 import type { RawResponse } from './types.js';
-import { nowIso, sleep } from './util.js';
+import { nowIso, sleep, errorText } from './util.js';
 import { EnvHttpProxyAgent } from 'undici';
 import { curlFetch } from './http-curl.js';
 import robotsModule from 'robots-parser';
+import { resolvePublicTarget, type PublicResolver } from './public-url.js';
+import { publicDispatcher } from './public-http.js';
 // This CommonJS package's declaration wraps its callable export in `default`.
 const robotsParser = robotsModule as unknown as typeof robotsModule.default;
 
 const dispatcher = new EnvHttpProxyAgent();
-const networkFetch: typeof fetch = (url, init) => fetch(url, { ...init, dispatcher } as RequestInit);
+const networkFetch: typeof fetch = (url, init) => fetch(url, { dispatcher, ...init } as RequestInit);
 const MAX_RESPONSE_BYTES = 12_000_000;
 
 async function boundedText(response: Response): Promise<string> {
@@ -41,31 +43,92 @@ export class HttpError extends Error {
 export class Http {
   readonly raw: RawResponse[] = [];
   private readonly hostNext = new Map<string, number>();
+  private readonly hostRequests = new Map<string, Promise<void>>();
+  private readonly hostSpacing = new Map<string, number>();
   private readonly hostCooldown = new Map<string, HttpError>();
   private readonly sharedResponses = new Map<string, RawResponse>();
   private readonly robots = new Map<string, ReturnType<typeof robotsParser>>();
-  constructor(private readonly store: Store, private readonly fetcher: typeof fetch = networkFetch, readonly signal?: AbortSignal) {}
-  async page(url: string, spacingMs = 1500): Promise<RawResponse> {
+  constructor(private readonly store: Store, private readonly fetcher: typeof fetch = networkFetch, readonly signal?: AbortSignal, private readonly publicResolver?: PublicResolver) {}
+  private async pageDelay(url: string, publicOnly: boolean): Promise<number> {
     const origin = new URL(url).origin, robotsUrl = origin + '/robots.txt';
     let rules = this.robots.get(origin);
     if (!rules) {
       let body = '';
-      try { body = (await this.get(robotsUrl)).body; }
+      try { body = (await this.get(robotsUrl, 0, 'fetch', publicOnly)).body; }
       catch (error) { if (!(error instanceof HttpError && error.status === 404)) throw error; }
       rules = robotsParser(robotsUrl, body); this.robots.set(origin, rules);
     }
     if (rules.isAllowed(url, 'Feedgarden') === false) throw new HttpError('robots.txt disallows ' + new URL(url).pathname, 403);
-    return this.get(url, Math.max(spacingMs, (rules.getCrawlDelay('Feedgarden') ?? 0) * 1000));
+    return (rules.getCrawlDelay('Feedgarden') ?? 0) * 1000;
+  }
+  async page(url: string, spacingMs = 1500, publicOnly = false): Promise<RawResponse> {
+    return this.get(url, Math.max(spacingMs, await this.pageDelay(url, publicOnly)), 'fetch', publicOnly);
   }
   async shared(url: string): Promise<RawResponse> {
     const existing = this.sharedResponses.get(url);
     if (existing) { this.raw.push(existing); return existing; }
     const response = await this.get(url); this.sharedResponses.set(url, response); return response;
   }
-  async get(url: string, spacingMs = 0, transport: 'fetch' | 'curl' = 'fetch'): Promise<RawResponse> {
+  private async withHost<T>(host: string, spacingMs: number, signal: AbortSignal | undefined, request: () => Promise<T>): Promise<T> {
+    const previous = this.hostRequests.get(host) ?? Promise.resolve();
+    if (spacingMs > 0) this.hostSpacing.set(host, Math.max(spacingMs, this.hostSpacing.get(host) ?? 0));
+    const serialize = this.hostSpacing.has(host);
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const queued = serialize ? previous.then(() => held) : Promise.all([previous, held]).then(() => {});
+    this.hostRequests.set(host, queued);
+    let started = false;
+    try {
+      signal?.throwIfAborted();
+      if (serialize) await new Promise<void>((resolve, reject) => {
+        const abort = () => reject(signal!.reason);
+        signal?.addEventListener('abort', abort, { once: true });
+        previous.then(() => { signal?.removeEventListener('abort', abort); resolve(); });
+      });
+      signal?.throwIfAborted();
+      const wait = (this.hostNext.get(host) ?? 0) - Date.now();
+      if (wait > 0) await sleep(wait, signal);
+      signal?.throwIfAborted();
+      const cooldown = this.hostCooldown.get(host);
+      if (cooldown?.retryAt && Date.parse(cooldown.retryAt) > Date.now()) throw cooldown;
+      started = true;
+      return await request();
+    } finally {
+      if (started && serialize) this.hostNext.set(host, Date.now() + this.hostSpacing.get(host)!);
+      release();
+      void queued.then(() => { if (this.hostRequests.get(host) === queued) this.hostRequests.delete(host); });
+    }
+  }
+  private async publicFetch(url: string, init: RequestInit, spacingMs: number): Promise<{ response: Response; url: string; body: string }> {
+    const respectRobots = this.robots.has(new URL(url).origin) && new URL(url).pathname !== '/robots.txt';
+    for (let redirects = 0; ; redirects++) {
+      init.signal?.throwIfAborted();
+      let target;
+      try { target = await resolvePublicTarget(url, this.publicResolver); url = target.url; } catch (error) { throw new HttpError(errorText(error)); }
+      init.signal?.throwIfAborted();
+      const delay = redirects && respectRobots ? Math.max(spacingMs, await this.pageDelay(url, true)) : spacingMs;
+      const page = await this.withHost(new URL(url).host, delay, this.signal, async () => {
+        const dispatcher = publicDispatcher(target), headers = new Headers(init.headers);
+        headers.set('Host', new URL(url).host);
+        try {
+          const response = await this.fetcher(url, { ...init, headers, dispatcher, redirect: 'manual', signal: AbortSignal.any([AbortSignal.timeout(25000), ...(this.signal ? [this.signal] : [])]) } as RequestInit);
+          if ([301, 302, 303, 307, 308].includes(response.status)) { await response.body?.cancel(); return { response, url, body: '' }; }
+          return { response, url, body: await boundedText(response) };
+        } finally { await dispatcher.destroy(); }
+      });
+      const { response } = page;
+      if (![301, 302, 303, 307, 308].includes(response.status)) return page;
+      if (redirects >= 3 || !response.headers.get('location')) throw new HttpError('Article redirect limit or missing target');
+      url = new URL(response.headers.get('location')!, url).href;
+      // Conditional validators belong to the original URL, not its redirect target.
+      const headers = new Headers(init.headers); headers.delete('If-None-Match'); headers.delete('If-Modified-Since');
+      init = { ...init, headers };
+    }
+  }
+  async get(url: string, spacingMs = 0, transport: 'fetch' | 'curl' = 'fetch', publicOnly = false): Promise<RawResponse> {
     this.signal?.throwIfAborted();
     const host = new URL(url).host;
-    const cached = this.store.cache(url);
+    const cachedHeaders = this.store.cacheHeaders(url);
     const checkCooldown = () => {
       const error = this.hostCooldown.get(host);
       if (error?.retryAt && Date.parse(error.retryAt) > Date.now()) throw error;
@@ -73,23 +136,25 @@ export class Http {
     };
     for (let attempt = 0; attempt < 3; attempt++) {
       checkCooldown();
-      const wait = (this.hostNext.get(host) ?? 0) - Date.now();
-      if (wait > 0) await sleep(wait, this.signal);
-      checkCooldown();
-      this.hostNext.set(host, Date.now() + spacingMs);
       try {
-        const response = await (transport === 'curl' && this.fetcher === networkFetch ? curlFetch : this.fetcher)(url, { headers: {
+        const init = { headers: {
           'User-Agent': 'Feedgarden/0.1 (+https://sinputer.top/feedgarden/)',
-          ...(cached?.headers.etag ? { 'If-None-Match': cached.headers.etag } : {}),
-          ...(cached?.headers['last-modified'] ? { 'If-Modified-Since': cached.headers['last-modified'] } : {}),
-        }, signal: AbortSignal.any([AbortSignal.timeout(25000), ...(this.signal ? [this.signal] : [])]) });
+          ...(cachedHeaders?.etag ? { 'If-None-Match': cachedHeaders.etag } : {}),
+          ...(cachedHeaders?.['last-modified'] ? { 'If-Modified-Since': cachedHeaders['last-modified'] } : {}),
+        }, signal: this.signal };
+        const page = publicOnly ? await this.publicFetch(url, init, spacingMs) : await this.withHost(host, spacingMs, this.signal, async () => {
+          const response = await (transport === 'curl' && this.fetcher === networkFetch ? curlFetch : this.fetcher)(url, { ...init, signal: AbortSignal.any([AbortSignal.timeout(25000), ...(this.signal ? [this.signal] : [])]) });
+          return { response, url, body: await boundedText(response) };
+        });
+        const { response } = page;
         const headers: Record<string, string> = {};
         for (const key of ['etag', 'last-modified', 'content-type', 'retry-after', 'x-ratelimit-remaining', 'x-ratelimit-reset']) {
           const value = response.headers.get(key); if (value) headers[key] = value;
         }
-        const body = response.status === 304 && cached ? cached.body : await boundedText(response);
+        const cached = response.status === 304 ? this.store.cache(url) : undefined;
+        const body = cached ? cached.body : page.body;
         if (Buffer.byteLength(body) > MAX_RESPONSE_BYTES) throw new HttpError('Response exceeds 12 MB limit');
-        const raw = { url, status: response.status, body, headers: { ...cached?.headers, ...headers }, fetchedAt: nowIso() };
+        const raw = { url, ...(publicOnly ? { resolvedUrl: page.url } : {}), status: response.status, body, headers: response.status === 304 ? { ...cached?.headers, ...headers } : headers, fetchedAt: nowIso() };
         this.raw.push(raw);
         if (response.status === 429 || (response.status === 403 && headers['x-ratelimit-remaining'] !== undefined && Number(headers['x-ratelimit-remaining']) === 0)) {
           const retry = headers['retry-after'], reset = Number(headers['x-ratelimit-reset']);

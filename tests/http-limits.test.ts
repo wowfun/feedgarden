@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Http } from '../src/http.js';
 import { Store } from '../src/store.js';
+import { getEventListeners } from 'node:events';
 
 test('fetch aborts oversized declared and streamed byte counts before EOF', async () => {
   for (const declared of [true, false]) {
@@ -44,5 +45,25 @@ test('runner cancellation interrupts host spacing without issuing another reques
     cancellation.abort(reason);
     await assert.rejects(pending, /abort|Lost database job lease/i);
     assert.equal(calls, 1);
+  } finally { store.close(); }
+});
+
+test('cancelling a queued host request detaches its abort listener while the preceding body remains open', async () => {
+  const store = new Store(':memory:'), cancellation = new AbortController(); let calls = 0, close!: () => void, started!: () => void;
+  const firstStarted = new Promise<void>(resolve => { started = resolve; });
+  try {
+    const http = new Http(store, async () => {
+      calls++;
+      return new Response(new ReadableStream({ start(controller) { close = () => controller.close(); started(); } }));
+    }, cancellation.signal);
+    const first = http.get('https://example.test/first', 50); await firstStarted;
+    const queued = http.get('https://example.test/second');
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.ok(getEventListeners(cancellation.signal, 'abort').length > 0);
+    cancellation.abort(new Error('Stop queued work'));
+    await assert.rejects(queued, /Stop queued work/);
+    assert.equal(getEventListeners(cancellation.signal, 'abort').length, 0);
+    assert.equal(calls, 1);
+    close(); await first;
   } finally { store.close(); }
 });

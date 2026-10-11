@@ -1,0 +1,15 @@
+---
+publish: true
+content_type: "post"
+title: "Porch"
+description: "Porch 为 AI 编程工作提供本地化的项目摘要与成本追踪。Jerry 发布的条目没有说明它集成哪些编程工具、成本如何归属统计，以及是否有数据离开本地环境。"
+date: "2026-10-09T04:53:12.000Z"
+updated: "2026-10-09T14:29:13.445Z"
+first_seen: "2026-10-09T14:24:10.671Z"
+date_basis: "published"
+source_url: "https://www.producthunt.com/products/porch-6"
+repo_url: "https://github.com/amone-labs/porch"
+tags: ["source/producthunt","topics/coding","topics/evaluation"]
+---
+
+Porch 为 AI 编程工作提供本地化的项目摘要与成本追踪。Jerry 发布的条目没有说明它集成哪些编程工具、成本如何归属统计，以及是否有数据离开本地环境。

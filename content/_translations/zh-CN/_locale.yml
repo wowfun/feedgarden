@@ -169,7 +169,19 @@
     "topics/energy": "能源",
     "topics/security-privacy": "安全与隐私",
     "topics/content-provenance": "内容溯源",
-    "topics/hardware": "硬件"
+    "topics/hardware": "硬件",
+    "topics/communication": "沟通",
+    "topics/health": "健康与医学",
+    "topics/culture-society": "文化与社会",
+    "topics/history": "历史",
+    "topics/astronomy": "天文学",
+    "topics/generative-media": "生成式媒体",
+    "topics/open-source": "开源",
+    "topics/quantum-physics": "量子物理",
+    "topics/agriculture": "农业",
+    "topics/system-dynamics": "系统动力学",
+    "topics/geopolitics": "地缘政治",
+    "topics/ai-safety": "AI 安全"
   },
   "tag_aliases": {}
 }

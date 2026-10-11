@@ -25,7 +25,10 @@ export function summaryItem(item: Item, maxChars: number): SummaryInput['items']
   const comments = item.discussion?.comments.slice(0, 10).map(comment => ({ ...comment, text: normalize(comment.text).slice(0, 600), author: normalize(comment.author) }));
   return { source: item.source, id: item.id, title: normalize(item.title), text: normalize(item.text).slice(0, maxChars), ...(item.author ? { author: normalize(item.author) } : {}), ...(item.media?.length ? { media: item.media.slice(0, 6) } : {}), ...(item.articleQuote ? { articleQuote: item.articleQuote } : {}), ...(comments?.length ? { discussion: { comments } } : {}) };
 }
-export const itemPath = (source: string, id: string): string => 'items/' + hash([source, id]) + '.md';
+export function itemPath(source: string, day: string, number: number): string {
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(source) || !/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isSafeInteger(number) || number < 1) throw new Error('Invalid item path components');
+  return `${source}/${day.slice(0, 7)}/${day.slice(8)}/item-${number}.md`;
+}
 export function eligible(item: Item, firstSeen: string, cutoff: string, source: Source): boolean {
   if (item.source === 'x' && item.kind === 'repost') return false;
   if (item.source === 'arxiv' && source.includeKeywords.length && !source.includeKeywords.some(word => (item.title + ' ' + item.text).toLowerCase().includes(word.toLowerCase()))) return false;

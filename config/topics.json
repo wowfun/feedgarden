@@ -128,6 +128,161 @@
       "description": "Physical devices, electronics, components and do-it-yourself hardware builds.",
       "aliases": [],
       "deprecated": false
+    },
+    {
+      "id": "communication",
+      "name": {
+        "en": "Communication",
+        "zh-CN": "沟通"
+      },
+      "description": "Human conversation, interpersonal communication and the social dynamics of talking with others.",
+      "aliases": [],
+      "deprecated": false
+    },
+    {
+      "id": "health",
+      "name": {
+        "en": "Health & Medicine",
+        "zh-CN": "健康与医学"
+      },
+      "description": "Human health, clinical conditions, treatments and medical research.",
+      "aliases": [
+        "medicine",
+        "clinical research"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "culture-society",
+      "name": {
+        "en": "Culture & Society",
+        "zh-CN": "文化与社会"
+      },
+      "description": "Cultural trends, social change, media consumption and public discourse.",
+      "aliases": [
+        "society",
+        "culture"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "history",
+      "name": {
+        "en": "History",
+        "zh-CN": "历史"
+      },
+      "description": "Historical events, documents, archives and their interpretation.",
+      "aliases": [
+        "historical archives"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "astronomy",
+      "name": {
+        "en": "Astronomy",
+        "zh-CN": "天文学"
+      },
+      "description": "Planets, celestial bodies, orbital dynamics and observational sky surveys.",
+      "aliases": [
+        "space science",
+        "planetary science"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "generative-media",
+      "name": {
+        "en": "Generative Media",
+        "zh-CN": "生成式媒体"
+      },
+      "description": "AI-generated music, video, images and other creative media, including tools, quality debates and their cultural and economic effects.",
+      "aliases": [
+        "AI art",
+        "AI music",
+        "AI-generated content"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "open-source",
+      "name": {
+        "en": "Open Source",
+        "zh-CN": "开源"
+      },
+      "description": "Open source projects, their communities, governance, funding and infrastructure sustainability.",
+      "aliases": [
+        "FOSS",
+        "free software"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "quantum-physics",
+      "name": {
+        "en": "Quantum Physics",
+        "zh-CN": "量子物理"
+      },
+      "description": "Quantum mechanics experiments, entanglement, and foundational physics research.",
+      "aliases": [
+        "quantum mechanics",
+        "quantum information"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "agriculture",
+      "name": {
+        "en": "Agriculture",
+        "zh-CN": "农业"
+      },
+      "description": "Farming, crop production and the use of agricultural land and products, including food-versus-fuel debates.",
+      "aliases": [
+        "farming",
+        "crop production"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "system-dynamics",
+      "name": {
+        "en": "System Dynamics",
+        "zh-CN": "系统动力学"
+      },
+      "description": "Stock-and-flow modelling, feedback loops, simulation of dynamic systems and the tools and languages used to build and run such models.",
+      "aliases": [
+        "stock and flow diagrams",
+        "systems thinking",
+        "反馈回路"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "geopolitics",
+      "name": {
+        "en": "Geopolitics",
+        "zh-CN": "地缘政治"
+      },
+      "description": "International conflict, military technology and statecraft, including drone and missile warfare and its policy debate.",
+      "aliases": [
+        "international conflict",
+        "military technology"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "ai-safety",
+      "name": {
+        "en": "AI Safety",
+        "zh-CN": "AI 安全"
+      },
+      "description": "AI safety and alignment: ensuring AI systems behave as intended, safety research, and the institutional responsibility for developing AI safely.",
+      "aliases": [
+        "AI alignment",
+        "AI safety research",
+        "AI 安全"
+      ],
+      "deprecated": false
     }
   ]
 }

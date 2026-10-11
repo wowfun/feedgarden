@@ -178,6 +178,31 @@ test('DSH structured result preserves bilingual punctuation and paragraphs and r
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
+test('HN guidance preserves other sources skill identity and comment revisions update existing bilingual paths', async () => {
+  assert.equal(await reportSkill(['producthunt']), await readFile('.agents/skills/feedgarden-report/SKILL.md', 'utf8'));
+  assert.ok((await reportSkill(['hackernews'])).includes('Additional trusted instructions'));
+  const directory = await mkdtemp(join(tmpdir(), 'feedgarden-hn-')), store = new Store(':memory:'); let calls = 0;
+  try {
+    await writeFile(join(directory, 'topics.json'), JSON.stringify(topics));
+    const config = configSchema.parse({ version: 2, storage: { directory }, feed: { directory: join(directory, 'content'), topics: join(directory, 'topics.json') }, agent: { model: 'deepseek/deepseek-flash', runtimeDirectory: join(directory, 'tasks') }, sources: [{ id: 'hackernews', name: 'HN', intervalHours: 1, streams: [{ id: 'frontpage', channels: [{ id: 'firebase', kind: 'hn-api' }] }] }] });
+    store.setMeta('cutoff', '1970-01-01T00:00:00Z'); seed(store);
+    store.saveCollection(item.source, item.stream, item.channel, { items: [item], raw: [], coverage: { status: 'complete', to: item.observedAt, notes: [] } }, '');
+    const generator: Generator = async (_agent, input, _repair, workspace) => {
+      calls++; const i = input.items[0]!;
+      return { output: { contractVersion: 2, newTopics: [], items: [{ source: i.source, id: i.id, topics: ['coding'], en: { title: i.title, summary: 'The original explains a bounded design with a clearly defined scope. It uses source evidence to explain how the system behaves and why its boundaries matter.' }, 'zh-CN': { title: '原文', summary: '原文解释了一种具有明确边界的设计，利用来源提供的证据说明系统如何运行，以及这些边界为什么影响它的行为。正文与评论是独立的材料，讨论中的观点应当保留其归属。' }, discussion: { commentIds: ['2', '3'], en: i.discussion!.comments.map(comment => comment.text).join(' '), 'zh-CN': '评论提出经验和不同观点。' } }] }, directory: workspace!, events: [], usage: [] };
+    };
+    await summarize(config, store, {}, generator); await writeSite(config, store);
+    const path = join(config.feed.directory, 'hackernews/2026-10/09/item-1.md'), before = await readFile(path, 'utf8');
+    assert.ok(before.includes('## Article') && before.includes('## HN discussion'));
+    await summarize(config, store, {}, generator); assert.equal(calls, 1);
+    cache(store, api + '3.json', { id: 3, type: 'comment', parent: 100, by: 'second', text: 'A changed argument with further evidence.' });
+    await summarize(config, store, {}, generator, new Date(Date.now() + 3600_001).toISOString()); await writeSite(config, store); assert.equal(calls, 2);
+    assert.ok((await readFile(path, 'utf8')).includes('changed argument'));
+    assert.equal(acceptedItems(store).length, 1);
+    assert.ok((await readFile(join(config.feed.directory, '_translations/zh-CN/hackernews/2026-10/09/item-1.md'), 'utf8')).includes('## HN 热门讨论'));
+  } finally { store.close(); await rm(directory, { recursive: true, force: true }); }
+});
+
 test('HN output budgeting preserves FIFO items and resumes quota-deferred work without regenerating accepted copy', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'feedgarden-hn-batches-')), store = new Store(':memory:'), batches: string[][] = [];
   try {

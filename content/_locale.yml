@@ -34,7 +34,19 @@
     "topics/energy": "Energy",
     "topics/security-privacy": "Security & Privacy",
     "topics/content-provenance": "Content Provenance",
-    "topics/hardware": "Hardware"
+    "topics/hardware": "Hardware",
+    "topics/communication": "Communication",
+    "topics/health": "Health & Medicine",
+    "topics/culture-society": "Culture & Society",
+    "topics/history": "History",
+    "topics/astronomy": "Astronomy",
+    "topics/generative-media": "Generative Media",
+    "topics/open-source": "Open Source",
+    "topics/quantum-physics": "Quantum Physics",
+    "topics/agriculture": "Agriculture",
+    "topics/system-dynamics": "System Dynamics",
+    "topics/geopolitics": "Geopolitics",
+    "topics/ai-safety": "AI Safety"
   },
   "tag_aliases": {}
 }

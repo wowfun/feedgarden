@@ -1,0 +1,15 @@
+---
+publish: true
+content_type: "post"
+title: "OpenCharm"
+description: "OpenCharm 被介绍为「为你已有的 AI 智能体提供开源身体」。该条目将其定位为配合现有智能体方案的开源层，但未说明其集成方式、新增能力或支持哪些智能体。"
+date: "2026-10-09T07:00:00.000Z"
+updated: "2026-10-09T14:29:13.445Z"
+first_seen: "2026-10-09T14:24:55.221Z"
+date_basis: "published"
+source_url: "https://www.producthunt.com/products/opencharm"
+repo_url: "https://github.com/opencharm-labs/opencharm"
+tags: ["source/producthunt","topics/agents","topics/coding"]
+---
+
+OpenCharm 被介绍为「为你已有的 AI 智能体提供开源身体」。该条目将其定位为配合现有智能体方案的开源层，但未说明其集成方式、新增能力或支持哪些智能体。

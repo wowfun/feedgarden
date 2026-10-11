@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rename, rm, writeFile, readFile } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
+import { DateTime } from 'luxon';
 import type { Config } from './config.js';
 import { Store } from './store.js';
 import { iterateAcceptedItems, itemPath, type AcceptedItem } from './items.js';
@@ -50,6 +51,7 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
   signal?.throwIfAborted();
   await recoverContent(config);
   const registry = await loadTopics(config.feed.topics);
+  const timezones = new Map(config.sources.map(source => [source.id, source.timezone]));
   const destination = resolve(config.feed.directory);
   const manifests = await Promise.all(['en', 'zh-CN'].map(locale => readFile('config/locales/' + locale + '.json', 'utf8')));
   const signature = hash({ contentVersion: store.meta('content_version'), registry, sources: config.sources.map(({ id, name, timezone }) => ({ id, name, timezone })), manifests, renderRevision: 1 });
@@ -78,7 +80,10 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
     for (const record of iterateAcceptedItems(store)) {
         signal?.throwIfAborted();
         const { source, id } = record.item;
-        const path = itemPath(source, id), identity = JSON.stringify([source, id]);
+        const day = DateTime.fromISO(record.date, { zone: timezones.get(source) ?? 'Asia/Shanghai' }).toISODate();
+        if (!day) throw new Error('Invalid item date: ' + source + '/' + id);
+        itemPath(source, day, 1); // Validate directory components before reserving a number.
+        const path = itemPath(source, day, store.itemNumber(source, id, day)), identity = JSON.stringify([source, id]);
         const previous = paths.get(path);
         if (previous && previous !== identity) throw new Error('Item path collision: ' + path);
         paths.set(path, identity);

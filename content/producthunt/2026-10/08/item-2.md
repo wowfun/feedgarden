@@ -1,0 +1,15 @@
+---
+publish: true
+content_type: "post"
+title: "OpenVids"
+description: "OpenVids is an open-source video editor that is operated by chatting with AI agents rather than through conventional timeline controls. The listing, posted by Roman, does not specify supported platforms, agent models or licensing terms."
+date: "2026-10-08T19:58:50.000Z"
+updated: "2026-10-09T14:29:13.445Z"
+first_seen: "2026-10-09T14:24:10.671Z"
+date_basis: "published"
+source_url: "https://www.producthunt.com/products/openvids"
+repo_url: "https://github.com/bazodev/open-vids"
+tags: ["source/producthunt","topics/products","topics/coding","topics/agents"]
+---
+
+OpenVids is an open-source video editor that is operated by chatting with AI agents rather than through conventional timeline controls. The listing, posted by Roman, does not specify supported platforms, agent models or licensing terms.

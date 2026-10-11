@@ -42,6 +42,7 @@ export class Store {
     this.db.transaction(() => {
       this.db.exec('CREATE INDEX IF NOT EXISTS agent_calls_at ON agent_calls(at); CREATE INDEX IF NOT EXISTS items_first_seen ON items(source,first_seen,id);');
       this.db.exec('CREATE INDEX IF NOT EXISTS raw_responses_fingerprint ON raw_responses(source,stream,channel,url,hash,status);');
+      this.db.exec('CREATE TABLE IF NOT EXISTS feed_item_paths(source TEXT NOT NULL,id TEXT NOT NULL,day TEXT NOT NULL,number INTEGER NOT NULL CHECK(number>0),PRIMARY KEY(source,id,day),UNIQUE(source,day,number));');
       this.db.exec(`
         CREATE TABLE IF NOT EXISTS feed_planning(source TEXT NOT NULL,id TEXT NOT NULL,due_at TEXT NOT NULL,PRIMARY KEY(source,id));
         CREATE INDEX IF NOT EXISTS feed_planning_due ON feed_planning(source,due_at,id);
@@ -159,6 +160,15 @@ export class Store {
   states(): ChannelState[] { return this.db.prepare('SELECT * FROM channel_state ORDER BY source,stream,channel').all() as ChannelState[]; }
   meta(key: string): string | undefined { return (this.db.prepare('SELECT value FROM feed_meta WHERE key=?').get(key) as { value: string } | undefined)?.value; }
   setMeta(key: string, value: string): void { this.db.prepare('INSERT OR REPLACE INTO feed_meta VALUES (?,?)').run(key, value); }
+  itemNumber(source: string, id: string, day: string): number {
+    return this.db.transaction(() => {
+      const existing = this.db.prepare('SELECT number FROM feed_item_paths WHERE source=? AND id=? AND day=?').get(source, id, day) as { number: number } | undefined;
+      if (existing) return existing.number;
+      const { number } = this.db.prepare('SELECT COALESCE(MAX(number),0)+1 AS number FROM feed_item_paths WHERE source=? AND day=?').get(source, day) as { number: number };
+      this.db.prepare('INSERT INTO feed_item_paths VALUES (?,?,?,?)').run(source, id, day, number);
+      return number;
+    })();
+  }
   startCall(report: string, model: string, maxDaily: number): number {
     return this.db.transaction(() => {
       const day = nowIso().slice(0, 10);

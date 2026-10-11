@@ -190,6 +190,21 @@ test('policy changes rekey unfinished historical revisions without replacing the
   } finally { await f.cleanup(); }
 });
 
+test('unchanged rendering preserves the tree and topics; metadata, locale and recovery changes invalidate it', async () => {
+  const f = await fixture();
+  try {
+    f.save([item('a')]); await summarize(f.config, f.store, {}, generator, at);
+    await writeSite(f.config, f.store); const path = join(f.config.feed.directory, 'one/2026-10/10/item-1.md'), before = await stat(path);
+    await writeSite(f.config, f.store); const after = await stat(path); assert.equal(after.ino, before.ino);
+    const topicBefore = await stat(f.config.feed.topics); await applyTopics(f.config.feed.topics, topics); assert.equal((await stat(f.config.feed.topics)).ino, topicBefore.ino);
+    f.config.sources[0]!.name = 'Renamed'; await writeSite(f.config, f.store); assert.match(await readFile(join(f.config.feed.directory, '_locale.yml'), 'utf8'), /Renamed/);
+    const accepted = f.store.db.prepare('SELECT accepted FROM feed_summaries').get() as { accepted: string };
+    const record = JSON.parse(accepted.accepted); record.item.url = 'https://example.test/new';
+    f.store.db.prepare('UPDATE feed_summaries SET accepted=?').run(JSON.stringify(record)); await writeSite(f.config, f.store);
+    assert.match(await readFile(path, 'utf8'), /example.test\/new/);
+  } finally { await f.cleanup(); }
+});
+
 test('host pacing waits for response completion; zero-spacing API calls can still overlap', async t => {
   t.mock.timers.enable({ apis: ['Date'], now: new Date(at) });
   const store = new Store(':memory:'); let requests = 0, close!: () => void, started!: () => void;

@@ -60,10 +60,10 @@ test('an oversized registry fails before enrichment or queue mutations with meas
 });
 test('native ID path safety and source-aware cache; metadata updates reuse copy, changed text regenerates',async()=>{
  const f=await fixture();let calls=0;const gen:Generator=async(...args)=>{calls++;return generator(...args);};
- try{save(f.store,[item('../../a','one'),item('../../a','two')]);await summarize(f.config,f.store,{},gen,at);assert.equal(calls,2);assert.notEqual(itemPath('one','../../a'),itemPath('two','../../a'));assert.match(itemPath('one','../../a'),/^items\/[a-f0-9]{64}\.md$/);
+ try{save(f.store,[item('../../a','one'),item('../../a','two')]);await summarize(f.config,f.store,{},gen,at);assert.equal(calls,2);assert.notEqual(itemPath('one','2026-10-09',1),itemPath('two','2026-10-09',1));assert.equal(itemPath('one','2026-10-09',1),'one/2026-10/09/item-1.md');assert.throws(()=>itemPath('../one','2026-10-09',1));
  save(f.store,[item('../../a','one',{url:'https://example.test/new',metrics:{score:100}})]);await summarize(f.config,f.store,{},gen,at);assert.equal(calls,2);assert.equal(acceptedItems(f.store).find(r=>r.item.source==='one')?.item.url,'https://example.test/new');
  save(f.store,[item('../../a','one',{text:'New facts'})]);await summarize(f.config,f.store,{},gen,at);assert.equal(calls,3);
- await writeSite(f.config,f.store);const en=await readFile(join(f.config.feed.directory,itemPath('one','../../a')),'utf8'),zh=await readFile(join(f.config.feed.directory,'_translations/zh-CN',itemPath('one','../../a')),'utf8');assert.match(en,/source_url: "https:\/\/example.test\//);assert.match(en,/topics\/coding/);assert.match(zh,/source\/one/);
+ await writeSite(f.config,f.store);const en=await readFile(join(f.config.feed.directory,itemPath('one','2026-10-09',1)),'utf8'),zh=await readFile(join(f.config.feed.directory,'_translations/zh-CN',itemPath('one','2026-10-09',1)),'utf8');assert.match(en,/source_url: "https:\/\/example.test\//);assert.match(en,/topics\/coding/);assert.match(zh,/source\/one/);
  }finally{await f.cleanup();}
 });
 test('a failed revision retains the previous bilingual snapshot and backs off to five attempts',async()=>{
@@ -113,7 +113,7 @@ test('topic additions do not invalidate accepted summaries; deprecation remaps o
  const f=await fixture();try{save(f.store,[item('a')]);await summarize(f.config,f.store,{},generator,at);
  const next={version:1 as const,topics:[{...topic,deprecated:true,replacedBy:'dev'}, {...topic,id:'dev',name:{en:'Development','zh-CN':'开发'}}]};await applyTopics(f.config.feed.topics,next);
  await summarize(f.config,f.store,{},()=>{throw new Error('Should reuse');},at);await writeSite(f.config,f.store);
- assert.match(await readFile(join(f.config.feed.directory,itemPath('one','a')),'utf8'),/topics\/dev/);assert.match(await readFile(join(f.config.feed.directory,'_locale.yml'),'utf8'),/"topics\/coding": "topics\/dev"/);
+ assert.match(await readFile(join(f.config.feed.directory,itemPath('one','2026-10-09',1)),'utf8'),/topics\/dev/);assert.match(await readFile(join(f.config.feed.directory,'_locale.yml'),'utf8'),/"topics\/coding": "topics\/dev"/);
  assert.throws(()=>validateRegistry({version:1,topics:[topic,{...topic,id:'duplicate'}]}),/Duplicate/);
  await assert.rejects(applyTopics(f.config.feed.topics,{version:1,topics:[]} ),/cannot be removed/);
  }finally{await f.cleanup();}
@@ -269,7 +269,7 @@ test('content journal recovers the staged tree between its two renames',async()=
 test('three-way topic merge admits independent additions and rejects same-ID conflicts and unmanaged publication paths',()=>{
  const b=registry,l={version:1 as const,topics:[topic,{...topic,id:'models',name:{en:'Models','zh-CN':'模型'}}]},r={version:1 as const,topics:[topic,{...topic,id:'research',name:{en:'Research','zh-CN':'研究'}}]};assert.equal(mergeTopics(b,l,r).topics.length,3);
  assert.throws(()=>mergeTopics(b,{...b,topics:[{...topic,description:'Local'}]},{...b,topics:[{...topic,description:'Remote'}]}),/coding/);
- assertManagedPaths(['content/items/a.md','config/topics.json']);assert.throws(()=>assertManagedPaths(['README.md']));assert.throws(()=>assertManagedPaths(['reports/old.md']));assertManagedPaths(['reports/old.md'],['reports/old.md']);
+ assertManagedPaths(['content/one/2026-10/09/item-1.md','config/topics.json']);assert.throws(()=>assertManagedPaths(['README.md']));assert.throws(()=>assertManagedPaths(['reports/old.md']));assertManagedPaths(['reports/old.md'],['reports/old.md']);
 });
 test('legacy schema is refused before upgrading; migration baseline excludes existing identities',async()=>{
  const f=await fixture();try{const legacy=join(f.root,'legacy.sqlite');await f.store.backup(legacy);const db=new Database(legacy);db.exec('DROP TABLE feed_meta; DROP TABLE feed_excluded; DROP TABLE feed_jobs; DROP TABLE feed_summaries; DROP TABLE feed_cache; DROP TABLE feed_batches; PRAGMA user_version=2;');db.close();assert.throws(()=>new Store(legacy),/Migration required/);const raw=new Database(legacy);assert.equal(raw.pragma('user_version',{simple:true}),2);raw.prepare('INSERT INTO items VALUES (?,?,?,?,?,?,?)').run('one','old',at,at,at,JSON.stringify(item('old')),'hash');initializeFeedSchema(raw,'2026-10-08T16:00:00.000Z');raw.close();const upgraded=new Store(legacy);try{assert.equal(upgraded.meta('cutoff'),'2026-10-08T16:00:00.000Z');assert.deepEqual(upgraded.db.prepare('SELECT * FROM feed_excluded').all(),[{source:'one',id:'old'}]);}finally{upgraded.close();}
@@ -307,7 +307,7 @@ test('paged planning preserves every FIFO identity across page boundaries and in
   f.store.db.exec("CREATE TRIGGER reject_rewrite BEFORE UPDATE ON feed_summaries BEGIN SELECT RAISE(FAIL,'unexpected ready rewrite'); END;");
   assert.equal((await summarize(f.config,f.store,{},()=>{throw new Error('unexpected model call');},at)).generated,0);
   await writeSite(f.config,f.store);
-  assert.match(await readFile(join(f.config.feed.directory,itemPath('two','0269')),'utf8'),/Title 0269/);
+  assert.match(await readFile(join(f.config.feed.directory,itemPath('two','2026-10-09',135)),'utf8'),/Title 0269/);
  } finally {await f.cleanup();}
 });
 

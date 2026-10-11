@@ -8,6 +8,8 @@ website:
   theme: minimal
   repository: wowfun/feedgarden
   edit_branch: main
+  properties:
+    hidden: [first_seen, date_basis]
   i18n:
     enabled: true
     locales: [en, zh-CN]

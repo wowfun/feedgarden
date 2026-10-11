@@ -10,17 +10,32 @@ export async function run(program: string, args: string[], cwd: string, env: Nod
     child.on('error', fail); child.on('exit', code => code === 0 ? done() : fail(new Error(program + ' exited with ' + code)));
   });
 }
+export interface ThemeLock { repository: string; commit: string }
+export function parseThemeLock(value: unknown): ThemeLock {
+  const lock = value as Partial<ThemeLock> | null;
+  if (!lock || typeof lock.repository !== 'string' || !lock.repository || typeof lock.commit !== 'string' || !/^[a-f0-9]{40}$/.test(lock.commit)) throw new Error('Theme lock requires a repository and full commit SHA');
+  return { repository: lock.repository, commit: lock.commit };
+}
+export async function readThemeLock(root: string): Promise<ThemeLock> { return parseThemeLock(JSON.parse(await readFile(join(root, '.github/theme.lock.json'), 'utf8'))); }
+export function assertThemeLock(expected: ThemeLock, actual: ThemeLock): void {
+  if (expected.repository !== actual.repository || expected.commit !== actual.commit) throw new Error('MANUAL_ACTION: Theme lock differs from the local trusted lock; review and integrate the theme change before publishing');
+}
+export function validationEnvironment(inherited: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { GIT_TERMINAL_PROMPT: '0' };
+  for (const name of ['PATH', 'HOME', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'WINDIR']) if (inherited[name]) env[name] = inherited[name];
+  return env;
+}
 export async function buildSite(root = process.cwd()): Promise<string> {
   const project = process.cwd();
-  const lock = JSON.parse(await readFile(join(root, '.github/theme.lock.json'), 'utf8')) as { repository: string; commit: string };
-  if (!/^[a-f0-9]{40}$/.test(lock.commit)) throw new Error('Theme lock requires a full commit SHA');
+  const lock = await readThemeLock(project);
+  if (resolve(root) !== resolve(project)) assertThemeLock(lock, await readThemeLock(root));
   let upstream = resolve(project, '.local/themes', lock.commit);
   const reference = resolve(project, '.references/jekyll-obsidian');
   if (existsSync(reference) && execFileSync('git', ['-C', reference, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() === lock.commit) upstream = reference;
   if (!existsSync(upstream)) {
     await mkdir(dirname(upstream), { recursive: true });
-    await run('git', ['clone', '--no-checkout', lock.repository, upstream], project);
-    await run('git', ['checkout', '--detach', lock.commit], upstream);
+    await run('git', ['clone', '--no-checkout', lock.repository, upstream], project, validationEnvironment());
+    await run('git', ['checkout', '--detach', lock.commit], upstream, validationEnvironment());
   }
   if (execFileSync('git', ['-C', upstream, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() !== lock.commit) throw new Error('Theme checkout differs from the lock');
   if (execFileSync('git', ['-C', upstream, 'status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).trim()) throw new Error('Pinned theme has uncommitted changes');
@@ -33,7 +48,7 @@ export async function buildSite(root = process.cwd()): Promise<string> {
     if (!installed) throw new Error('MANUAL_ACTION: Install Node 26 for the Jekyll frontend build');
     node = join(versions, installed, 'bin');
   }
-  const env = { ...process.env, PATH: [ruby, node, process.env.PATH].join(':'), BUNDLE_GEMFILE: join(website, 'Gemfile') };
+  const env = { ...validationEnvironment(), PATH: [ruby, node, process.env.PATH].join(':'), BUNDLE_GEMFILE: join(website, 'Gemfile') };
   if (!existsSync(join(website, 'node_modules'))) await run('npm', ['ci'], website, env);
   try { execFileSync('bundle', ['check'], { cwd: website, env, stdio: 'ignore' }); }
   catch { await run('bundle', ['install'], website, env); }

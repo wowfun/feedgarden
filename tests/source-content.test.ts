@@ -1,3 +1,4 @@
+import type { SummaryInput } from '../src/agent.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { extractMedia, parseArticle, enrichItem } from '../src/source-content.js';
@@ -46,7 +47,7 @@ test('media-only collection revisions remain auditable while metric changes reus
 
 test('expanded bilingual copy selects only known media and the renderer preserves safe paragraphs and lists', () => {
   const media = extractMedia(html, item.url), enriched = { ...item, media };
-  const input = { contractVersion: 2, topics: { version: 1, topics: [{ id: 'research', name: { en: 'Research', 'zh-CN': '研究' }, description: 'Research', aliases: [], deprecated: false }] }, items: [summaryItem(enriched, 4000)] };
+  const input: SummaryInput = { contractVersion: 2, topics: { version: 1, topics: [{ id: 'research', name: { en: 'Research', 'zh-CN': '研究' }, description: 'Research', aliases: [], deprecated: false }] }, items: [summaryItem(enriched, 4000)] };
   const summary = 'First paragraph. '.repeat(45) + '\n\n- Measured results\n- <script>unsafe</script>';
   const artifact = { contractVersion: 2, newTopics: [], items: [{ source: item.source, id: item.id, topics: ['research'], media: [media[0]!.id], en: { title: item.title, summary }, 'zh-CN': { title: '研究报告', summary: '第一段。\n\n- 结果\n- 方法' } }] };
   const copy = validateArtifact(artifact, input).output.items[0]!;

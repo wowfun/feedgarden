@@ -34,8 +34,13 @@ function optionValues(option: SessionConfigOption | undefined): OptionValue[] {
   if (!option || option.type !== 'select') return [];
   return option.options.flatMap(entry => 'options' in entry ? entry.options : [entry]);
 }
-export interface SummaryInput { contractVersion: 2; topics: Registry; items: Pick<Item, 'source' | 'id' | 'title' | 'text' | 'author' | 'media'>[] }
+export interface SummaryInput { contractVersion: 2; topics: Registry; items: (Pick<Item, 'source' | 'id' | 'title' | 'text' | 'author' | 'media' | 'articleQuote'> & { discussion?: Pick<NonNullable<Item['discussion']>, 'comments'> })[] }
 export interface AgentResult { output: ReturnType<typeof validateArtifact>['output']; usage: unknown[]; directory: string; events: unknown[]; omittedNotifications?: { usage: number; events: number } }
+
+export function artifactRepairFeedback(error: string): string {
+  if (!/\btool[- ](?:input|call|arguments?)\b/i.test(error) || !/\b(?:invalid|malformed) JSON\b|\bJSON\b.{0,40}\b(?:invalid|malformed)\b/i.test(error)) return error.slice(0, 1000);
+  return 'The previous tool call contained invalid JSON. Submit the structured object directly, escape quotes and line breaks inside strings, and check every closing bracket. Do not use single-quoted strings or trailing commas. The items field is an array, not an object: never close it with }. Put the required newTopics array before items. Within each item, en, zh-CN and discussion are sibling fields. If discussion is the last field, after its final zh-CN string close the discussion object, the item object, the items array and the root object, in that order: "}}]}. Do not omit the ] or add an extra } before it.';
+}
 
 class NotificationLog {
   readonly values: unknown[] = [];
@@ -125,7 +130,7 @@ export async function generateBatch(config: Config['agent'], input: SummaryInput
       await connection.agent.request('session/set_config_option', { sessionId, configId: effort.id, value: config.effort }, { cancellationSignal: abort });
     }
     stage = 'generate';
-    const prompt = 'Call feedgarden_input to load the trusted feedgarden-report skill and fixed input. Follow the skill, using feedgarden_result to write result.json. Do not answer with the artifact in chat.' + (repair ? ' Prior artifact validation failed: ' + repair.slice(0, 1000) : '');
+    const prompt = 'Call feedgarden_input to load the trusted feedgarden-report skill and fixed input. Follow the skill, using feedgarden_result to write result.json. Supply contractVersion, items and newTopics directly as tool arguments. Do not wrap the artifact in a JSON string or answer with it in chat.' + (repair ? ' Previous attempt failed: ' + artifactRepairFeedback(repair) : '');
     const response = await connection.agent.request('session/prompt', { sessionId, prompt: [{ type: 'text', text: prompt }] }, { cancellationSignal: abort });
     if (response.stopReason !== 'end_turn') throw new Error('Agent stopped with ' + response.stopReason);
     stage = 'validate-artifact';

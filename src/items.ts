@@ -1,17 +1,18 @@
 import { readFile, mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import type { z } from 'zod';
 import type { Config, Source } from './config.js';
 import { generateBatch, type AgentResult, type SummaryInput } from './agent.js';
-import { validateArtifact, ArtifactError } from './topics-contract.mjs';
+import { validateArtifact, ArtifactError, outputSchema } from './topics-contract.mjs';
 import { applyTopics, loadTopics, type Registry } from './topics.js';
 import { Store, QuotaDeferred } from './store.js';
-import type { Item, Translation } from './types.js';
+import type { Item } from './types.js';
 import { atomicWrite, errorText, hash, nowIso, safeUrl } from './util.js';
 import { enrichItem } from './source-content.js';
 import { Http } from './http.js';
 
-export interface ItemCopy { source: string; id: string; topics: string[]; media?: string[]; en: Translation; 'zh-CN': Translation }
+export type ItemCopy = z.infer<typeof outputSchema>['items'][number];
 export interface AcceptedItem { item: Item; copy: ItemCopy; firstSeen: string; date: string; dateBasis: 'published' | 'observed'; updated: string }
 interface Job { source: string; id: string; cache_key: string; data: string; state: string; attempts: number; next_at: string; error: string | null }
 interface FixedJob { source: string; id: string; key: string; item: Item; firstSeen: string }
@@ -46,11 +47,17 @@ export async function summarize(config: Config, store: Store, options: { source?
   const cutoff = store.meta('cutoff')!;
   const http = new Http(store, undefined, options.signal);
   let registry = await loadTopics(config.feed.topics), generated = 0, deferred = false, runtimeFailures = 0;
+  function checkRegistryBudget(): void {
+    const chars = JSON.stringify({ contractVersion: 2, topics: registry, items: [] }).length;
+    if (chars >= config.agent.maxInputChars) throw new Error(`Topic registry uses ${chars} characters, exceeding agent.maxInputChars=${config.agent.maxInputChars} before any item. Increase maxInputChars (up to 24000) or shorten topic descriptions through topics apply, preserving IDs and aliases.`);
+    if (chars >= config.agent.maxInputChars * 0.8) console.warn(`Topic registry uses ${chars}/${config.agent.maxInputChars} input characters; shorten descriptions or increase agent.maxInputChars before item headroom runs out.`);
+  }
+  checkRegistryBudget();
   // Recover a saved artifact before spending another ACP attempt.
-  async function accept(batch: Batch, result: unknown): Promise<void> {
+  async function accept(batch: Batch, result: unknown, validated?: ReturnType<typeof validateArtifact>): Promise<void> {
     options.signal?.throwIfAborted();
     const input = JSON.parse(batch.input) as SummaryInput;
-    const { output, registry: validatedRegistry } = validateArtifact(result, input);
+    const { output, registry: validatedRegistry } = validated ?? validateArtifact(result, input);
     const previous = await loadTopics(config.feed.topics);
     if (hash(previous) !== hash(input.topics) && hash(previous) !== hash(validatedRegistry)) throw new Error('Topic registry changed while a task was running');
     const next = validatedRegistry as Registry;
@@ -132,27 +139,42 @@ export async function summarize(config: Config, store: Store, options: { source?
     if (!chosen) break;
     cursor = chosen.id; store.setMeta('round_robin', cursor);
     const agent = { ...config.agent, ...chosen.agent };
+    checkRegistryBudget();
     const fixed: FixedJob[] = [], input: SummaryInput = { contractVersion: 2, topics: registry, items: [] };
+    let oversizedChars = 0;
     for (const job of jobs) {
       const data = JSON.parse(job.data) as { item: Item; firstSeen: string };
       input.items.push(summaryItem(data.item, agent.maxItemChars));
-      if (JSON.stringify(input).length > agent.maxInputChars) { input.items.pop(); break; }
+      const chars = JSON.stringify(input).length;
+      if (chars > agent.maxInputChars) { oversizedChars = chars; input.items.pop(); break; }
       fixed.push({ source: job.source, id: job.id, key: job.cache_key, ...data });
     }
-    if (!fixed.length) throw new Error('Topic registry and one item exceed the complete agent input budget');
+    if (!fixed.length) {
+      store.db.prepare("UPDATE feed_jobs SET state='failed',error=? WHERE source=? AND id=?").run(`Item and topic registry use ${oversizedChars} characters, exceeding agent.maxInputChars=${agent.maxInputChars}. Increase maxInputChars or lower maxItemChars, then use --retry-failed. No ACP attempt was spent.`, jobs[0]!.source, jobs[0]!.id);
+      continue;
+    }
     const id = randomUUID(), workspace = resolve(agent.runtimeDirectory, 'task-' + id);
     const batch: Batch = { id, input: JSON.stringify(input), jobs: JSON.stringify(fixed), workspace, state: 'prepared' };
     await mkdir(workspace, { recursive: true, mode: 0o700 });
-    await atomicWrite(join(workspace, 'input.json'), batch.input);
     store.db.prepare('INSERT INTO feed_batches VALUES (?,?,?,?,?,?,NULL)').run(id, batch.input, batch.jobs, workspace, 'prepared', at);
     if (!options.rebuild) {
       const cached = fixed.map(job => (store.db.prepare('SELECT copy FROM feed_cache WHERE key=?').get(job.key) as { copy: string } | undefined)?.copy);
       if (cached.every(Boolean)) {
-        await accept(batch, { contractVersion: 2, items: cached.map(copy => JSON.parse(copy!)), newTopics: [] });
-        continue;
+        try {
+          await accept(batch, { contractVersion: 2, items: cached.map(copy => JSON.parse(copy!)), newTopics: [] });
+          continue;
+        } catch (error) {
+          if (!(error instanceof ArtifactError) && !(error instanceof SyntaxError)) throw error;
+          // Cached copy can outlive its topic assignments. A rejected cache is
+          // a miss; paid generation still owns the attempt and backoff budget.
+          store.db.transaction(() => {
+            for (const job of fixed) store.db.prepare('DELETE FROM feed_cache WHERE key=?').run(job.key);
+          })();
+        }
       }
     }
-    let repair: string | undefined;
+    // Persisted failures cross the queue boundary unchanged; the agent owns repair wording.
+    let repair = jobs.find(job => job.error)?.error ?? undefined;
     for (let attempt = 0; attempt < 2; attempt++) {
       if (fixed.some(job => (store.db.prepare('SELECT attempts FROM feed_jobs WHERE source=? AND id=?').get(job.source, job.id) as { attempts: number }).attempts >= 5)) break;
       let call: number;
@@ -166,11 +188,11 @@ export async function summarize(config: Config, store: Store, options: { source?
       try {
         const result = await generator(agent, input, repair, workspace, options.signal);
         options.signal?.throwIfAborted();
-        validateArtifact(result.output, input);
+        const validated = validateArtifact(result.output, input);
         persisting = true;
         await atomicWrite(join(workspace, 'result.json'), JSON.stringify(result.output));
         await atomicWrite(join(workspace, 'audit.json'), JSON.stringify({ inputHash: hash(input), model: agent.model, skillHash, ...result }, null, 2));
-        await accept(batch, result.output);
+        await accept(batch, result.output, validated);
         store.finishCall(call, 'succeeded', result.usage); runtimeFailures = 0; repair = undefined; break;
       } catch (error) {
         repair = errorText(error); store.finishCall(call, 'failed', { error: repair });

@@ -14,6 +14,7 @@ import { date, parseFollowBuilders } from '../src/channels/parsers.js';
 import { convertConfig, migrate, rollback } from '../src/migrate.js';
 import { assertManagedPaths } from '../src/publish.js';
 import { hash } from '../src/util.js';
+import { artifactRepairFeedback } from '../src/agent.js';
 import type { Item } from '../src/types.js';
 const at='2026-10-09T10:00:00.000Z';
 const topic={id:'coding',name:{en:'Coding','zh-CN':'编程'},description:'Developer tools',aliases:[],deprecated:false};
@@ -33,6 +34,29 @@ test('all eligible items enter persistent per-source FIFO and round-robin batche
  const result=await summarize(f.config,f.store,{},async(...args)=>{order.push(args[1].items[0]!.source);assert.ok(JSON.stringify(args[1]).length<=24000);return generator(...args);},at);
  assert.equal(result.generated,24);assert.deepEqual(order,['one','two','one','two']);assert.equal(acceptedItems(f.store).length,24);
  }finally{await f.cleanup();}
+});
+test('an oversized item fails without a model call or blocking following items, and can be retried with a larger budget', async () => {
+ const f=await fixture();
+ try {
+  f.config.agent.maxInputChars=4000;save(f.store,[item('a-large','one',{text:'x'.repeat(3900)}),item('z-small')]);let calls=0;
+  const gen:Generator=async(...args)=>{calls++;return generator(...args);};
+  const result=await summarize(f.config,f.store,{},gen,at);
+  assert.equal(result.generated,1);assert.equal(result.failed,1);assert.equal(calls,1);
+  const failed=f.store.db.prepare('SELECT state,attempts,error FROM feed_jobs WHERE id=?').get('a-large') as {state:string;attempts:number;error:string};
+  assert.equal(failed.state,'failed');assert.equal(failed.attempts,0);assert.match(failed.error,/maxInputChars.*maxItemChars/);
+  f.config.agent.maxInputChars=8000;assert.equal((await summarize(f.config,f.store,{retryFailed:true},gen,at)).generated,1);
+  assert.equal(calls,2);
+ } finally {await f.cleanup();}
+});
+test('an oversized registry fails before enrichment or queue mutations with measured budget guidance', async () => {
+ const f=await fixture();
+ try {
+  f.config.agent.maxInputChars=4000;
+  await writeFile(f.config.feed.topics,JSON.stringify({version:1,topics:[topic,...Array.from({length:20},(_,i)=>({...topic,id:'large-'+i,name:{en:'Large '+i,'zh-CN':'大主题 '+i},description:'x'.repeat(400)}))]}));
+  save(f.store,[item('one')]);let prepared=0;
+  await assert.rejects(summarize(f.config,f.store,{},generator,at,async row=>{prepared++;return row;}),/Topic registry uses \d+.*maxInputChars/);
+  assert.equal(prepared,0);assert.equal((f.store.db.prepare('SELECT count(*) n FROM feed_jobs').get() as {n:number}).n,0);
+ } finally {await f.cleanup();}
 });
 test('native ID path safety and source-aware cache; metadata updates reuse copy, changed text regenerates',async()=>{
  const f=await fixture();let calls=0;const gen:Generator=async(...args)=>{calls++;return generator(...args);};
@@ -57,6 +81,34 @@ test('invalid artifacts get one immediate repair; quota deferral remains pending
  save(f.store,[item('b')]);f.config.agent.maxDailyCalls=2;const result=await summarize(f.config,f.store,{},()=>{throw new Error('No quota');},at);assert.equal(result.deferred,true);assert.equal(result.pending,1);assert.equal(result.failed,0);
  }finally{await f.cleanup();}
 });
+test('tool JSON repair feedback tolerates provider wording while preserving other errors', () => {
+ for (const error of [
+  'ACP generate: DeepSeek Messages stream: tool input is invalid JSON',
+  'Provider rejected TOOL ARGUMENTS: malformed JSON',
+  'A tool-call failed because JSON was invalid',
+ ]) {
+  assert.match(artifactRepairFeedback(error), /escape quotes and line breaks/);
+  assert.match(artifactRepairFeedback(error), /structured object directly/);
+ }
+ for (const error of ['Tool input exceeds limit', 'Invalid JSON in HTTP response', 'MANUAL_ACTION: Missing credentials', 'Transport disconnected', 'x'.repeat(1500)]) {
+  assert.equal(artifactRepairFeedback(error), error.slice(0, 1000));
+ }
+});
+test('a persisted provider JSON failure receives actionable format feedback on the next bounded retry', async () => {
+ const f=await fixture();
+ try {
+  save(f.store,[item('format')]);
+  await summarize(f.config,f.store,{},async()=>{throw new Error('ACP generate: DeepSeek Messages stream: tool input is invalid JSON');},at);
+  assert.equal(acceptedItems(f.store).length,0);
+  const result=await summarize(f.config,f.store,{},async(...args)=>{
+   assert.match(args[2]??'',/tool input is invalid JSON/);
+   assert.match(artifactRepairFeedback(args[2]!),/escape quotes and line breaks/);assert.match(artifactRepairFeedback(args[2]!),/structured object directly/);
+   return generator(...args);
+  },new Date(Date.parse(at)+20*60_000).toISOString());
+  assert.equal(result.generated,1);assert.equal(result.pending,0);
+  assert.equal((f.store.db.prepare('SELECT count(*) n FROM agent_calls').get() as {n:number}).n,2);
+ } finally {await f.cleanup();}
+});
 test('topic additions do not invalidate accepted summaries; deprecation remaps output and aliases',async()=>{
  const f=await fixture();try{save(f.store,[item('a')]);await summarize(f.config,f.store,{},generator,at);
  const next={version:1 as const,topics:[{...topic,deprecated:true,replacedBy:'dev'}, {...topic,id:'dev',name:{en:'Development','zh-CN':'开发'}}]};await applyTopics(f.config.feed.topics,next);
@@ -65,6 +117,58 @@ test('topic additions do not invalidate accepted summaries; deprecation remaps o
  assert.throws(()=>validateRegistry({version:1,topics:[topic,{...topic,id:'duplicate'}]}),/Duplicate/);
  await assert.rejects(applyTopics(f.config.feed.topics,{version:1,topics:[]} ),/cannot be removed/);
  }finally{await f.cleanup();}
+});
+test('A to B to A source revisions evict deprecated cached topics and let the source queue progress', async () => {
+ const f=await fixture();
+ try {
+  f.config.agent.maxBatchItems=1;
+  const original=item('oscillating');save(f.store,[original]);
+  await summarize(f.config,f.store,{},generator,at);
+  const originalKey=(f.store.db.prepare('SELECT cache_key FROM feed_jobs WHERE id=?').get(original.id) as {cache_key:string}).cache_key;
+  await applyTopics(f.config.feed.topics,{version:1,topics:[{...topic,deprecated:true,replacedBy:'dev'},{...topic,id:'dev',name:{en:'Development','zh-CN':'开发'}}]});
+  const updated:Generator=async(...args)=>{const result=await generator(...args);for(const copy of result.output.items)copy.topics=['dev'];return result;};
+  save(f.store,[{...original,title:'Changed title'}]);await summarize(f.config,f.store,{},updated,at);
+  save(f.store,[original,item('following')]);let calls=0;
+  const result=await summarize(f.config,f.store,{},async(...args)=>{calls++;return updated(...args);},at);
+  assert.equal(result.generated,2);assert.equal(result.pending,0);assert.equal(result.failed,0);assert.equal(calls,2);
+  const cached=f.store.db.prepare('SELECT copy FROM feed_cache WHERE key=?').get(originalKey) as {copy:string};
+  assert.deepEqual(JSON.parse(cached.copy).topics,['dev']);
+  assert.equal(acceptedItems(f.store).length,2);
+ } finally {await f.cleanup();}
+});
+test('valid cache reuse spends no model call, while malformed cached JSON regenerates normally', async () => {
+ const f=await fixture();
+ try {
+  const original=item('cached');save(f.store,[original]);await summarize(f.config,f.store,{},generator,at);
+  const originalKey=(f.store.db.prepare('SELECT cache_key FROM feed_jobs WHERE id=?').get(original.id) as {cache_key:string}).cache_key;
+  save(f.store,[{...original,title:'Changed title'}]);await summarize(f.config,f.store,{},generator,at);
+  save(f.store,[original]);const before=(f.store.db.prepare('SELECT count(*) n FROM agent_calls').get() as {n:number}).n;
+  assert.equal((await summarize(f.config,f.store,{},()=>{throw new Error('Valid cache must be reused');},at)).generated,1);
+  assert.equal((f.store.db.prepare('SELECT count(*) n FROM agent_calls').get() as {n:number}).n,before);
+  save(f.store,[{...original,title:'Changed title'}]);await summarize(f.config,f.store,{},generator,at);
+  f.store.db.prepare('UPDATE feed_cache SET copy=? WHERE key=?').run('{invalid JSON',originalKey);
+  save(f.store,[original]);assert.equal((await summarize(f.config,f.store,{},generator,at)).generated,1);
+ } finally {await f.cleanup();}
+});
+test('an invalid cache obeys quota deferral and the five paid-attempt cap while retaining the accepted snapshot', async () => {
+ const f=await fixture();
+ try {
+  const original=item('bounded-cache');save(f.store,[original]);await summarize(f.config,f.store,{},generator,at);
+  const key=(f.store.db.prepare('SELECT cache_key FROM feed_jobs WHERE id=?').get(original.id) as {cache_key:string}).cache_key;
+  const revised={...original,title:'Changed title'};save(f.store,[revised]);await summarize(f.config,f.store,{},generator,at);
+  f.store.db.prepare('UPDATE feed_cache SET copy=? WHERE key=?').run('{broken',key);save(f.store,[original]);
+  f.config.agent.maxDailyCalls=2;
+  assert.equal((await summarize(f.config,f.store,{},()=>{throw new Error('Quota must defer without generating');},at)).deferred,true);
+  assert.equal(f.store.db.prepare('SELECT copy FROM feed_cache WHERE key=?').get(key),undefined);
+  assert.equal((f.store.db.prepare('SELECT attempts FROM feed_jobs').get() as {attempts:number}).attempts,0);
+  f.config.agent.maxDailyCalls=80;let calls=0;
+  const invalid:Generator=async(...args)=>{calls++;const result=await generator(...args);result.output.items[0]!.topics=['missing'];return result;};
+  for(let visit=0;visit<3;visit++)await summarize(f.config,f.store,{},invalid,new Date(Date.parse(at)+visit*7*3600_000).toISOString());
+  assert.deepEqual(f.store.db.prepare('SELECT state,attempts FROM feed_jobs').get(),{state:'failed',attempts:5});assert.equal(calls,5);
+  assert.equal(acceptedItems(f.store)[0]!.copy.en.title,revised.title);
+  await summarize(f.config,f.store,{retryFailed:true},generator,new Date(Date.parse(at)+30*3600_000).toISOString());
+  assert.equal(acceptedItems(f.store)[0]!.copy.en.title,original.title);
+ } finally {await f.cleanup();}
 });
 test('topic file is durable before accepted DB commit, and saved artifact recovers without another call',async()=>{
  const f=await fixture();try{save(f.store,[item('a')]);f.store.db.exec("CREATE TRIGGER reject_accept BEFORE INSERT ON feed_summaries BEGIN SELECT RAISE(FAIL,'simulated crash'); END;");

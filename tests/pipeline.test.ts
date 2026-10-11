@@ -128,15 +128,19 @@ test('online SQLite backup includes WAL state and an active lease excludes anoth
   } finally { store.close(); await rm(root, { recursive: true }); }
 });
 
-test('DSH plugin restricts all other capabilities and ignores model-controlled paths', async () => {
+test('DSH plugin accepts structured artifacts and refuses model-controlled paths', async () => {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-plugin-'));
   let guard: (exec: { name: string }) => string | undefined = () => ''; const tools = new Map<string, any>(); let ready = false;
   try {
     await writeFile(join(root, 'input.json'), '{"contractVersion":2,"topics":{"version":1,"topics":[]},"items":[]}'); await writeFile(join(root, 'SKILL.md'), 'trusted skill');
-    await dshPlugin({ tools: { guard: (fn: typeof guard) => { guard = fn; }, register: (tool: any) => tools.set(tool.name, tool) }, provide: () => { ready = true; } }, { directory: root });
+    await dshPlugin({ tools: { guard: fn => { guard = exec => fn({ name: exec.name } as Parameters<typeof fn>[0]); return () => {}; }, register: tool => { tools.set(tool.name, tool); return () => { tools.delete(tool.name); }; } }, provide: () => { ready = true; } }, { directory: root });
     assert.equal(ready, true); assert.ok(guard({ name: 'bash' })); assert.ok(guard({ name: 'read' })); assert.equal(guard({ name: 'feedgarden_result' }), undefined);
     assert.match(await tools.get('feedgarden_input').execute(), /trusted skill/);
-    await tools.get('feedgarden_result').execute({ json: '{"contractVersion":2,"items":[],"newTopics":[]}', path: '/tmp/should-not-write' });
+    const result = tools.get('feedgarden_result');
+    assert.equal(result.parameters.type, 'object'); assert.equal(result.parameters.additionalProperties, false);
+    assert.ok(result.parameters.properties.items); assert.equal(result.parameters.properties.json, undefined);
+    await assert.rejects(result.execute({ contractVersion: 2, items: [], newTopics: [], path: '/tmp/should-not-write' }), /Unrecognized key/);
+    await result.execute({ contractVersion: 2, items: [], newTopics: [] });
     assert.equal(await readFile(join(root, 'result.json'), 'utf8'), '{"contractVersion":2,"items":[],"newTopics":[]}');
     assert.deepEqual((await readdir(root)).sort(), ['SKILL.md', 'input.json', 'result.json']);
   } finally { await rm(root, { recursive: true }); }

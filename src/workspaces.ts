@@ -9,7 +9,9 @@ export async function pruneWorkspaces(agent: Config['agent'], store: Store, at: 
   const parent = await lstat(root).catch(error => { if (error.code === 'ENOENT') return; throw error; });
   if (!parent?.isDirectory() || parent.isSymbolicLink()) return;
   const cutoff = new Date(Date.parse(at) - agent.workspaceRetentionDays * 86400_000).toISOString();
-  const rows = store.db.prepare("SELECT id,workspace FROM feed_batches WHERE state IN ('accepted','failed','interrupted') AND workspace!='' AND julianday(created_at)<julianday(?)").all(cutoff) as { id: string; workspace: string }[];
+  // Deferred batches are not resumed: their pending jobs are re-batched on the
+  // next run. Keep their database evidence, but expire their owned directories.
+  const rows = store.db.prepare("SELECT id,workspace FROM feed_batches WHERE state IN ('accepted','failed','interrupted','deferred') AND workspace!='' AND julianday(created_at)<julianday(?)").all(cutoff) as { id: string; workspace: string }[];
   for (const row of rows) {
     const path = resolve(row.workspace);
     if (dirname(path) !== root || !/^task-[0-9a-f-]{36}$/.test(basename(path))) continue;

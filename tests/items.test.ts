@@ -15,6 +15,7 @@ import { convertConfig, migrate, rollback } from '../src/migrate.js';
 import { assertManagedPaths } from '../src/publish.js';
 import { hash } from '../src/util.js';
 import { artifactRepairFeedback } from '../src/agent.js';
+import { pruneWorkspaces } from '../src/workspaces.js';
 import type { Item } from '../src/types.js';
 const at='2026-10-09T10:00:00.000Z';
 const topic={id:'coding',name:{en:'Coding','zh-CN':'编程'},description:'Developer tools',aliases:[],deprecated:false};
@@ -186,8 +187,8 @@ test('retention prunes only expired runner-owned terminal workspaces and preserv
   const external=join(f.root,'external-evidence');await mkdir(external);await writeFile(join(external,'keep'),'evidence');
   const linked=join(f.config.agent.runtimeDirectory,'task-00000000-0000-0000-0000-000000000000');await symlink(external,linked,process.platform==='win32'?'junction':'dir');
   f.store.db.prepare('INSERT INTO feed_batches VALUES (?,?,?,?,?,?,NULL)').run('linked','{}','[]',linked,'accepted',at);
-  f.store.db.prepare("UPDATE feed_batches SET state='deferred' WHERE id=?").run(batch.id);
-  const later='2026-11-01T00:00:00.000Z';await summarize(f.config,f.store,{},generator,later);
+  f.store.db.prepare("UPDATE feed_batches SET state='running' WHERE id=?").run(batch.id);
+  const later='2026-11-01T00:00:00.000Z';await pruneWorkspaces(f.config.agent,f.store,later);
   assert.ok(await stat(batch.workspace));
   f.store.db.prepare("UPDATE feed_batches SET state='accepted' WHERE id=?").run(batch.id);
   await summarize(f.config,f.store,{},generator,later);
@@ -197,6 +198,22 @@ test('retention prunes only expired runner-owned terminal workspaces and preserv
   assert.equal(acceptedItems(f.store).length,1);
  } finally {await f.cleanup();}
 });
+test('expired deferred workspaces can be pruned without deleting queued jobs or batch evidence', async () => {
+ const f=await fixture();
+ try {
+  save(f.store,[item('deferred')]);f.config.agent.maxDailyCalls=1;
+  f.store.startCall('spent','model',1);
+  assert.equal((await summarize(f.config,f.store,{},()=>{throw new Error('Quota should defer');},at)).deferred,true);
+  const batch=f.store.db.prepare('SELECT * FROM feed_batches').get() as {id:string;workspace:string;input:string;jobs:string};
+  const jobs=f.store.db.prepare('SELECT * FROM feed_jobs').all();
+  await pruneWorkspaces(f.config.agent,f.store,at);assert.ok(await stat(batch.workspace));
+  await pruneWorkspaces(f.config.agent,f.store,'2026-11-01T00:00:00.000Z');
+  await assert.rejects(stat(batch.workspace),{code:'ENOENT'});
+  assert.deepEqual(f.store.db.prepare('SELECT * FROM feed_jobs').all(),jobs);
+  assert.deepEqual(f.store.db.prepare('SELECT state,workspace,input,jobs FROM feed_batches WHERE id=?').get(batch.id),{state:'deferred',workspace:'',input:batch.input,jobs:batch.jobs});
+ } finally {await f.cleanup();}
+});
+
 test('canonical topic editing during an agent call stops without a dangling public reference',async()=>{
  const f=await fixture();try{save(f.store,[item('a')]);await assert.rejects(summarize(f.config,f.store,{},async(...args)=>{await writeFile(f.config.feed.topics,JSON.stringify({version:1,topics:[]}));return generator(...args);},at),/cannot be removed|Unknown|changed|topic/i);assert.equal(acceptedItems(f.store).length,0);
  }finally{await f.cleanup();}

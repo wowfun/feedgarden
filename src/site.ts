@@ -1,12 +1,14 @@
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rename, rm, writeFile, readFile } from 'node:fs/promises';
-import { join, resolve, dirname } from 'node:path';
+import { join, resolve, dirname, relative, isAbsolute } from 'node:path';
 import { DateTime } from 'luxon';
 import type { Config } from './config.js';
 import { Store } from './store.js';
 import { iterateAcceptedItems, itemPath, type AcceptedItem } from './items.js';
 import { loadTopics } from './topics.js';
 import { atomicWrite, safeUrl, hash } from './util.js';
+import { importArchives, archiveManifestSignature } from './archives.js';
+import { reconcileSelection, selectionPolicy, selectionClause } from './selection.js';
 
 function escapeMarkdown(value: string): string { return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\\`*_[\]{}()#!|$~]/g, char => `&#${char.charCodeAt(0)};`).replace(/\b([a-z][a-z0-9+.-]*):(?=\/\/)/gi, '$1&#58;').replace(/[\r\n]+/g, ' ').trim(); }
 function frontmatter(properties: Record<string, unknown>): string { return `---\n${Object.entries(properties).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n')}\n---\n\n`; }
@@ -50,11 +52,13 @@ export async function recoverContent(config: Config): Promise<void> {
 export async function writeSite(config: Config, store: Store, signal?: AbortSignal, force = false): Promise<boolean> {
   signal?.throwIfAborted();
   await recoverContent(config);
+  await importArchives(config, store, signal);
+  for (const source of config.sources) if (store.meta('selection_policy:' + source.id) !== selectionPolicy(source)) reconcileSelection(config, store, { source: source.id, signal });
   const registry = await loadTopics(config.feed.topics);
   const timezones = new Map(config.sources.map(source => [source.id, source.timezone]));
   const destination = resolve(config.feed.directory);
   const manifests = await Promise.all(['en', 'zh-CN'].map(locale => readFile('config/locales/' + locale + '.json', 'utf8')));
-  const signature = hash({ contentVersion: store.meta('content_version'), registry, sources: config.sources.map(({ id, name, timezone }) => ({ id, name, timezone })), manifests, renderRevision: 1 });
+  const signature = hash({ contentVersion: store.meta('content_version'), registry, sources: config.sources.map(({ id, name, timezone, selection }) => ({ id, name, timezone, selection })), manifests, renderRevision: 2 });
   const signatureKey = 'render_signature:' + destination;
   if (!force && existsSync(destination) && existsSync(join(destination, 'index.md')) && existsSync(join(destination, '_translations/zh-CN/index.md')) && store.meta(signatureKey) === signature) return false;
   const topicIds = new Map(registry.topics.map(topic => [topic.id, topic.replacedBy ?? topic.id]));
@@ -63,19 +67,39 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
   const paths = new Map<string, string>();
   const directories = new Set<string>();
   try {
+    // Configuration changes regenerate only the managed locale manifests;
+    // every other opaque archive file remains part of the private snapshot.
+    const preserveManifest = store.meta('selection_archive_manifest') === await archiveManifestSignature(config);
     async function write(path: string, body: string): Promise<void> {
       signal?.throwIfAborted();
       const file = join(staging, path), directory = dirname(file);
       if (!directories.has(directory)) { await mkdir(directory, { recursive: true }); directories.add(directory); }
       await writeFile(file, body.trimEnd() + '\n');
     }
+    async function preserve(path: string, body: string | Buffer): Promise<void> {
+      signal?.throwIfAborted();
+      const file = resolve(staging, path), rel = relative(staging, file);
+      if (/^[a-z]:/i.test(path) || path.includes('\\') || isAbsolute(path) || isAbsolute(rel) || !rel || rel === '..' || rel.startsWith('..' + (process.platform === 'win32' ? '\\' : '/'))) throw new Error('Invalid archived relative path: ' + path);
+      const directory = dirname(file);
+      if (!directories.has(directory)) { await mkdir(directory, { recursive: true }); directories.add(directory); }
+      await writeFile(file, body);
+    }
+    for (const row of store.db.prepare('SELECT path,body FROM feed_archive_files ORDER BY path').iterate() as Iterable<{ path: string; body: Buffer }>) {
+      if (!preserveManifest && (row.path === '_locale.yml' || row.path === '_translations/zh-CN/_locale.yml')) continue;
+      await preserve(row.path, row.body);
+    }
     for (const locale of ['en', 'zh-CN'] as const) {
       const prefix = locale === 'zh-CN' ? '_translations/zh-CN/' : '';
       const manifest = JSON.parse(manifests[locale === 'en' ? 0 : 1]!);
       manifest.tag_labels = Object.fromEntries([...config.sources.map(source => ['source/' + source.id, source.name]), ...registry.topics.map(topic => ['topics/' + topic.id, topic.name[locale]])]);
       manifest.tag_aliases = Object.fromEntries(registry.topics.filter(topic => topic.replacedBy).map(topic => ['topics/' + topic.id, 'topics/' + topic.replacedBy]));
-      await write(prefix + '_locale.yml', JSON.stringify(manifest, null, 2));
-      await write(prefix + 'index.md', frontmatter({ publish: true, content_type: 'page', title: 'Feedgarden' }));
+      if (!preserveManifest || !existsSync(join(staging, prefix + '_locale.yml'))) await write(prefix + '_locale.yml', JSON.stringify(manifest, null, 2));
+      if (!existsSync(join(staging, prefix + 'index.md'))) await write(prefix + 'index.md', frontmatter({ publish: true, content_type: 'page', title: 'Feedgarden' }));
+    }
+    const archived = store.db.prepare(`SELECT a.path,a.source,a.id,a.en,a.zh FROM feed_archives a LEFT JOIN feed_summaries f ON f.source=a.source AND f.id=a.id LEFT JOIN feed_excluded e ON e.source=a.source AND e.id=a.id WHERE f.id IS NULL AND e.id IS NULL AND ${selectionClause('a', true)} ORDER BY a.path`);
+    for (const row of archived.iterate() as Iterable<{ path: string; source: string; id: string; en: string; zh: string }>) {
+      paths.set(row.path, JSON.stringify([row.source, row.id]));
+      await preserve(row.path, row.en); await preserve('_translations/zh-CN/' + row.path, row.zh);
     }
     for (const record of iterateAcceptedItems(store)) {
         signal?.throwIfAborted();

@@ -13,6 +13,8 @@ import { enrichItem, enrichmentInterval } from './source-content.js';
 import { Http } from './http.js';
 import { reportSkill } from './report-skill.js';
 import { pruneWorkspaces } from './workspaces.js';
+import { importArchives } from './archives.js';
+import { reconcileSelection, selectionClause } from './selection.js';
 
 export type ItemCopy = z.infer<typeof outputSchema>['items'][number];
 export interface AcceptedItem { item: Item; copy: ItemCopy; firstSeen: string; date: string; dateBasis: 'published' | 'observed'; updated: string }
@@ -35,7 +37,7 @@ export function eligible(item: Item, firstSeen: string, cutoff: string, source: 
   return (item.basis === 'observed' ? firstSeen : item.publishedAt) >= cutoff;
 }
 export function* iterateAcceptedItems(store: Store): IterableIterator<AcceptedItem> {
-  const query = store.db.prepare('SELECT f.source,f.id,f.accepted FROM feed_summaries f LEFT JOIN feed_excluded e ON e.source=f.source AND e.id=f.id WHERE e.id IS NULL AND (f.source,f.id)>(?,?) ORDER BY f.source,f.id LIMIT 128');
+  const query = store.db.prepare(`SELECT f.source,f.id,f.accepted FROM feed_summaries f LEFT JOIN feed_excluded e ON e.source=f.source AND e.id=f.id WHERE e.id IS NULL AND ${selectionClause('f', true)} AND (f.source,f.id)>(?,?) ORDER BY f.source,f.id LIMIT 128`);
   let source = '', id = '';
   while (true) {
     const rows = query.all(source, id) as { source: string; id: string; accepted: string }[];
@@ -49,6 +51,8 @@ export async function summarize(config: Config, store: Store, options: { source?
   options.signal?.throwIfAborted();
   const sources = config.sources.filter(source => source.enabled && (!options.source || source.id === options.source));
   if (options.source && !sources.length) throw new Error('Unknown or disabled source: ' + options.source);
+  await importArchives(config, store, options.signal);
+  reconcileSelection(config, store, { source: options.source, at, signal: options.signal });
   const skillHashes = new Map(await Promise.all(sources.map(async source => [source.id, hash(await reportSkill([source.id]))] as const)));
   const cutoff = store.meta('cutoff')!;
   const http = new Http(store, undefined, options.signal);
@@ -68,6 +72,7 @@ export async function summarize(config: Config, store: Store, options: { source?
     update: store.db.prepare('UPDATE feed_jobs SET data=? WHERE source=? AND id=?'),
     retry: store.db.prepare("UPDATE feed_jobs SET state='pending',attempts=0,next_at='',error=NULL WHERE source=? AND id=?"),
     accepted: store.db.prepare('SELECT accepted FROM feed_summaries WHERE source=? AND id=?'),
+    archived: store.db.prepare('SELECT 1 FROM feed_archives a WHERE source=? AND id=? AND NOT EXISTS(SELECT 1 FROM feed_summaries f WHERE f.source=a.source AND f.id=a.id)'),
     attempts: store.db.prepare('SELECT attempts FROM feed_jobs WHERE source=? AND id=?'),
     present: store.db.prepare('UPDATE feed_summaries SET accepted=? WHERE source=? AND id=?'),
     schedule: store.db.prepare('UPDATE feed_planning SET due_at=? WHERE source=? AND id=?'),
@@ -91,13 +96,15 @@ export async function summarize(config: Config, store: Store, options: { source?
       jobs.forEach((job, i) => {
         const copy = output.items[i]! as ItemCopy;
         const accepted: AcceptedItem = { item: job.item, copy, firstSeen: job.firstSeen, date: job.item.basis === 'observed' ? job.firstSeen : job.item.publishedAt, dateBasis: job.item.basis === 'observed' ? 'observed' : 'published', updated: at };
-        store.db.prepare('INSERT OR REPLACE INTO feed_summaries VALUES (?,?,?,?,?)').run(job.source, job.id, job.key, JSON.stringify(accepted), at);
         store.db.prepare('INSERT OR REPLACE INTO feed_cache VALUES (?,?)').run(job.key, JSON.stringify(copy));
+        // A recovered artifact can outlive its selection. Complete its job and
+        // keep the accepted copy privately; output queries enforce selection.
+        store.db.prepare('INSERT OR REPLACE INTO feed_summaries VALUES (?,?,?,?,?)').run(job.source, job.id, job.key, JSON.stringify(accepted), at);
         store.db.prepare("UPDATE feed_jobs SET state='ready',error=NULL WHERE source=? AND id=? AND cache_key=?").run(job.source, job.id, job.key);
       });
       store.db.prepare("UPDATE feed_batches SET state='accepted',error=NULL WHERE id=?").run(batch.id);
     })();
-    generated += jobs.length;
+    generated += jobs.filter(job => store.isSelected(job.source, job.id)).length;
   }
   const unfinished = store.db.prepare("SELECT * FROM feed_batches WHERE state IN ('prepared','running') ORDER BY created_at,id").all() as Batch[];
   for (const batch of unfinished) {
@@ -138,7 +145,7 @@ export async function summarize(config: Config, store: Store, options: { source?
           planning.remove.run(source.id, row.id); continue;
         }
         let item = JSON.parse(row.data) as Item;
-        if (planning.excluded.get(source.id, row.id) || !eligible(item, row.first_seen, cutoff, source)) {
+        if (!store.isSelected(source.id, row.id) || planning.archived.get(source.id, row.id) && !options.refresh && !options.rebuild || planning.excluded.get(source.id, row.id) || !eligible(item, row.first_seen, cutoff, source)) {
           planning.remove.run(source.id, row.id); continue;
         }
         safeUrl(item.url);
@@ -170,7 +177,7 @@ export async function summarize(config: Config, store: Store, options: { source?
   let cursor = store.meta('round_robin') ?? '';
   // The due-time index requires sorting the entire pending queue per batch.
   // Walk the partial FIFO index instead; next_at still filters delayed retries.
-  const pendingJobs = store.db.prepare(`SELECT j.* FROM feed_jobs j INDEXED BY feed_jobs_pending_order WHERE source=? AND state='pending' AND next_at<=? AND attempts<5 ORDER BY json_extract(data,'$.firstSeen'),id LIMIT ?`);
+  const pendingJobs = store.db.prepare(`SELECT j.* FROM feed_jobs j INDEXED BY feed_jobs_pending_order WHERE source=? AND state='pending' AND next_at<=? AND attempts<5 AND ${selectionClause('j')} ORDER BY json_extract(data,'$.firstSeen'),id LIMIT ?`);
   while (sources.length) {
     options.signal?.throwIfAborted();
     const start = (sources.findIndex(source => source.id === cursor) + 1) % sources.length;
@@ -225,6 +232,7 @@ export async function summarize(config: Config, store: Store, options: { source?
     // Persisted failures cross the queue boundary unchanged; the agent owns repair wording.
     let repair = jobs.find(job => job.error)?.error ?? undefined;
     for (let attempt = 0; attempt < 2; attempt++) {
+      if (fixed.some(job => !store.isSelected(job.source, job.id))) { store.db.prepare("UPDATE feed_batches SET state='interrupted',error='Selection changed before generation' WHERE id=?").run(id); break; }
       if (fixed.some(job => (planning.attempts.get(job.source, job.id) as { attempts: number }).attempts >= 5)) break;
       let call: number;
       try { call = store.startCall(id, agent.model, agent.maxDailyCalls); }
@@ -266,6 +274,6 @@ export async function summarize(config: Config, store: Store, options: { source?
     }
     if (runtimeFailures >= 3) throw new Error('Three consecutive ACP runtime/transport failures; stopping this run');
   }
-  const states = (sources.length ? store.db.prepare("SELECT state,count(*) count FROM feed_jobs WHERE state!='ready' AND source IN (" + sources.map(() => '?').join(',') + ") GROUP BY state").all(...sources.map(source => source.id)) : []) as { state: string; count: number }[];
+  const states = (sources.length ? store.db.prepare("SELECT state,count(*) count FROM feed_jobs j WHERE state!='ready' AND " + selectionClause('j') + " AND source IN (" + sources.map(() => '?').join(',') + ") GROUP BY state").all(...sources.map(source => source.id)) : []) as { state: string; count: number }[];
   return { generated, pending: states.find(row => row.state === 'pending')?.count ?? 0, failed: states.find(row => row.state === 'failed')?.count ?? 0, deferred };
 }

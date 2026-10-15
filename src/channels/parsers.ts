@@ -1,6 +1,7 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { load } from 'cheerio';
-import type { Item } from '../types.js';
+import type { Item, RankingWindow } from '../types.js';
+import { redditRanking } from '../scoring.js';
 import { DateTime } from 'luxon';
 import { safeUrl, iso } from '../util.js';
 import { extractMedia, mediaForUrl } from '../source-content.js';
@@ -51,7 +52,7 @@ export function parseFollowBuilders(body: string, context: ParseContext): { gene
   });
   return { generatedAt, items };
 }
-export function parseFeed(body: string, context: ParseContext, notes?: string[]): Item[] {
+export function parseFeed(body: string, context: ParseContext, notes?: string[], redditWindow?: RankingWindow): Item[] {
   const document = xml(body);
   if (!document.rss?.channel && !document.feed && !document.RDF) throw new Error('Response is not an RSS or Atom feed');
   const entries: any[] = array(document.feed?.entry ?? document.rss?.channel?.item ?? document.RDF?.item);
@@ -69,6 +70,10 @@ export function parseFeed(body: string, context: ParseContext, notes?: string[])
     let id = text(entry.id ?? entry.guid) || url;
     if (context.source === 'arxiv') id = url.match(/(?:abs|pdf)\/([^?#]+)/)?.[1]?.replace(/v\d+$/, '') ?? id;
     if (context.source === 'hackernews') id = text(entry.comments).match(/[?&]id=(\d+)/)?.[1] ?? id;
+    if (context.source === 'reddit') {
+      const postId = new URL(url).pathname.match(/\/comments\/([a-z0-9]+)(?:\/|$)/i)?.[1];
+      if (postId) id = 't3_' + postId.toLowerCase();
+    }
     const published = date(text(entry.published ?? entry.pubDate ?? entry.date), context.timezone);
     const rawSummary = [entry.encoded, entry.content, entry.summary, entry.description].map(text).find(Boolean) ?? '';
     const summary = context.source === 'reddit' ? plain(load(rawSummary)('div.md').text()) : plain(rawSummary);
@@ -84,6 +89,7 @@ export function parseFeed(body: string, context: ParseContext, notes?: string[])
       text: summary, author: plain(text(entry.author?.name ?? entry.creator ?? entry.author)),
       media,
       metrics: { rank: index + 1 }, basis: published ? context.source === 'arxiv' && !announcementDate ? 'submitted' : 'published' : 'observed',
+      ...(context.source === 'reddit' && redditWindow ? { ranking: redditRanking(index + 1, entries.length, context.observedAt, redditWindow) } : {}),
       metadata: { missingPublicationDate: !published, ...(announcementDate ? { announcementDate: true } : {}), ...(entry.announce_type ? { announceType: text(entry.announce_type) } : {}) },
     } satisfies Item];
   }, 'feed', notes);

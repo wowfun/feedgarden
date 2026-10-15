@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { DateTime } from 'luxon';
 import { load } from 'cheerio';
 import type { Source, Stream, Channel } from '../config.js';
-import type { Collection, Item } from '../types.js';
+import type { Collection, Item, RankingWindow } from '../types.js';
 import { Http } from '../http.js';
 import { Store } from '../store.js';
 import { pythonExecutable } from '../process-command.js';
@@ -23,11 +23,19 @@ function collected(c: ChannelContext, items: Item[], notes: string[] = [], curso
 async function feed(c: ChannelContext): Promise<Collection> {
   const raw = await c.http.get(c.channel.url!, c.source.id === 'reddit' ? 60000 : c.source.id === 'arxiv' ? 3100 : 0, c.channel.transport);
   const notes: string[] = [];
-  const items = parseFeed(raw.body, base(c), notes);
+  const feedUrl = new URL(c.channel.url!);
+  const window = c.source.id === 'reddit' && feedUrl.pathname.endsWith('/top.rss') ? feedUrl.searchParams.get('t') : undefined;
+  const redditWindow = window && ['day', 'week', 'month', 'year', 'all'].includes(window) ? window as RankingWindow : undefined;
+  const items = parseFeed(raw.body, base(c), notes, redditWindow);
   if (items.length) notes.push('Recent feed window; completeness before the oldest returned item is unknown.');
   if (c.source.id === 'hackernews') notes.push('Hacker News front-page RSS; score and comment counts are unavailable.');
   if (c.source.id === 'producthunt') notes.push('New-product feed, not a dated leaderboard.');
-  return collected(c, items, notes);
+  const result = collected(c, items, notes);
+  if (redditWindow) {
+    const document = xml(raw.body);
+    result.ranking = { method: 'reddit-rss-percentile', window: redditWindow, size: array(document.feed?.entry ?? document.rss?.channel?.item ?? document.RDF?.item).length };
+  }
+  return result;
 }
 async function hn(c: ChannelContext): Promise<Collection> {
   const url = 'https://hacker-news.firebaseio.com/v0';

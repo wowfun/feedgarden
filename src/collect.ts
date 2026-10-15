@@ -5,6 +5,8 @@ import { Http, HttpError } from './http.js';
 import { Store } from './store.js';
 import { errorText, nowIso, sleep, iso } from './util.js';
 import type { Coverage } from './types.js';
+import { importArchives } from './archives.js';
+import { reconcileSelection } from './selection.js';
 
 export type CollectionResult = { source: string; stream: string } & ({ channel: string; items?: number } & Coverage | { status: 'unavailable' | 'deferred' });
 export async function collect(config: Config, store: Store, selected?: string, due = false, registry = adapters, sinceOverride?: string, signal?: AbortSignal): Promise<CollectionResult[]> {
@@ -13,6 +15,7 @@ export async function collect(config: Config, store: Store, selected?: string, d
   const results: CollectionResult[] = [];
   const sources = config.sources.filter(source => source.enabled && (!selected || source.id === selected));
   if (selected && !sources.length) throw new Error(`Unknown or disabled source: ${selected}`);
+  await importArchives(config, store, signal);
   const http = new Http(store, undefined, signal);
   for (const source of sources) {
     for (const stream of source.streams) {
@@ -51,6 +54,7 @@ export async function collect(config: Config, store: Store, selected?: string, d
       if (source.id === 'arxiv') await sleep(3100, signal);
     }
   }
+  reconcileSelection(config, store, { source: selected, signal });
   return results;
 }
 function next(source: Source, now: string): string { return iso(DateTime.fromISO(now).plus({ hours: source.intervalHours }), 'next collection time'); }

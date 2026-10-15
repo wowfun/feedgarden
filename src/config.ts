@@ -22,6 +22,11 @@ export const sourceSchema = z.object({
   intervalHours: z.number().positive(),
   streams: z.array(z.object({ id: z.string().regex(/^[a-zA-Z0-9_.-]+$/), channels: z.array(channelSchema).min(1) }).strict()).min(1),
   includeKeywords: z.array(z.string().min(2)).default([]),
+  selection: z.object({
+    method: z.enum(['hn-engagement', 'reddit-rss-percentile']),
+    dailyLimit: z.number().int().min(1).max(2000).default(50),
+    updateDays: z.number().int().min(1).max(30).default(7),
+  }).strict().optional(),
   agent: z.object({ model: z.string().optional(), effort: z.string().optional() }).strict().optional(),
 }).strict();
 export const configSchema = z.object({
@@ -41,6 +46,7 @@ export const configSchema = z.object({
 }).strict().superRefine((config, context) => {
   const seen = new Set<string>();
   for (const source of config.sources) {
+    if (source.selection && source.id !== (source.selection.method === 'hn-engagement' ? 'hackernews' : 'reddit')) context.addIssue({ code: 'custom', message: `Selection method does not match source: ${source.id}` });
     if (seen.has(source.id)) context.addIssue({ code: 'custom', message: `Duplicate source: ${source.id}` });
     seen.add(source.id);
     const streams = new Set<string>();

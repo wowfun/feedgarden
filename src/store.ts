@@ -2,7 +2,8 @@ import Database from 'better-sqlite3';
 import { DateTime } from 'luxon';
 import { mkdirSync, chmodSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Collection, Item, RawResponse } from './types.js';
+import type { Collection, Item, RawResponse, RankingObservation, Metrics } from './types.js';
+import { rankingObservation } from './scoring.js';
 import { hash, nowIso, iso } from './util.js';
 
 export interface ChannelState { source: string; stream: string; channel: string; cursor: string | null; last_success: string | null; last_attempt: string; next_attempt: string; status: string; notes: string }
@@ -47,9 +48,24 @@ export class Store {
     if (version < 3) initializeFeedSchema(this.db, iso(DateTime.now().setZone('Asia/Shanghai').startOf('day').toUTC()), false);
     this.db.transaction(() => {
       this.db.exec('CREATE INDEX IF NOT EXISTS agent_calls_at ON agent_calls(at); CREATE INDEX IF NOT EXISTS items_first_seen ON items(source,first_seen,id);');
+      this.db.exec('CREATE INDEX IF NOT EXISTS items_selection_published ON items(source,julianday(published_at),id); CREATE INDEX IF NOT EXISTS items_selection_seen ON items(source,julianday(first_seen),id);');
       this.db.exec("CREATE INDEX IF NOT EXISTS feed_jobs_pending_order ON feed_jobs(source,json_extract(data,'$.firstSeen'),id,next_at) WHERE state='pending' AND attempts<5;");
       this.db.exec('CREATE INDEX IF NOT EXISTS raw_responses_fingerprint ON raw_responses(source,stream,channel,url,hash,status);');
       this.db.exec('CREATE TABLE IF NOT EXISTS feed_item_paths(source TEXT NOT NULL,id TEXT NOT NULL,day TEXT NOT NULL,number INTEGER NOT NULL CHECK(number>0),PRIMARY KEY(source,id,day),UNIQUE(source,day,number));');
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS feed_rankings(source TEXT NOT NULL,id TEXT NOT NULL,data TEXT NOT NULL,observed_at TEXT NOT NULL,PRIMARY KEY(source,id));
+        CREATE TABLE IF NOT EXISTS feed_rank_snapshots(source TEXT NOT NULL,stream TEXT NOT NULL,window TEXT NOT NULL,observed_at TEXT NOT NULL,PRIMARY KEY(source,stream,window));
+        CREATE TABLE IF NOT EXISTS feed_selection(source TEXT NOT NULL,id TEXT NOT NULL,day TEXT NOT NULL,selected INTEGER NOT NULL CHECK(selected IN (0,1)),score REAL,method TEXT NOT NULL,scored_at TEXT,PRIMARY KEY(source,id));
+        CREATE INDEX IF NOT EXISTS feed_selection_day ON feed_selection(source,day,selected);
+        CREATE TABLE IF NOT EXISTS feed_selection_days(source TEXT NOT NULL,day TEXT NOT NULL,policy TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(source,day));
+        CREATE TABLE IF NOT EXISTS feed_archives(path TEXT PRIMARY KEY,source TEXT NOT NULL,id TEXT,day TEXT NOT NULL,number INTEGER NOT NULL,item TEXT,en TEXT NOT NULL,zh TEXT NOT NULL);
+        CREATE UNIQUE INDEX IF NOT EXISTS feed_archives_identity ON feed_archives(source,id) WHERE id IS NOT NULL;
+        CREATE TABLE IF NOT EXISTS feed_archive_files(path TEXT PRIMARY KEY,body BLOB NOT NULL);
+      `);
+      // Collection changes enqueue planning; planning consumes or reschedules
+      // each row after enrichment. Accepted content/exclusion changes bump the
+      // render signature; removing a job or accepted copy re-enqueues its item.
+      // These invariants also apply to maintenance writers outside summarize().
       this.db.exec(`
         CREATE TABLE IF NOT EXISTS feed_planning(source TEXT NOT NULL,id TEXT NOT NULL,due_at TEXT NOT NULL,PRIMARY KEY(source,id));
         CREATE INDEX IF NOT EXISTS feed_planning_due ON feed_planning(source,due_at,id);
@@ -143,12 +159,15 @@ export class Store {
     this.db.transaction(() => {
       for (const raw of result.raw) this.saveRaw(source, stream, channel, raw);
       for (const item of result.items) {
-        const data = JSON.stringify(item);
+        const ranking = rankingObservation(item);
+        const data = JSON.stringify(ranking ? { ...item, ranking } : item);
         const contentHash = hash({ title: item.title, text: item.text, url: item.url, author: item.author, ...(item.media?.length ? { media: item.media } : {}) });
         upsertItem.run(source, item.id, item.publishedAt, item.observedAt, item.observedAt, data, contentHash);
         insertVersion.run(source, item.id, contentHash, data, item.observedAt);
         insertObservation.run(source, item.id, stream, channel, item.observedAt, data);
+        if (ranking) this.saveRanking(source, item.id, ranking);
       }
+      if (result.ranking && (result.coverage.status === 'complete' || result.coverage.status === 'partial')) this.db.prepare('INSERT INTO feed_rank_snapshots VALUES (?,?,?,?) ON CONFLICT(source,stream,window) DO UPDATE SET observed_at=excluded.observed_at WHERE excluded.observed_at>=feed_rank_snapshots.observed_at').run(source, stream, result.ranking.window, result.coverage.to);
       const previous = this.channel(source, stream, channel);
       const successful = result.coverage.status === 'complete' || result.coverage.status === 'partial';
       this.db.prepare('INSERT OR REPLACE INTO channel_state VALUES (?,?,?,?,?,?,?,?,?)').run(source, stream, channel,
@@ -157,8 +176,50 @@ export class Store {
       if (result.coverage.status !== 'complete') this.db.prepare('INSERT INTO gaps(source,stream,channel,at,details) VALUES (?,?,?,?,?)').run(source, stream, channel, attemptedAt, JSON.stringify(result.coverage));
     })();
   }
+  saveRanking(source: string, id: string, ranking: RankingObservation): boolean {
+    if (!Number.isFinite(ranking.score)) throw new Error('Invalid selection score');
+    const observedAt = new Date(ranking.observedAt).toISOString();
+    return this.statement('INSERT INTO feed_rankings VALUES (?,?,?,?) ON CONFLICT(source,id) DO UPDATE SET data=excluded.data,observed_at=excluded.observed_at WHERE julianday(excluded.observed_at)>=julianday(feed_rankings.observed_at)').run(source, id, JSON.stringify({ ...ranking, observedAt }), observedAt).changes === 1;
+  }
+  private currentRankingItem(source: string, id: string, observedAt: string): Item | undefined {
+    const row = this.statement('SELECT i.data,r.observed_at FROM items i LEFT JOIN feed_rankings r ON r.source=i.source AND r.id=i.id WHERE i.source=? AND i.id=?').get(source, id) as { data: string; observed_at: string | null } | undefined;
+    if (!row) return;
+    const item = JSON.parse(row.data) as Item, incoming = new Date(observedAt).getTime();
+    if (!Number.isFinite(incoming)) throw new Error('Invalid ranking observation timestamp');
+    // Cached evidence must not restore an older metric or inactive state after
+    // a more recent collection, ranking observation or deletion check.
+    const timestamps = [row.observed_at, item.observedAt, item.ranking?.observedAt, item.metadata?.rankingInactiveAt];
+    if (timestamps.some(timestamp => typeof timestamp === 'string' && Date.parse(timestamp) > incoming)) return;
+    return item;
+  }
+  updateRankingItem(source: string, id: string, ranking: RankingObservation, metrics: Metrics): boolean {
+    const update = () => {
+      const item = this.currentRankingItem(source, id, ranking.observedAt);
+      if (!item || !this.saveRanking(source, id, ranking)) return false;
+      const metadata = { ...item.metadata }; delete metadata.rankingInactive; delete metadata.rankingInactiveAt;
+      this.statement('UPDATE items SET data=? WHERE source=? AND id=?').run(JSON.stringify({ ...item, metrics: { ...item.metrics, ...metrics }, ranking: { ...ranking, observedAt: new Date(ranking.observedAt).toISOString() }, metadata }), source, id);
+      return true;
+    };
+    return this.db.inTransaction ? update() : this.db.transaction(() => { this.assertLease(); return update(); })();
+  }
+  markRankingInactive(source: string, id: string, observedAt: string): boolean {
+    const update = () => {
+      const item = this.currentRankingItem(source, id, observedAt);
+      if (!item) return false;
+      this.statement('UPDATE items SET data=? WHERE source=? AND id=?').run(JSON.stringify({ ...item, metadata: { ...item.metadata, rankingInactive: true, rankingInactiveAt: new Date(observedAt).toISOString() } }), source, id);
+      return true;
+    };
+    return this.db.inTransaction ? update() : this.db.transaction(() => { this.assertLease(); return update(); })();
+  }
+  isSelected(source: string, id: string, existing = false): boolean {
+    if (!this.meta('selection_policy:' + source)) return true;
+    const row = this.statement('SELECT selected FROM feed_selection WHERE source=? AND id=?').get(source, id) as { selected: number } | undefined;
+    return row ? row.selected === 1 : existing;
+  }
   items(source: string, start?: string, end?: string): Item[] {
-    const rows = this.db.prepare('SELECT data FROM items WHERE source=? AND published_at>=? AND published_at<? ORDER BY published_at,id').all(source, start ?? '', end ?? '9999') as { data: string }[];
+    const clauses = [start ? 'julianday(published_at)>=julianday(?)' : '', end ? 'julianday(published_at)<julianday(?)' : ''].filter(Boolean);
+    const args = [source, ...(start ? [start] : []), ...(end ? [end] : [])];
+    const rows = this.db.prepare(`SELECT data FROM items WHERE source=? ${clauses.length ? 'AND ' + clauses.join(' AND ') : ''} ORDER BY julianday(published_at),id`).all(...args) as { data: string }[];
     return rows.map(row => JSON.parse(row.data) as Item);
   }
   observations(source: string, start: string, end: string): Item[] {

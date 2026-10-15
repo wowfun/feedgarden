@@ -16,6 +16,48 @@ const exec = promisify(execFile);
 // Cold SDK/rendering imports are part of process startup. Bound that separately
 // from the cancellation latency measured after the fixture receives a request.
 const cliStartupTimeout = 30_000;
+test('scheduled runs recover HN fallback scores even when the next collection is not due', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'feedgarden-rank-run-'));
+  const server = createServer((_request, response) => response.end(`<rss><channel><title>Fixture</title><item><title>HN post</title><link>https://news.ycombinator.com/item?id=1</link><comments>https://news.ycombinator.com/item?id=1</comments><pubDate>${new Date().toUTCString()}</pubDate></item></channel></rss>`));
+  await new Promise<void>(done => server.listen(0, '127.0.0.1', done));
+  const address = server.address(); assert.ok(address && typeof address !== 'string');
+  const config = configSchema.parse({ version: 2, storage: { directory: root, database: join(root, 'data.sqlite') }, feed: { directory: join(root, 'content'), topics: resolve('config/topics.json') },
+    agent: { model: 'deepseek/deepseek-flash', maxDailyCalls: 1, runtimeDirectory: join(root, 'tasks') }, sources: [{ id: 'hackernews', name: 'HN', intervalHours: 1, selection: { method: 'hn-engagement' }, streams: [{ id: 'main', channels: [
+      { id: 'primary', kind: 'hn-api' }, { id: 'fallback', kind: 'feed', url: `http://127.0.0.1:${address.port}/feed` },
+    ] }] }] });
+  const file = join(root, 'config.json'), preload = join(root, 'ranking.mjs');
+  await writeFile(file, JSON.stringify(config));
+  await writeFile(preload, `import { Http, HttpError } from ${JSON.stringify(pathToFileURL(resolve('src/http.ts')).href)};
+const get=Http.prototype.get;
+Http.prototype.get=async function(url,...args){
+ if(!url.startsWith('https://hacker-news.firebaseio.com/'))return get.call(this,url,...args);
+ if(url.endsWith('/topstories.json')||process.env.FEEDGARDEN_FIXTURE_RANK!=='ready')throw new HttpError('Fixture API unavailable',503);
+ const raw={url,status:200,headers:{},fetchedAt:new Date().toISOString(),body:JSON.stringify({id:1,type:'story',score:25,descendants:0,kids:[]})};
+ this.store.saveCache(raw);this.raw.push(raw);return raw;
+};`);
+  const seed = new Store(config.storage.database); seed.setMeta('cutoff', '1970-01-01T00:00:00.000Z');
+  seed.finishCall(seed.startCall('previous', config.agent.model, 1), 'succeeded', {}); seed.close();
+  const args = ['--import', 'tsx', '--import', pathToFileURL(preload).href, resolve('src/cli.ts'), 'run', '--due', '--no-publish', '--config', file];
+  const env = { ...process.env, NO_PROXY: '127.0.0.1', no_proxy: '127.0.0.1' };
+  try {
+    await assert.rejects(exec(process.execPath, args, { env, timeout: cliStartupTimeout }), error => {
+      assert.equal((error as any).code, 1); assert.match((error as any).stderr, /Run incomplete/); return true;
+    });
+    const before = new Store(config.storage.database);
+    let attempt: string;
+    try { assert.ok(!before.isSelected('hackernews', '1')); attempt = before.channel('hackernews', 'main', 'fallback')!.last_attempt; }
+    finally { before.close(); }
+    await exec(process.execPath, args, { env: { ...env, FEEDGARDEN_FIXTURE_RANK: 'ready' }, timeout: cliStartupTimeout });
+    const after = new Store(config.storage.database);
+    try {
+      assert.equal(after.channel('hackernews', 'main', 'fallback')!.last_attempt, attempt!, 'collection was skipped by its cadence');
+      assert.ok(after.isSelected('hackernews', '1'));
+      assert.deepEqual(after.db.prepare('SELECT status FROM runs ORDER BY id').all(), [{ status: 'partial' }, { status: 'succeeded' }]);
+      assert.equal((after.db.prepare('SELECT state FROM feed_jobs').get() as { state: string }).state, 'pending', 'quota prevents any paid fixture call');
+    } finally { after.close(); }
+  } finally { await new Promise<void>(done => server.close(() => done())); await rm(root, { recursive: true, force: true }); }
+});
+
 test('migration commands discover JSON configs and reject ambiguous defaults before touching storage', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'feedgarden-config-'));
   const loader = pathToFileURL(resolve('node_modules/tsx/dist/loader.mjs')).href;

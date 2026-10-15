@@ -3,9 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { parse } from 'jsonc-parser';
 import lockfile from 'proper-lockfile';
-import { loadConfig } from './config.js';
+import { loadConfig, readConfig, resolveConfigFile, type Config } from './config.js';
 import { Store } from './store.js';
 import { collect, type CollectionResult } from './collect.js';
 import { summarize } from './items.js';
@@ -24,8 +23,8 @@ const { values, positionals } = parseArgs({ allowPositionals: true, options: {
 const command = positionals[0];
 if (values.help || !command) console.log('Feedgarden: migrate | rollback ARCHIVE | collect [--since ISO] | summarize [--source ID] [--refresh] [--rebuild] [--retry-failed] | topics apply FILE | run --due | doctor [--live] | render | backup | publish\nOptions: --config FILE --no-publish');
 else {
-  const configFile = values.config ?? 'feedgarden.jsonc';
-  const config = command === 'migrate' || command === 'rollback' ? convertConfig(parse(await readFile(configFile, 'utf8'))) : loadConfig(values.config);
+  const configFile = resolveConfigFile(values.config);
+  const config = command === 'migrate' || command === 'rollback' ? convertConfig(readConfig(configFile)) : loadConfig(configFile);
   await mkdir(config.storage.directory, { recursive: true, mode: 0o700 });
   const target = resolve(config.storage.directory, 'runner');
   await writeFile(target, '', { flag: 'a', mode: 0o600 });

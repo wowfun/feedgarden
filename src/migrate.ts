@@ -6,7 +6,7 @@ import { resolve, join, dirname, relative, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { DateTime } from 'luxon';
 import { parse } from 'jsonc-parser';
-import { configSchema, type Config } from './config.js';
+import { configSchema, resolveConfigFile, type Config } from './config.js';
 import { initializeFeedSchema, Store } from './store.js';
 import { atomicWrite, hash, nowIso, iso } from './util.js';
 import { writeSite } from './site.js';
@@ -46,7 +46,8 @@ async function checksums(root: string, signal?: AbortSignal): Promise<Record<str
   await visit(root); return result;
 }
 const revision = (directory = process.cwd()) => execFileSync('git', ['-C', directory, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-export async function migrate(configFile = 'feedgarden.jsonc', at = nowIso(), signal?: AbortSignal): Promise<string> {
+export async function migrate(configFile?: string, at = nowIso(), signal?: AbortSignal): Promise<string> {
+  configFile = resolveConfigFile(configFile);
   signal?.throwIfAborted();
   const raw = await readFile(configFile, 'utf8'), legacy = parse(raw), config = convertConfig(legacy);
   await mkdir(config.storage.directory, { recursive: true, mode: 0o700 });

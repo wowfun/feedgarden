@@ -16,6 +16,21 @@ const exec = promisify(execFile);
 // Cold SDK/rendering imports are part of process startup. Bound that separately
 // from the cancellation latency measured after the fixture receives a request.
 const cliStartupTimeout = 30_000;
+test('migration commands discover JSON configs and reject ambiguous defaults before touching storage', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'feedgarden-config-'));
+  const loader = pathToFileURL(resolve('node_modules/tsx/dist/loader.mjs')).href;
+  const invoke = (command: string, ...args: string[]) => exec(process.execPath, ['--import', loader, resolve('src/cli.ts'), command, ...args], { cwd: directory });
+  try {
+    await writeFile(join(directory, 'feedgarden.json'), JSON.stringify({ version: 99 }));
+    for (const command of ['migrate', 'rollback']) {
+      await assert.rejects(invoke(command), error => /Unsupported configuration version/.test((error as any).stderr));
+    }
+    await writeFile(join(directory, 'feedgarden.jsonc'), JSON.stringify({ version: 98 }));
+    await assert.rejects(invoke('migrate'), error => /Both JSON and JSONC exist/.test((error as any).stderr));
+    await assert.rejects(invoke('migrate', '--config', 'feedgarden.json'), error => /Unsupported configuration version/.test((error as any).stderr));
+    await assert.rejects(lstat(join(directory, '.local')), { code: 'ENOENT' });
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
 test('quota deferral exits zero, retains pending items and finishes render/backup', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'feedgarden-cli-'));
   const config = configSchema.parse({ version: 2, storage: { directory, database: join(directory, 'data.sqlite') },

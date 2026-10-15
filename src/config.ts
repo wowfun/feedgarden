@@ -55,11 +55,15 @@ export type Config = z.infer<typeof configSchema>;
 export type Source = z.infer<typeof sourceSchema>;
 export type Channel = z.infer<typeof channelSchema>;
 export type Stream = Source['streams'][number];
-export function loadConfig(file?: string): Config {
+export function resolveConfigFile(file?: string): string {
   if (!file && existsSync('feedgarden.json') && existsSync('feedgarden.jsonc')) throw new Error('Both JSON and JSONC exist; use --config');
-  file ??= existsSync('feedgarden.jsonc') ? 'feedgarden.jsonc' : 'feedgarden.json';
+  return resolve(file ?? (existsSync('feedgarden.jsonc') ? 'feedgarden.jsonc' : 'feedgarden.json'));
+}
+export function readConfig(file?: string): unknown {
+  file = resolveConfigFile(file);
   const errors: ParseError[] = [];
   const value = parse(readFileSync(resolve(file), 'utf8'), errors, { allowTrailingComma: file.endsWith('.jsonc'), disallowComments: !file.endsWith('.jsonc') });
   if (errors.length) throw new Error(errors.map(error => `${printParseErrorCode(error.error)} at ${error.offset}`).join('; '));
-  return configSchema.parse(value);
+  return value;
 }
+export function loadConfig(file?: string): Config { return configSchema.parse(readConfig(file)); }

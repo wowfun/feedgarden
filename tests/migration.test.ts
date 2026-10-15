@@ -4,12 +4,13 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, cp, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
 import { Store } from '../src/store.js';
 import { configSchema } from '../src/config.js';
 import { hash } from '../src/util.js';
 const project=process.cwd();
-test('actual migration archives WAL data and legacy files, resumes fixed baseline, and rollback restores schema 2',async()=>{
+test('default JSON config migration archives WAL data, resumes fixed baseline, and rollback restores schema 2',async()=>{
  const root=await mkdtemp(join(tmpdir(),'feedgarden-migration-'));
  try {
   await mkdir(join(root,'.github'));await mkdir(join(root,'config/locales'),{recursive:true});await mkdir(join(root,'reports'));
@@ -17,14 +18,14 @@ test('actual migration archives WAL data and legacy files, resumes fixed baselin
   await writeFile(join(root,'reports/old.md'),'Legacy report preserved');
   const opaque=Buffer.alloc(300007,0xff);await writeFile(join(root,'reports/opaque.bin'),opaque);
   const c=configSchema.parse({version:2,storage:{directory:join(root,'.local'),database:join(root,'.local/data.sqlite')},feed:{directory:join(root,'content'),topics:join(root,'config/topics.json')},agent:{model:'deepseek/deepseek-flash'},sources:[{id:'one',name:'One',intervalHours:1,streams:[{id:'main',channels:[{id:'rss',kind:'feed'}]}]}]});
-  const configFile=join(root,'config.json');await writeFile(configFile,JSON.stringify(c));
+  const configFile=join(root,'feedgarden.json');await writeFile(configFile,JSON.stringify(c));
   const store=new Store(c.storage.database);store.close();
   const db=new Database(c.storage.database);db.pragma('journal_mode = WAL');
   db.exec('DROP TABLE feed_meta; DROP TABLE feed_excluded; DROP TABLE feed_jobs; DROP TABLE feed_summaries; DROP TABLE feed_cache; DROP TABLE feed_batches; PRAGMA user_version=2;');
   db.prepare('INSERT INTO items VALUES (?,?,?,?,?,?,?)').run('one','historical','2026-10-09T00:00:00Z','2026-10-09T00:00:00Z','2026-10-09T00:00:00Z','{}','old');
   execFileSync('git',['init','-q'],{cwd:root});execFileSync('git',['add','.'],{cwd:root});execFileSync('git',['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','Fixture'],{cwd:root});
-  const invoke=(...args:string[])=>execFileSync(process.execPath,['--import',resolve('node_modules/tsx/dist/loader.mjs'),resolve('src/cli.ts'),...args,'--config',configFile],{cwd:root,encoding:'utf8'});
-  const result=invoke('migrate');db.close();assert.match(result,/Migration archive/);
+  const invoke=(...args:string[])=>execFileSync(process.execPath,['--import',pathToFileURL(resolve('node_modules/tsx/dist/loader.mjs')).href,resolve('src/cli.ts'),...args],{cwd:root,encoding:'utf8'});
+  let result: string; try { result=invoke('migrate'); } finally { db.close(); } assert.match(result,/Migration archive/);
   const journal=JSON.parse(await readFile(join(root,'.local/migration.json'),'utf8'));assert.equal(journal.state,'complete');
   const manifest=JSON.parse(await readFile(join(journal.archive,'manifest.json'),'utf8'));
   assert.equal(manifest.checksums['reports/opaque.bin'],hash(opaque.toString('base64')),'streaming checksums must match existing archive hashes across chunk boundaries');

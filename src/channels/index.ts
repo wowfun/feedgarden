@@ -11,7 +11,7 @@ import { Store } from '../store.js';
 import { pythonExecutable } from '../process-command.js';
 import { validationEnvironment } from '../build-site.js';
 import { hash, mapLimit, safeUrl, errorText, iso, isoDate } from '../util.js';
-import { array, date, parseFeed, parseFollowBuilders, parseProductHunt, parseTrending, plain, text, xml, type ParseContext } from './parsers.js';
+import { array, date, parseFeed, parseXTimeline, parseFollowBuilders, parseProductHunt, parseTrending, plain, text, xml, type ParseContext } from './parsers.js';
 
 const exec = promisify(execFile);
 export interface ChannelContext { source: Source; stream: Stream; channel: Channel; store: Store; http: Http; now: string; since: string; restartRange?: boolean }
@@ -22,8 +22,9 @@ function collected(c: ChannelContext, items: Item[], notes: string[] = [], curso
 }
 async function feed(c: ChannelContext): Promise<Collection> {
   const raw = await c.http.get(c.channel.url!, c.source.id === 'reddit' ? 60000 : c.source.id === 'arxiv' ? 3100 : 0, c.channel.transport);
-  const items = parseFeed(raw.body, base(c));
-  const notes = items.length ? ['Recent feed window; completeness before the oldest returned item is unknown.'] : [];
+  const notes: string[] = [];
+  const items = parseFeed(raw.body, base(c), notes);
+  if (items.length) notes.push('Recent feed window; completeness before the oldest returned item is unknown.');
   if (c.source.id === 'hackernews') notes.push('Hacker News front-page RSS; score and comment counts are unavailable.');
   if (c.source.id === 'producthunt') notes.push('New-product feed, not a dated leaderboard.');
   return collected(c, items, notes);
@@ -83,16 +84,9 @@ async function xCli(c: ChannelContext): Promise<Collection> {
   };
   let rows = await run(100);
   const boundary = c.store.channel(c.source.id, c.stream.id, c.channel.id)?.cursor;
-  if (boundary && !rows.some(row => String(row.id) === boundary) && rows.length >= 100) rows = await run(200);
-  const items: Item[] = rows.map(row => {
-    const publishedAt = date(row.createdAtISO ?? row.createdAt, c.source.timezone);
-    if (!/^\d+$/.test(String(row.id)) || !publishedAt || typeof row.text !== 'string') throw new Error('Invalid X timeline item');
-    return { ...base(c), id: String(row.id), title: plain(row.text).slice(0, 180), text: plain(row.text) + (row.quotedTweet?.text ? ' Quoting @' + row.quotedTweet.author?.screenName + ': ' + plain(row.quotedTweet.text) : ''), author: row.author?.screenName ?? c.stream.id,
-      url: safeUrl(row.url ?? `https://x.com/${c.stream.id}/status/${row.id}`), publishedAt, basis: 'published',
-      metrics: { score: row.metrics?.likes ?? null, comments: row.metrics?.replies ?? null }, kind: row.isRetweet ? 'repost' : row.quotedTweet ? 'quote' : 'original',
-    };
-  });
-  const notes = boundary && !items.some(item => item.id === boundary) ? ['The current timeline did not overlap the previous boundary; a collection gap may exist.'] : [];
+  if (boundary && !rows.some(row => String(row?.id) === boundary) && rows.length >= 100) rows = await run(200);
+  const notes: string[] = [], items = parseXTimeline(rows, base(c), notes);
+  if (boundary && !items.some(item => item.id === boundary)) notes.push('The current timeline did not overlap the previous boundary; a collection gap may exist.');
   if (!boundary && items.length >= 100) notes.push('Initial timeline is bounded to 100 posts; earlier history is unknown.');
   notes.push('The timeline endpoint does not guarantee complete author threads.');
   const newest = items.map(item => item.id).sort((a, b) => BigInt(a) > BigInt(b) ? -1 : 1)[0];

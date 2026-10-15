@@ -25,6 +25,16 @@ export function xml(body: string): any {
   }).parse(body);
 }
 export interface ParseContext { source: string; stream: string; channel: string; observedAt: string; timezone?: string }
+function parseEntries<T>(entries: any[], convert: (entry: any, index: number) => T[], label: string, notes?: string[]): T[] {
+  let failed = 0;
+  const items = entries.flatMap((entry, index) => {
+    try { return convert(entry, index); }
+    catch (error) { if (!notes) throw error; failed++; return []; }
+  });
+  if (failed && !items.length) throw new Error(`All ${label} entries failed validation`);
+  if (failed) notes!.push(`${failed} malformed ${label} entries were skipped.`);
+  return items;
+}
 export function parseFollowBuilders(body: string, context: ParseContext): { generatedAt: string; items: Item[] } {
   const feed = JSON.parse(body);
   const generatedAt = date(feed.generatedAt);
@@ -41,17 +51,20 @@ export function parseFollowBuilders(body: string, context: ParseContext): { gene
   });
   return { generatedAt, items };
 }
-export function parseFeed(body: string, context: ParseContext): Item[] {
+export function parseFeed(body: string, context: ParseContext, notes?: string[]): Item[] {
   const document = xml(body);
   if (!document.rss?.channel && !document.feed && !document.RDF) throw new Error('Response is not an RSS or Atom feed');
   const entries: any[] = array(document.feed?.entry ?? document.rss?.channel?.item ?? document.RDF?.item);
   const announcementDate = context.source === 'arxiv' && !document.feed;
-  return entries.flatMap((entry, index) => {
+  // Callers with a page-offset checkpoint keep strict parsing. Snapshot feeds
+  // may supply notes to retain valid entries and report degraded coverage.
+  return parseEntries<Item>(entries, (entry, index) => {
     if (context.source === 'arxiv' && entry.announce_type && text(entry.announce_type) !== 'new') return [];
     const links: any[] = array(entry.link);
     const link = links.find(link => typeof link === 'string' || !link['@rel'] || link['@rel'] === 'alternate');
     const rawUrl = typeof link === 'string' ? link : link?.['@href'];
-    if (!rawUrl || !entry.title) throw new Error('Feed entry has no title or link');
+    const title = plain(text(entry.title));
+    if (!rawUrl || !title) throw new Error('Feed entry has no title or link');
     const url = safeUrl(rawUrl);
     let id = text(entry.id ?? entry.guid) || url;
     if (context.source === 'arxiv') id = url.match(/(?:abs|pdf)\/([^?#]+)/)?.[1]?.replace(/v\d+$/, '') ?? id;
@@ -67,13 +80,24 @@ export function parseFeed(body: string, context: ParseContext): Item[] {
       const candidate = mediaForUrl(kind.startsWith('image') ? 'image' : 'video', enclosure['@url'], text(enclosure.title), url);
       if (candidate && !media.some(existing => existing.url === candidate.url) && media.length < 6) media.push(candidate);
     }
-    return [{ ...context, id, title: plain(text(entry.title)), url, publishedAt: published ?? context.observedAt,
+    return [{ ...context, id, title, url, publishedAt: published ?? context.observedAt,
       text: summary, author: plain(text(entry.author?.name ?? entry.creator ?? entry.author)),
       media,
       metrics: { rank: index + 1 }, basis: published ? context.source === 'arxiv' && !announcementDate ? 'submitted' : 'published' : 'observed',
       metadata: { missingPublicationDate: !published, ...(announcementDate ? { announcementDate: true } : {}), ...(entry.announce_type ? { announceType: text(entry.announce_type) } : {}) },
     } satisfies Item];
-  });
+  }, 'feed', notes);
+}
+export function parseXTimeline(rows: any[], context: ParseContext, notes: string[]): Item[] {
+  return parseEntries<Item>(rows, row => {
+    const publishedAt = date(row.createdAtISO ?? row.createdAt, context.timezone);
+    if (!/^\d+$/.test(String(row.id)) || !publishedAt || typeof row.text !== 'string') throw new Error('Invalid X timeline item');
+    const body = plain(row.text);
+    return [{ ...context, id: String(row.id), title: body.slice(0, 180), text: body + (row.quotedTweet?.text ? ' Quoting @' + row.quotedTweet.author?.screenName + ': ' + plain(row.quotedTweet.text) : ''), author: row.author?.screenName ?? context.stream,
+      url: safeUrl(row.url ?? `https://x.com/${context.stream}/status/${row.id}`), publishedAt, basis: 'published',
+      metrics: { score: row.metrics?.likes ?? null, comments: row.metrics?.replies ?? null }, kind: row.isRetweet ? 'repost' : row.quotedTweet ? 'quote' : 'original',
+    }];
+  }, 'X timeline', notes);
 }
 export function parseTrending(body: string, context: ParseContext): Item[] {
   const $ = load(body); const articles = $('article.Box-row');

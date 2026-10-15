@@ -101,6 +101,7 @@ export async function generateBatch(config: Config['agent'], input: SummaryInput
   signal?.throwIfAborted();
   const [command, args] = agentCommand(config.command, ['acp', '--patch', patch]);
   const child = spawn(command, args, { cwd: directory, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+  const closed = new Promise<void>(done => child.once('close', () => done()));
   const usage = new NotificationLog(), events = new NotificationLog();
   let stderr = '', sessionId: string | undefined, stage = 'initialize';
   child.stderr.on('data', data => { stderr = (stderr + String(data)).slice(-8000); });
@@ -152,6 +153,17 @@ export async function generateBatch(config: Config['agent'], input: SummaryInput
     signal?.removeEventListener('abort', cancel);
     if (sessionId && !abort.aborted) await connection.agent.request('session/close', { sessionId }, { cancellationSignal: AbortSignal.timeout(3000) }).catch(() => {});
     connection.close(); child.stdin.end();
-    const kill = setTimeout(() => child.kill('SIGKILL'), 2000); kill.unref();
+    const kill = setTimeout(() => child.kill('SIGKILL'), 2000);
+    let deadline: NodeJS.Timeout | undefined;
+    const stopped = new Promise<void>(done => {
+      deadline = setTimeout(() => {
+        // Inherited pipes or a missing close notification must not hold the
+        // runner lease forever after the termination grace period.
+        child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy();
+        child.unref(); done();
+      }, 3000);
+    });
+    try { await Promise.race([closed, stopped]); }
+    finally { clearTimeout(kill); if (deadline) clearTimeout(deadline); }
   }
 }

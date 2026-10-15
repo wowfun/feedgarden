@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { ChildProcess } from 'node:child_process';
 import { generateBatch } from '../src/agent.js';
 import { configSchema } from '../src/config.js';
 import type { Item } from '../src/types.js';
@@ -13,6 +14,7 @@ const peer = `#!/usr/bin/env node
 import { createInterface } from 'node:readline';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
+import { spawn } from 'node:child_process';
 if (process.argv.includes('--version')) { console.log('0.1.7-rc.2'); process.exit(0); }
 const mode = basename(process.argv[1]).split('.')[0];
 const options = [{ id: 'model', category: 'model', type: 'select', name: 'Model', currentValue: '["deepseek-official","deepseek-flash"]', options: [{value:'["deepseek-official","deepseek-flash"]', name:'Flash'}] }, {id:'thinking', category:'thought_level', type:'select', name:'Thinking', currentValue:'off', options:[{value:'off',name:'Off'}]}];
@@ -32,6 +34,10 @@ createInterface({input:process.stdin}).on('line', line => {
  else if(method==='session/prompt') {
   if(mode==='timeout') return;
   if(mode==='cancel') {writeFileSync('prompt-started','ready');return;}
+  if(mode==='heldpipes') {
+   const descendant=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:['ignore',process.stdout,process.stderr],windowsHide:true});
+   writeFileSync('descendant-pid',String(descendant.pid));writeFileSync('prompt-started','ready');return;
+  }
   if(mode==='flood') {
    for(let n=0;n<400;n++)send({method:'session/update',params:{sessionId:'fixture',update:{sessionUpdate:'tool_call',toolCallId:String(n),title:'Fixed tool',status:'in_progress',content:[{type:'content',content:{type:'text',text:'x'.repeat(n===0?70000:1024)}}]}}});
   }
@@ -78,4 +84,50 @@ test('ACP runner cancellation stops an active prompt with the original lease fai
   const rejected=assert.rejects(pending,error=>error===reason);
   cancellation.abort(reason);await rejected;
  }finally{if(previous===undefined)delete process.env.FEEDGARDEN_AGENT_API_KEY;else process.env.FEEDGARDEN_AGENT_API_KEY=previous;await rm(root,{recursive:true,force:true});}
+});
+
+test('ACP cancellation finishes even when a descendant keeps the stdio pipes open', async () => {
+ const root=await mkdtemp(join(tmpdir(),'feedgarden-acp-pipes-')),previous=process.env.FEEDGARDEN_AGENT_API_KEY;process.env.FEEDGARDEN_AGENT_API_KEY='fixture-key';
+ let descendant: number | undefined, pending: Promise<unknown> | undefined;
+ try {
+  const command=join(root,'heldpipes.mjs');await writeFile(command,peer,{mode:0o700});
+  const config={...configSchema.shape.agent.parse({model:'deepseek/deepseek-flash'}),command,runtimeDirectory:root},cancellation=new AbortController(),reason=new Error('Lost lease while pipes were held');
+  pending=generateBatch(config,{contractVersion:2,topics:{version:1,topics:[]},items:[]},undefined,root,cancellation.signal).then(()=>undefined,error=>error);
+  const deadline=Date.now()+5000;
+  while(!(await stat(join(root,'prompt-started')).catch(()=>undefined))){assert.ok(Date.now()<deadline);await new Promise(done=>setTimeout(done,10));}
+  descendant=Number(await import('node:fs/promises').then(fs=>fs.readFile(join(root,'descendant-pid'),'utf8')));
+  cancellation.abort(reason);
+  let timer: NodeJS.Timeout | undefined;
+  try { assert.equal(await Promise.race([pending,new Promise(done=>{timer=setTimeout(()=>done('cleanup hung'),4500);})]),reason); }
+  finally {if(timer)clearTimeout(timer);}
+ } finally {
+  if(descendant)try{process.kill(descendant,'SIGKILL');}catch{}
+  await pending;
+  if(previous===undefined)delete process.env.FEEDGARDEN_AGENT_API_KEY;else process.env.FEEDGARDEN_AGENT_API_KEY=previous;
+  await rm(root,{recursive:true,force:true});
+ }
+});
+
+test('ACP cleanup has a deadline when the child never emits close', async t => {
+ const root=await mkdtemp(join(tmpdir(),'feedgarden-acp-no-close-')),previous=process.env.FEEDGARDEN_AGENT_API_KEY;process.env.FEEDGARDEN_AGENT_API_KEY='fixture-key';
+ const emit=ChildProcess.prototype.emit,children: ChildProcess[]=[];
+ t.mock.method(ChildProcess.prototype,'emit',function(this: ChildProcess,event: string,...args: unknown[]){
+  if(event==='close'){children.push(this);return false;}return Reflect.apply(emit,this,[event,...args]);
+ });
+ let pending: Promise<unknown> | undefined;
+ try {
+  const command=join(root,'cancel.mjs');await writeFile(command,peer,{mode:0o700});
+  const config={...configSchema.shape.agent.parse({model:'deepseek/deepseek-flash'}),command,runtimeDirectory:root},cancellation=new AbortController(),reason=new Error('Missing close notification');
+  pending=generateBatch(config,{contractVersion:2,topics:{version:1,topics:[]},items:[]},undefined,root,cancellation.signal).then(()=>undefined,error=>error);
+  const deadline=Date.now()+5000;
+  while(!(await stat(join(root,'prompt-started')).catch(()=>undefined))){assert.ok(Date.now()<deadline);await new Promise(done=>setTimeout(done,10));}
+  cancellation.abort(reason);
+  let timer: NodeJS.Timeout | undefined;
+  try {assert.equal(await Promise.race([pending,new Promise(done=>{timer=setTimeout(()=>done('cleanup hung'),4500);})]),reason);}
+  finally {if(timer)clearTimeout(timer);}
+ } finally {
+  t.mock.restoreAll();for(const child of children)Reflect.apply(emit,child,['close',0,null]);await pending;
+  if(previous===undefined)delete process.env.FEEDGARDEN_AGENT_API_KEY;else process.env.FEEDGARDEN_AGENT_API_KEY=previous;
+  await rm(root,{recursive:true,force:true});
+ }
 });

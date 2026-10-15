@@ -12,6 +12,23 @@ const robotsParser = robotsModule as unknown as typeof robotsModule.default;
 const dispatcher = new EnvHttpProxyAgent();
 const networkFetch: typeof fetch = (url, init) => fetch(url, { dispatcher, ...init } as RequestInit);
 const MAX_RESPONSE_BYTES = 12_000_000;
+const MAX_COOLDOWN_SECONDS = 86400;
+
+function rateLimitRetryAt(host: string, headers: Record<string, string>): string {
+  const now = Date.now(), retry = headers['retry-after'];
+  let seconds = retry ? /^\d+$/.test(retry) ? Number(retry) : (Date.parse(retry) - now) / 1000 : NaN;
+  if (!Number.isFinite(seconds)) {
+    const value = headers['x-ratelimit-reset'];
+    const reset = value?.trim() ? Number(value) : NaN;
+    // Reddit reports a duration; GitHub and many other APIs report epoch
+    // seconds. For unknown hosts, distinguish contemporary epochs from delays.
+    // Millisecond epochs are outside this header's supported units. Reject
+    // them rather than silently turning malformed input into a 24-hour stall.
+    seconds = reset < 0 || reset >= 100_000_000_000 ? NaN : host === 'api.github.com' || reset >= 1_000_000_000 ? reset - now / 1000 : reset;
+  }
+  const delay = Math.min(MAX_COOLDOWN_SECONDS, Math.max(1, Number.isFinite(seconds) ? seconds : 1800));
+  return new Date(now + delay * 1000).toISOString();
+}
 
 async function boundedText(response: Response): Promise<string> {
   if (Number(response.headers.get('content-length')) > MAX_RESPONSE_BYTES) {
@@ -70,11 +87,16 @@ export class Http {
     const response = await this.get(url); this.sharedResponses.set(url, response); return response;
   }
   private async withHost<T>(host: string, spacingMs: number, signal: AbortSignal | undefined, request: () => Promise<T>): Promise<T> {
+    // Unpaced API calls may overlap. The first paced request waits for all
+    // outstanding bodies, then permanently enables pacing for this host.
+    // Later calls inherit the largest requested gap, measured from body EOF.
     const previous = this.hostRequests.get(host) ?? Promise.resolve();
     if (spacingMs > 0) this.hostSpacing.set(host, Math.max(spacingMs, this.hostSpacing.get(host) ?? 0));
     const serialize = this.hostSpacing.has(host);
     let release!: () => void;
     const held = new Promise<void>(resolve => { release = resolve; });
+    // Keep the predecessor in the tail even if this waiter aborts: later work
+    // must not overtake a body that is still being read.
     const queued = serialize ? previous.then(() => held) : Promise.all([previous, held]).then(() => {});
     this.hostRequests.set(host, queued);
     let started = false;
@@ -157,10 +179,7 @@ export class Http {
         const raw = { url, ...(publicOnly ? { resolvedUrl: page.url } : {}), status: response.status, body, headers: response.status === 304 ? { ...cached?.headers, ...headers } : headers, fetchedAt: nowIso() };
         this.raw.push(raw);
         if (response.status === 429 || (response.status === 403 && headers['x-ratelimit-remaining'] !== undefined && Number(headers['x-ratelimit-remaining']) === 0)) {
-          const retry = headers['retry-after'], reset = Number(headers['x-ratelimit-reset']);
-          const seconds = retry ? /^\d+$/.test(retry) ? Number(retry) : (Date.parse(retry) - Date.now()) / 1000
-            : reset ? host === 'api.github.com' ? reset - Date.now() / 1000 : reset : 1800;
-          const retryAt = new Date(Date.now() + Math.max(1, Number.isFinite(seconds) ? seconds : 1800) * 1000).toISOString();
+          const retryAt = rateLimitRetryAt(host, headers);
           const error = new HttpError(`Rate limited by ${host}`, response.status, retryAt);
           this.hostCooldown.set(host, error);
           throw error;

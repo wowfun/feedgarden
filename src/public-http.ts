@@ -5,6 +5,8 @@ import type { PublicTarget } from './public-url.js';
 // Route by the original origin so Undici retains HTTP(S)_PROXY / NO_PROXY
 // semantics. The selected pool connects (or CONNECTs) to the validated IP.
 // Host and TLS servername remain the original hostname, with normal CA checks.
+// Each validated request/redirect owns its dispatcher. Reusing a hostname pool
+// across DNS checks could bypass the current request's destination pinning.
 export function publicDispatcher(target: PublicTarget, options: EnvHttpProxyAgent.Options = {}): EnvHttpProxyAgent {
   const original = new URL(target.url), pinned = new URL(original.origin);
   // Undici's SOCKS transport constructs its own pools and bypasses factory.

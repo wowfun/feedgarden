@@ -81,8 +81,9 @@ export function parseFeed(body: string, context: ParseContext, notes?: string[],
     for (const enclosure of [...array(entry.enclosure), ...array(entry.content), ...array(entry.thumbnail)]) {
       if (typeof enclosure !== 'object' || !enclosure?.['@url']) continue;
       const kind = String(enclosure['@type'] ?? enclosure['@medium'] ?? '');
-      if (!/^(image|video)/.test(kind)) continue;
-      const candidate = mediaForUrl(kind.startsWith('image') ? 'image' : 'video', enclosure['@url'], text(enclosure.title), url);
+      const type = kind.startsWith('image') ? 'image' : kind.startsWith('video') ? 'video' : kind.startsWith('audio') ? 'audio' : kind === 'application/pdf' ? 'pdf' : undefined;
+      if (!type) continue;
+      const candidate = mediaForUrl(type, enclosure['@url'], text(enclosure.title), url);
       if (candidate && !media.some(existing => existing.url === candidate.url) && media.length < 6) media.push(candidate);
     }
     return [{ ...context, id, title, url, publishedAt: published ?? context.observedAt,

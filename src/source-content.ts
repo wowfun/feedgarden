@@ -5,14 +5,22 @@ import { Http } from './http.js';
 import { Store } from './store.js';
 import { productHuntPage, parseProductHuntRepository, repositoryUrl } from './producthunt.js';
 import { enrichHackerNews } from './hackernews.js';
+import { embedKind } from './media-embed.js';
+
+const officialArticleHosts = new Map([
+  ['openai', ['openai.com']],
+  ['anthropic', ['www.anthropic.com', 'anthropic.com']],
+]);
+function isOfficialArticle(item: Item): boolean {
+  return officialArticleHosts.get(item.source)?.includes(new URL(item.url).hostname) ?? false;
+}
 
 // Only recent enriched items receive periodic refreshes; changed items and
 // explicit --refresh remain eligible regardless of age.
 export function enrichmentInterval(item: Item): number {
   if (item.source === 'hackernews' && /^\d+$/.test(item.id)) return 3600_000;
   if (item.source === 'producthunt' && productHuntPage(item.url)) return 6 * 3600_000;
-  const hosts = item.source === 'openai' ? ['openai.com'] : item.source === 'anthropic' ? ['www.anthropic.com', 'anthropic.com'] : [];
-  return hosts.includes(new URL(item.url).hostname) ? 6 * 3600_000 : 0;
+  return isOfficialArticle(item) ? 6 * 3600_000 : 0;
 }
 
 export function mediaForUrl(type: Media['type'], value: string, title: string, base: string): Media | undefined {
@@ -37,14 +45,23 @@ export function extractMedia(html: string, base: string): Media[] {
     if (width > 0 && width < 120 || height > 0 && height < 80) return;
     add('image', image.attr('src') ?? image.attr('data-src'), image.closest('figure').find('figcaption').text() || image.attr('alt') || '');
   });
-  $('video,video source,iframe').each((_i, element) => {
-    const node = $(element), url = node.attr('src');
-    if (element.tagName === 'iframe' && !/(?:youtube(?:-nocookie)?\.com\/embed\/|player\.vimeo\.com\/video\/)/i.test(url ?? '')) return;
-    add('video', url, node.attr('title') || node.closest('figure').find('figcaption').text() || '');
+  $('audio,audio source,video,video source,iframe,object[type="application/pdf"],embed[type="application/pdf"]').each((_i, element) => {
+    const node = $(element), url = node.attr('src') ?? node.attr('data');
+    if (element.tagName === 'iframe') {
+      try {
+        const frame = new URL(url!, base);
+        if (!(['www.youtube.com', 'youtube.com', 'www.youtube-nocookie.com'].includes(frame.hostname) && frame.pathname.startsWith('/embed/') || frame.hostname === 'player.vimeo.com' && frame.pathname.startsWith('/video/') || frame.hostname === 'player.bilibili.com' && frame.pathname === '/player.html')) return;
+      } catch { return; }
+    }
+    const type = element.tagName === 'audio' || node.parents('audio').length ? 'audio' : ['object', 'embed'].includes(element.tagName) ? 'pdf' : 'video';
+    add(type, url, node.attr('title') || node.closest('figure').find('figcaption').text() || '');
   });
   $('a[href]').each((_i, element) => {
     const link = $(element), url = link.attr('href')!;
-    if (/(?:youtu\.be\/[^/?]+|youtube\.com\/(?:watch\?|shorts\/)|vimeo\.com\/\d+|\.(?:mp4|webm|m3u8)(?:[?#]|$))/i.test(url)) add('video', url, link.text());
+    try {
+      const kind = embedKind(safeUrl(url, base));
+      if (kind === 'video' || kind === 'audio' || kind === 'pdf') add(kind, url, link.text());
+    } catch { /* Unsupported source links remain prose. */ }
   });
   return [...candidates.values()];
 }
@@ -101,8 +118,7 @@ export async function enrichItem(item: Item, store: Store, http: Http, refresh =
     finally { saveEnrichmentResponses(item, store, http, start, 'hn-enrichment'); }
   }
   if (item.source === 'producthunt') return enrichProductHunt(item, store, http, refresh);
-  const allowed = item.source === 'openai' ? ['openai.com'] : item.source === 'anthropic' ? ['www.anthropic.com', 'anthropic.com'] : [];
-  if (!allowed.includes(new URL(item.url).hostname)) return item;
+  if (!isOfficialArticle(item)) return item;
   const feedHash = hash(item.text), cache = store.cache(item.url), rawStart = http.raw.length;
   let raw = cache, failure: string | undefined;
   try {
@@ -112,7 +128,7 @@ export async function enrichItem(item: Item, store: Store, http: Http, refresh =
     saveEnrichmentResponses(item, store, http, rawStart, 'article');
   }
   http.signal?.throwIfAborted();
-  const article = raw && store.extracted('official/v1/' + item.url, raw.body, () => parseArticle(raw!.body, item.url) ?? null);
+  const article = raw && store.extracted('official/v2/' + item.url, raw.body, () => parseArticle(raw!.body, item.url) ?? null);
   if (article && article.text.length > item.text.length) return { ...item, text: article.text, media: [...new Map([...article.media, ...(item.media ?? [])].map(candidate => [candidate.url, candidate])).values()].slice(0, 6), metadata: { ...item.metadata, enrichment: 'article', feedTextHash: feedHash, articleFetchedAt: raw!.fetchedAt, ...(failure ? { articleError: failure } : {}) } };
   // A transient fetch failure must not downgrade previously accepted full text.
   const previous = store.db.prepare('SELECT accepted FROM feed_summaries WHERE source=? AND id=?').get(item.source, item.id) as { accepted: string } | undefined;

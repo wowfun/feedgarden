@@ -63,7 +63,7 @@ export async function enrichHackerNews(item: Item, store: Store, http: Http, ref
         const raw = await cached(item.url, 6 * 3600_000, true), type = raw.headers['content-type'] ?? '';
         if (type && !/(?:text\/html|application\/xhtml\+xml|text\/plain)/i.test(type)) throw new Error('Original is not an HTML/text article');
         const base = raw.resolvedUrl ?? item.url;
-        const article = store.extracted('hackernews/v1/' + base, type + '\n' + raw.body, () => {
+        const article = store.extracted('hackernews/v2/' + base, type + '\n' + raw.body, () => {
           const parsed = /text\/plain/i.test(type) ? { text: raw.body.replace(/\s+/g, ' ').trim().slice(0, 100000), content: '' } : readHnArticle(raw.body, base);
           return parsed ? { text: parsed.text, media: extractMedia(parsed.content, base) } : null;
         });

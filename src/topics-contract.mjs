@@ -29,7 +29,7 @@ export function validateRegistry(value) {
   return registry;
 }
 const translation = z.object({ title: z.string().trim().min(1).max(240), summary: z.string().max(4000) }).strict();
-const mediaSchema = z.object({ id: slug, type: z.enum(['image', 'video']), url: z.url().max(2048).refine(value => { const url = new URL(value); return /^https?:$/.test(url.protocol) && !url.username && !url.password; }), title: z.string().max(240) }).strict();
+const mediaSchema = z.object({ id: slug, type: z.enum(['image', 'video', 'audio', 'pdf']), url: z.url().max(2048).refine(value => { const url = new URL(value); return /^https?:$/.test(url.protocol) && !url.username && !url.password; }), title: z.string().max(240) }).strict();
 const discussionSchema = z.object({ commentIds: z.array(z.string().regex(/^\d+$/)).min(1).max(6), en: z.string().trim().min(1).max(2000), 'zh-CN': z.string().trim().min(1).max(2000) }).strict();
 export const outputSchema = z.object({ contractVersion: z.literal(2), items: z.array(z.object({ source: slug, id: z.string(), topics: z.array(slug).min(1).max(3), media: z.array(slug).max(3).optional(), discussion: discussionSchema.optional(), en: translation, 'zh-CN': translation }).strict()), newTopics: z.array(topicSchema) }).strict();
 /** @param {unknown} value @param {SummaryInput} input */

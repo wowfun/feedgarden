@@ -2,7 +2,7 @@ export type Metrics = Partial<Record<'score' | 'comments' | 'stars' | 'starsWind
 export type SelectionMethod = 'hn-engagement' | 'reddit-rss-percentile';
 export type RankingWindow = 'day' | 'week' | 'month' | 'year' | 'all';
 export interface RankingObservation { method: SelectionMethod; score: number; observedAt: string; window?: RankingWindow; rank?: number; size?: number }
-export interface Media { id: string; type: 'image' | 'video'; url: string; title: string }
+export interface Media { id: string; type: 'image' | 'video' | 'audio' | 'pdf'; url: string; title: string }
 export interface Comment { id: string; parent: string; author: string; text: string }
 export interface Discussion { url: string; comments: Comment[]; totalComments: number | null; partial: boolean }
 export interface Item {

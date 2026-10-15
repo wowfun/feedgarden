@@ -26,7 +26,7 @@ Use plain paragraphs and optional bullet lists; do not put URLs, images, HTML, h
 or other Markdown formatting inside summary. Rendering handles source and media links.
 
 Review each item's optional media candidates. Select up to 3 IDs in the item's media
-array when a figure, screenshot, diagram, demo or video adds important evidence or helps
+array when a figure, screenshot, diagram, demo, video, audio recording or PDF adds important evidence or helps
 explain the content. Prefer useful article media over decorative covers and logos. Use
 only the exact supplied candidate IDs; never invent, modify or retrieve a URL. Empty
 media is correct when the source supplies no relevant candidates. The same selected

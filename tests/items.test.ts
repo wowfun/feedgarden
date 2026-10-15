@@ -214,6 +214,20 @@ test('expired deferred workspaces can be pruned without deleting queued jobs or 
  } finally {await f.cleanup();}
 });
 
+test('pending batch selection uses an ordered index and preserves first-seen order', async () => {
+ const f=await fixture();
+ try {
+  const prepare=f.store.db.prepare.bind(f.store.db);let queuedSQL='';
+  f.store.db.prepare=((sql:string)=>{if(sql.includes("ORDER BY json_extract(data,'$.firstSeen')"))queuedSQL=sql;return prepare(sql);}) as typeof f.store.db.prepare;
+  const rows=Array.from({length:120},(_,i)=>item(String(119-i).padStart(3,'0'),'one',{observedAt:new Date(Date.parse(at)+(i%3)*1000).toISOString()}));
+  save(f.store,rows);const order:string[]=[];
+  await summarize(f.config,f.store,{},async(...args)=>{order.push(...args[1].items.map(item=>item.id));return generator(...args);},at);
+  assert.deepEqual(order,rows.toSorted((a,b)=>a.observedAt.localeCompare(b.observedAt)||a.id.localeCompare(b.id)).map(item=>item.id));
+  const plan=prepare('EXPLAIN QUERY PLAN '+queuedSQL).all('one',at,10) as {detail:string}[];
+  assert.ok(plan.some(row=>row.detail.includes('feed_jobs_pending_order')),JSON.stringify(plan));
+  assert.ok(!plan.some(row=>row.detail.includes('TEMP B-TREE')),JSON.stringify(plan));
+ } finally {await f.cleanup();}
+});
 test('canonical topic editing during an agent call stops without a dangling public reference',async()=>{
  const f=await fixture();try{save(f.store,[item('a')]);await assert.rejects(summarize(f.config,f.store,{},async(...args)=>{await writeFile(f.config.feed.topics,JSON.stringify({version:1,topics:[]}));return generator(...args);},at),/cannot be removed|Unknown|changed|topic/i);assert.equal(acceptedItems(f.store).length,0);
  }finally{await f.cleanup();}

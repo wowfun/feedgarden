@@ -9,6 +9,12 @@ export interface ChannelState { source: string; stream: string; channel: string;
 export class Store {
   readonly db: Database.Database;
   private leaseOwner?: string;
+  private readonly statements = new Map<string, Database.Statement>();
+  private statement(sql: string): Database.Statement {
+    let statement = this.statements.get(sql);
+    if (!statement) { statement = this.db.prepare(sql); this.statements.set(sql, statement); }
+    return statement;
+  }
   constructor(readonly path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path);
@@ -41,6 +47,7 @@ export class Store {
     if (version < 3) initializeFeedSchema(this.db, iso(DateTime.now().setZone('Asia/Shanghai').startOf('day').toUTC()), false);
     this.db.transaction(() => {
       this.db.exec('CREATE INDEX IF NOT EXISTS agent_calls_at ON agent_calls(at); CREATE INDEX IF NOT EXISTS items_first_seen ON items(source,first_seen,id);');
+      this.db.exec("CREATE INDEX IF NOT EXISTS feed_jobs_pending_order ON feed_jobs(source,json_extract(data,'$.firstSeen'),id,next_at) WHERE state='pending' AND attempts<5;");
       this.db.exec('CREATE INDEX IF NOT EXISTS raw_responses_fingerprint ON raw_responses(source,stream,channel,url,hash,status);');
       this.db.exec('CREATE TABLE IF NOT EXISTS feed_item_paths(source TEXT NOT NULL,id TEXT NOT NULL,day TEXT NOT NULL,number INTEGER NOT NULL CHECK(number>0),PRIMARY KEY(source,id,day),UNIQUE(source,day,number));');
       this.db.exec(`
@@ -123,7 +130,7 @@ export class Store {
     const headers = JSON.stringify(raw.headers), digest = hash(raw.body);
     // Keep distinct representations and response metadata, without appending
     // another full body for an identical response. Existing evidence stays intact.
-    this.db.prepare(`INSERT INTO raw_responses(source,stream,channel,fetched_at,url,status,headers,body,hash)
+    this.statement(`INSERT INTO raw_responses(source,stream,channel,fetched_at,url,status,headers,body,hash)
       SELECT ?,?,?,?,?,?,?,?,? WHERE NOT EXISTS
       (SELECT 1 FROM raw_responses WHERE source=? AND stream=? AND channel=? AND url=? AND hash=? AND status=? AND headers=?)`).run(
       source, stream, channel, raw.fetchedAt, raw.url, raw.status, headers, raw.body, digest,
@@ -158,7 +165,7 @@ export class Store {
     return (this.db.prepare('SELECT data FROM observations WHERE source=? AND observed_at>=? AND observed_at<? ORDER BY observed_at,id').all(source, start, end) as { data: string }[]).map(row => JSON.parse(row.data) as Item);
   }
   states(): ChannelState[] { return this.db.prepare('SELECT * FROM channel_state ORDER BY source,stream,channel').all() as ChannelState[]; }
-  meta(key: string): string | undefined { return (this.db.prepare('SELECT value FROM feed_meta WHERE key=?').get(key) as { value: string } | undefined)?.value; }
+  meta(key: string): string | undefined { return (this.statement('SELECT value FROM feed_meta WHERE key=?').get(key) as { value: string } | undefined)?.value; }
   setMeta(key: string, value: string): void { this.db.prepare('INSERT OR REPLACE INTO feed_meta VALUES (?,?)').run(key, value); }
   itemNumber(source: string, id: string, day: string): number {
     return this.db.transaction(() => {

@@ -59,6 +59,19 @@ export async function summarize(config: Config, store: Store, options: { source?
     if (chars >= config.agent.maxInputChars * 0.8) console.warn(`Topic registry uses ${chars}/${config.agent.maxInputChars} input characters; shorten descriptions or increase agent.maxInputChars before item headroom runs out.`);
   }
   checkRegistryBudget();
+  // Prepare the planning statements once per run, not once per item.
+  const planning = {
+    remove: store.db.prepare('DELETE FROM feed_planning WHERE source=? AND id=?'),
+    excluded: store.db.prepare('SELECT 1 FROM feed_excluded WHERE source=? AND id=?'),
+    job: store.db.prepare('SELECT * FROM feed_jobs WHERE source=? AND id=?'),
+    insert: store.db.prepare("INSERT OR REPLACE INTO feed_jobs VALUES (?,?,?,?, 'pending',0,'',NULL)"),
+    update: store.db.prepare('UPDATE feed_jobs SET data=? WHERE source=? AND id=?'),
+    retry: store.db.prepare("UPDATE feed_jobs SET state='pending',attempts=0,next_at='',error=NULL WHERE source=? AND id=?"),
+    accepted: store.db.prepare('SELECT accepted FROM feed_summaries WHERE source=? AND id=?'),
+    attempts: store.db.prepare('SELECT attempts FROM feed_jobs WHERE source=? AND id=?'),
+    present: store.db.prepare('UPDATE feed_summaries SET accepted=? WHERE source=? AND id=?'),
+    schedule: store.db.prepare('UPDATE feed_planning SET due_at=? WHERE source=? AND id=?'),
+  };
   // Recover a saved artifact before spending another ACP attempt.
   async function accept(batch: Batch, result: unknown, validated?: ReturnType<typeof validateArtifact>): Promise<void> {
     store.assertLease();
@@ -122,39 +135,42 @@ export async function summarize(config: Config, store: Store, options: { source?
       for (const row of rows) {
         options.signal?.throwIfAborted();
         if (row.due_at && Date.parse(at) >= Date.parse(row.first_seen) + config.collection.enrichmentRefreshDays * 86400_000) {
-          store.db.prepare('DELETE FROM feed_planning WHERE source=? AND id=?').run(source.id, row.id); continue;
+          planning.remove.run(source.id, row.id); continue;
         }
         let item = JSON.parse(row.data) as Item;
-        if (store.db.prepare('SELECT 1 FROM feed_excluded WHERE source=? AND id=?').get(source.id, row.id) || !eligible(item, row.first_seen, cutoff, source)) {
-          store.db.prepare('DELETE FROM feed_planning WHERE source=? AND id=?').run(source.id, row.id); continue;
+        if (planning.excluded.get(source.id, row.id) || !eligible(item, row.first_seen, cutoff, source)) {
+          planning.remove.run(source.id, row.id); continue;
         }
         safeUrl(item.url);
         item = await prepare(item, store, http, !!(options.rebuild || options.refresh));
         options.signal?.throwIfAborted();
         const key = hash({ ...summaryItem(item, agent.maxItemChars), model: agent.model, effort: agent.effort, skillHash, contractVersion: 2, summaryRevision: 3 });
-        const previous = store.db.prepare('SELECT * FROM feed_jobs WHERE source=? AND id=?').get(source.id, row.id) as Job | undefined;
-        if (!previous || previous.cache_key !== key || options.rebuild) store.db.prepare("INSERT OR REPLACE INTO feed_jobs VALUES (?,?,?,?, 'pending',0,'',NULL)").run(source.id, row.id, key, JSON.stringify({ item, firstSeen: row.first_seen }));
+        const previous = planning.job.get(source.id, row.id) as Job | undefined;
+        if (!previous || previous.cache_key !== key || options.rebuild) planning.insert.run(source.id, row.id, key, JSON.stringify({ item, firstSeen: row.first_seen }));
         else {
           const data = JSON.stringify({ item, firstSeen: row.first_seen });
-          if (data !== previous.data) store.db.prepare('UPDATE feed_jobs SET data=? WHERE source=? AND id=?').run(data, source.id, row.id);
-          if (options.retryFailed && previous.state === 'failed') store.db.prepare("UPDATE feed_jobs SET state='pending',attempts=0,next_at='',error=NULL WHERE source=? AND id=?").run(source.id, row.id);
+          if (data !== previous.data) planning.update.run(data, source.id, row.id);
+          if (options.retryFailed && previous.state === 'failed') planning.retry.run(source.id, row.id);
           if (previous.state === 'ready') {
-            const old = store.db.prepare('SELECT accepted FROM feed_summaries WHERE source=? AND id=?').get(source.id, row.id) as { accepted: string };
+            const old = planning.accepted.get(source.id, row.id) as { accepted: string };
             const accepted = JSON.parse(old.accepted) as AcceptedItem;
             accepted.item = item; // Metrics/URL/date changes update presentation without another summary.
             accepted.dateBasis = item.basis === 'observed' ? 'observed' : 'published';
             accepted.date = accepted.dateBasis === 'observed' ? accepted.firstSeen : item.publishedAt;
             const updated = JSON.stringify(accepted);
-            if (updated !== old.accepted) store.db.prepare('UPDATE feed_summaries SET accepted=? WHERE source=? AND id=?').run(updated, source.id, row.id);
+            if (updated !== old.accepted) planning.present.run(updated, source.id, row.id);
           }
         }
         const interval = enrichmentInterval(item), nextRefresh = Date.parse(at) + interval;
-        if (interval && nextRefresh < Date.parse(row.first_seen) + config.collection.enrichmentRefreshDays * 86400_000) store.db.prepare('UPDATE feed_planning SET due_at=? WHERE source=? AND id=?').run(new Date(nextRefresh).toISOString(), source.id, row.id);
-        else store.db.prepare('DELETE FROM feed_planning WHERE source=? AND id=?').run(source.id, row.id);
+        if (interval && nextRefresh < Date.parse(row.first_seen) + config.collection.enrichmentRefreshDays * 86400_000) planning.schedule.run(new Date(nextRefresh).toISOString(), source.id, row.id);
+        else planning.remove.run(source.id, row.id);
       }
     }
   }
   let cursor = store.meta('round_robin') ?? '';
+  // The due-time index requires sorting the entire pending queue per batch.
+  // Walk the partial FIFO index instead; next_at still filters delayed retries.
+  const pendingJobs = store.db.prepare(`SELECT j.* FROM feed_jobs j INDEXED BY feed_jobs_pending_order WHERE source=? AND state='pending' AND next_at<=? AND attempts<5 ORDER BY json_extract(data,'$.firstSeen'),id LIMIT ?`);
   while (sources.length) {
     options.signal?.throwIfAborted();
     const start = (sources.findIndex(source => source.id === cursor) + 1) % sources.length;
@@ -164,7 +180,7 @@ export async function summarize(config: Config, store: Store, options: { source?
       // HN produces both article and discussion copy in two languages. Its output
       // can exceed the model's token limit even when a larger batch fits the input.
       const batchLimit = source.id === 'hackernews' ? Math.min(2, config.agent.maxBatchItems) : config.agent.maxBatchItems;
-      const candidates = store.db.prepare("SELECT * FROM feed_jobs WHERE source=? AND state='pending' AND next_at<=? AND attempts<5 ORDER BY json_extract(data,'$.firstSeen'),id LIMIT ?").all(source.id, at, batchLimit) as Job[];
+      const candidates = pendingJobs.all(source.id, at, batchLimit) as Job[];
       if (candidates.length) { chosen = source; jobs = candidates; break; }
     }
     if (!chosen) break;
@@ -209,7 +225,7 @@ export async function summarize(config: Config, store: Store, options: { source?
     // Persisted failures cross the queue boundary unchanged; the agent owns repair wording.
     let repair = jobs.find(job => job.error)?.error ?? undefined;
     for (let attempt = 0; attempt < 2; attempt++) {
-      if (fixed.some(job => (store.db.prepare('SELECT attempts FROM feed_jobs WHERE source=? AND id=?').get(job.source, job.id) as { attempts: number }).attempts >= 5)) break;
+      if (fixed.some(job => (planning.attempts.get(job.source, job.id) as { attempts: number }).attempts >= 5)) break;
       let call: number;
       try { call = store.startCall(id, agent.model, agent.maxDailyCalls); }
       catch (error) { if (error instanceof QuotaDeferred) { deferred = true; break; } throw error; }
@@ -240,7 +256,7 @@ export async function summarize(config: Config, store: Store, options: { source?
     if (repair) {
       store.db.transaction(() => {
         for (const job of fixed) {
-          const row = store.db.prepare('SELECT attempts FROM feed_jobs WHERE source=? AND id=?').get(job.source, job.id) as { attempts: number };
+          const row = planning.attempts.get(job.source, job.id) as { attempts: number };
           const exhausted = row.attempts >= 5;
           const next = new Date(Date.parse(at) + Math.min(6 * 3600_000, 900_000 * 2 ** (row.attempts - 1))).toISOString();
           store.db.prepare('UPDATE feed_jobs SET state=?,next_at=?,error=? WHERE source=? AND id=?').run(exhausted ? 'failed' : 'pending', next, repair, job.source, job.id);

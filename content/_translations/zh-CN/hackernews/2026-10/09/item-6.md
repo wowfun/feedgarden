@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Show HN：用 LED 灯丝制作柔性霓虹 T 恤"
-description: "因公司临时通知不到一周后举办霓虹主题活动，作者利用这个期限，把在零件箱里放了多年的 LED 灯丝做成了可穿戴的霓虹 T 恤，并详细记录了零件、工艺与限制。 LED 灯丝是柔性长条，内含数百颗微型 LED，外层包裹约 1.8 毫米的硅胶散光层；它们原本为爱迪生式灯泡量产，也很容易用于 DIY，Adafruit 把它们叫做 noodles（面条）。零件清单包括 600mm 12V 暖白灯丝、300mm 3V 红色灯丝和一根 1200mm 24V 红色灯丝，USB 移动电源、ESP"
+description: "因公司临时通知不到一周后举办霓虹主题活动，作者利用这个期限，把在零件箱里放了多年的 LED 灯丝做成了可穿戴的霓虹 T 恤，并详细记录了零件、工艺与限制。 LED 灯丝是柔性长条，内含数百颗微型 LED，外层包裹约 1.8 毫米的硅胶散光层；它们原本为爱迪生式灯泡量产，也很容易用于 DIY，Adafruit 把它们叫做 noodles（面条）。零件清单包括 600mm 12V 暖白灯丝、300mm 3V 红色灯丝和一根 1200mm 24V 红色灯丝，USB 移动电源、..."
 date: "2026-10-08T16:37:24.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -32,8 +32,16 @@ LED 灯丝是柔性长条，内含数百颗微型 LED，外层包裹约 1.8 毫�
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50008047>)
 
-## 图片与视频
+## 媒体
 
-- [图片](<https://scottbez1.github.io/LedNeonShirt/IMG_0582%202.jpeg>)
-- [图片](<https://blogger.googleusercontent.com/img/a/AVvXsEgs97-o3J1ajkrgSlL30Hi0TEdzSvL-0gPDR_GZX2oN0XAuFdG4264P2tlPh2fVHuyS_Q0neFBiChV43SyFa1_2Mo-2k2mdla1Eh4pCt-q30Z1dRTqpfarkzVJhUilzCMTwz1jJ-XiaiS7v9MwEf_8j1wo7qm39Dcxb0zgIjIfYZhznmWIJHy-OQMzwDGo=w640-h480>)
-- [图片](<https://blogger.googleusercontent.com/img/a/AVvXsEi9sSVYZFaXBVnzyDY7JFKH_PXSKFgPuwiMEbao5G14IOvU-iLHJrnENqK6IYsVb6U9Vi5q0bEWB8LmhpI_hzExGMppLnKwk6edb43TZCITUdk2LJZdwjIQ790SRRuZ5hS5Gss0dhtdFItcaKf4A_kVmcP7VCyZC0E08_AEfe3_dv-3qnnlgMh4_z_whEw=w640-h374>)
+![图片](<https://scottbez1.github.io/LedNeonShirt/IMG_0582%202.jpeg>)
+
+[图片](<https://scottbez1.github.io/LedNeonShirt/IMG_0582%202.jpeg>)
+
+![图片](<https://blogger.googleusercontent.com/img/a/AVvXsEgs97-o3J1ajkrgSlL30Hi0TEdzSvL-0gPDR_GZX2oN0XAuFdG4264P2tlPh2fVHuyS_Q0neFBiChV43SyFa1_2Mo-2k2mdla1Eh4pCt-q30Z1dRTqpfarkzVJhUilzCMTwz1jJ-XiaiS7v9MwEf_8j1wo7qm39Dcxb0zgIjIfYZhznmWIJHy-OQMzwDGo=w640-h480>)
+
+[图片](<https://blogger.googleusercontent.com/img/a/AVvXsEgs97-o3J1ajkrgSlL30Hi0TEdzSvL-0gPDR_GZX2oN0XAuFdG4264P2tlPh2fVHuyS_Q0neFBiChV43SyFa1_2Mo-2k2mdla1Eh4pCt-q30Z1dRTqpfarkzVJhUilzCMTwz1jJ-XiaiS7v9MwEf_8j1wo7qm39Dcxb0zgIjIfYZhznmWIJHy-OQMzwDGo=w640-h480>)
+
+![图片](<https://blogger.googleusercontent.com/img/a/AVvXsEi9sSVYZFaXBVnzyDY7JFKH_PXSKFgPuwiMEbao5G14IOvU-iLHJrnENqK6IYsVb6U9Vi5q0bEWB8LmhpI_hzExGMppLnKwk6edb43TZCITUdk2LJZdwjIQ790SRRuZ5hS5Gss0dhtdFItcaKf4A_kVmcP7VCyZC0E08_AEfe3_dv-3qnnlgMh4_z_whEw=w640-h374>)
+
+[图片](<https://blogger.googleusercontent.com/img/a/AVvXsEi9sSVYZFaXBVnzyDY7JFKH_PXSKFgPuwiMEbao5G14IOvU-iLHJrnENqK6IYsVb6U9Vi5q0bEWB8LmhpI_hzExGMppLnKwk6edb43TZCITUdk2LJZdwjIQ790SRRuZ5hS5Gss0dhtdFItcaKf4A_kVmcP7VCyZC0E08_AEfe3_dv-3qnnlgMh4_z_whEw=w640-h374>)

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Launching an opt-in vulnerability-finding service for open-source software"
-description: "Anthropic's Frontier Red Team launched OSS Scanner, an opt-in vulnerability scanner for open-source projects, announced October 8, 2026. Projects that join receive periodic security scans from Anthropic's strongest models at no cost. The te"
+description: "Anthropic's Frontier Red Team launched OSS Scanner, an opt-in vulnerability scanner for open-source projects, announced October 8, 2026. Projects that join receive periodic security scans from Anthropic's strongest models at no cost. The..."
 date: "2026-10-08T19:00:00.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:15.842Z"

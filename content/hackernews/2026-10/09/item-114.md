@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Once: a CLI that caches command output for a while"
-description: "once is a small Go command-line tool that runs a command in the current directory, prints its stdout, and keeps that output in memory inside a per-user background daemon. Repeated calls with the same command, directory and tenant key are an"
+description: "once is a small Go command-line tool that runs a command in the current directory, prints its stdout, and keeps that output in memory inside a per-user background daemon. Repeated calls with the same command, directory and tenant key are..."
 date: "2026-10-09T09:43:06.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"

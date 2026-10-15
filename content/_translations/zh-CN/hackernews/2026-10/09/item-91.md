@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "减少 C 语言中的未定义行为"
-description: "生物医学工程教授 Martin Uecker 平时为控制磁共振成像（MRI）扫描仪编写自由软件，他在 Kernel Recipes 大会上谈到了 C 语言的未定义行为（UB），以及 C 最终能否成为一种内存安全的语言。他认为到 2026 年 C 依然是一门好语言：可移植、长期稳定、编译快、生成的二进制快，行为容易预判，工具链丰富，必要时也能“让路”。 Uecker 把 UB 追溯到 C 的历史。C89 标准必须兼容各种硬件，包括采用符号-数值表示或反码整数、分段内存、奇异指针"
+description: "生物医学工程教授 Martin Uecker 平时为控制磁共振成像（MRI）扫描仪编写自由软件，他在 Kernel Recipes 大会上谈到了 C 语言的未定义行为（UB），以及 C 最终能否成为一种内存安全的语言。他认为到 2026 年 C 依然是一门好语言：可移植、长期稳定、编译快、生成的二进制快，行为容易预判，工具链丰富，必要时也能“让路”。 Uecker 把 UB 追溯到 C 的历史。C89 标准必须兼容各种硬件，包括采用符号-数值表示或反码整数、分段内存、奇..."
 date: "2026-10-09T02:02:53.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -38,7 +38,12 @@ Uecker 说，问题在于标准允许编译器对 UB 做出任何反应，甚至
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50015074>)
 
-## 图片与视频
+## 媒体
 
-- [图片: &#91;Martin Uecker&#93;](<https://static.lwn.net/images/conf/2026/kr/MartinUecker-sm.png>)
-- [视频: video](<https://www.youtube.com/watch?v=dhlYcmX_oBQ&list=PLEVVgAZOU9P8&index=14>)
+![图片: &#91;Martin Uecker&#93;](<https://static.lwn.net/images/conf/2026/kr/MartinUecker-sm.png>)
+
+[图片: &#91;Martin Uecker&#93;](<https://static.lwn.net/images/conf/2026/kr/MartinUecker-sm.png>)
+
+![视频: video](<https://www.youtube.com/watch?v=dhlYcmX_oBQ&list=PLEVVgAZOU9P8&index=14>)
+
+[视频: video](<https://www.youtube.com/watch?v=dhlYcmX_oBQ&list=PLEVVgAZOU9P8&index=14>)

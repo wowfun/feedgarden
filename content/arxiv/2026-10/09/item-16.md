@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "RISEBench++: Benchmarking Reasoning-Informed Visual Editing"
-description: "Large multi-modality models have advanced in visual understanding and generation, but visual editing remains difficult: following complex instructions, preserving appearance consistency and supporting flexible input formats are all challeng"
+description: "Large multi-modality models have advanced in visual understanding and generation, but visual editing remains difficult: following complex instructions, preserving appearance consistency and supporting flexible input formats are all chall..."
 date: "2026-10-08T17:15:58.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:59.851Z"

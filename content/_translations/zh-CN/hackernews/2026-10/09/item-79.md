@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "美国计划直播胡德堡枪击案凶手行刑枪决"
-description: "美国国防部长皮特·赫格塞思表示，公众将可以观看尼达尔·哈桑的枪决行刑，一名国防部官员向 BBC 表示该行刑将被直播。哈桑曾是美军少校兼精神科医生，来自弗吉尼亚州，他承认 2009 年在胡德堡一处拥挤的医疗建筑内开枪打死 13 名手无寸铁的士兵。五角大楼本周早些时候宣布将执行 60 多年来首例军事处决，一名五角大楼发言人表示特朗普总统已批准国防部长的建议。 行刑定于 12 月 3 日在得克萨斯州胡德堡进行，据信这将是美国近一个世纪以来首次公开处决，也是二战结束以来首次以枪决方式"
+description: "美国国防部长皮特·赫格塞思表示，公众将可以观看尼达尔·哈桑的枪决行刑，一名国防部官员向 BBC 表示该行刑将被直播。哈桑曾是美军少校兼精神科医生，来自弗吉尼亚州，他承认 2009 年在胡德堡一处拥挤的医疗建筑内开枪打死 13 名手无寸铁的士兵。五角大楼本周早些时候宣布将执行 60 多年来首例军事处决，一名五角大楼发言人表示特朗普总统已批准国防部长的建议。 行刑定于 12 月 3 日在得克萨斯州胡德堡进行，据信这将是美国近一个世纪以来首次公开处决，也是二战结束以来首次以枪..."
 date: "2026-10-08T23:01:32.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -34,6 +34,8 @@ tags: ["source/hackernews","topics/security-privacy","topics/industry"]
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50013637>)
 
-## 图片与视频
+## 媒体
 
-- [图片: An undated handout image of Hasan that was released by authorities in 2012](<https://ichef.bbci.co.uk/news/480/cpsprodpb/9c36/live/42b73e80-c363-11f1-adf9-5f790696e20a.png.webp>)
+![图片: An undated handout image of Hasan that was released by authorities in 2012](<https://ichef.bbci.co.uk/news/480/cpsprodpb/9c36/live/42b73e80-c363-11f1-adf9-5f790696e20a.png.webp>)
+
+[图片: An undated handout image of Hasan that was released by authorities in 2012](<https://ichef.bbci.co.uk/news/480/cpsprodpb/9c36/live/42b73e80-c363-11f1-adf9-5f790696e20a.png.webp>)

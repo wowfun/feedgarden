@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Alignment"
-description: "This page introduces Anthropic's Alignment team, one of six research teams listed alongside Economics, Interpretability, Societal Impacts, Frontier Red Team, and Evaluation and oversight. The team's premise is that future AI systems will li"
+description: "This page introduces Anthropic's Alignment team, one of six research teams listed alongside Economics, Interpretability, Societal Impacts, Frontier Red Team, and Evaluation and oversight. The team's premise is that future AI systems will..."
 date: "2026-10-09T14:18:15.842Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:15.842Z"

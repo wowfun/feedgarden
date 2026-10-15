@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "2026 年诺贝尔和平奖授予纳瓦内特姆·“纳维”·皮莱"
-description: "挪威诺贝尔委员会将 2026 年诺贝尔和平奖授予纳瓦内特姆·“纳维”·皮莱，称赞她以非凡的勇气与正直引领世界走向更全面的全球法律秩序，并在确保战争罪、危害人类罪和种族灭绝罪受到起诉方面发挥了关键作用。公告日期为 2026 年 10 月 9 日，委员会指出首届和平奖颁发于 125 年前，当时就已强调通过国际法解决冲突。 皮莱出生于南非德班一个印度泰米尔裔家庭，成长于种族隔离制度之下，后来成为律师和法律先驱，直面深层的结构性歧视、隔离与排斥。她早年曾为纳尔逊·曼德拉及其他反对种族"
+description: "挪威诺贝尔委员会将 2026 年诺贝尔和平奖授予纳瓦内特姆·“纳维”·皮莱，称赞她以非凡的勇气与正直引领世界走向更全面的全球法律秩序，并在确保战争罪、危害人类罪和种族灭绝罪受到起诉方面发挥了关键作用。公告日期为 2026 年 10 月 9 日，委员会指出首届和平奖颁发于 125 年前，当时就已强调通过国际法解决冲突。 皮莱出生于南非德班一个印度泰米尔裔家庭，成长于种族隔离制度之下，后来成为律师和法律先驱，直面深层的结构性歧视、隔离与排斥。她早年曾为纳尔逊·曼德拉及其他反..."
 date: "2026-10-09T10:12:11.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -34,6 +34,8 @@ tags: ["source/hackernews","topics/history","topics/industry","topics/culture-so
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50018420>)
 
-## 图片与视频
+## 媒体
 
-- [图片: Watch the 2026 Nobel Prize announcements live](<https://www.nobelprize.org/images/195121-landscape-large.jpg>)
+![图片: Watch the 2026 Nobel Prize announcements live](<https://www.nobelprize.org/images/195121-landscape-large.jpg>)
+
+[图片: Watch the 2026 Nobel Prize announcements live](<https://www.nobelprize.org/images/195121-landscape-large.jpg>)

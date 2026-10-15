@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "腾讯发布 5B 全模态文档解析模型 Youtu-Parsing-Omni"
-description: "腾讯发布了 Youtu-Parsing-Omni，被描述为一个紧凑的 5B 全模态解析模型。只需单一输入——文档页面、自然图像、图表或流程图、几何图形、音频片段或音视频——它就能产出一个统一的 JSON 信封式输出，同时覆盖感知与认知两个层面。 感知类输出包括版面元素、文本、表格、公式、边界框、时间戳、ASR、OCR、声学事件和镜头运动；认知类输出则包括图像说明、叙述和报告。具体输出哪一类由任务提示词决定（示例中的 --task 参数，对应 prompts/youtu_par"
+description: "腾讯发布了 Youtu-Parsing-Omni，被描述为一个紧凑的 5B 全模态解析模型。只需单一输入——文档页面、自然图像、图表或流程图、几何图形、音频片段或音视频——它就能产出一个统一的 JSON 信封式输出，同时覆盖感知与认知两个层面。 感知类输出包括版面元素、文本、表格、公式、边界框、时间戳、ASR、OCR、声学事件和镜头运动；认知类输出则包括图像说明、叙述和报告。具体输出哪一类由任务提示词决定（示例中的 --task 参数，对应 prompts/youtu_..."
 date: "2026-10-09T12:03:32.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:44.332Z"
@@ -27,6 +27,8 @@ tags: ["source/reddit","topics/models","topics/research"]
 
 官方给出的亮点包括：统一 schema，一个 JSON 信封由任务提示词驱动覆盖七个解析族；单一模型中的全模态编码器可处理图像、音频以及交错的音视频输入（帧加音轨）；小模型取得强劲成绩，在 OmniDocBench v1.6 上达到 96.96 总分的最优水平，在 OmniParsingBench 上以 75.08 平均分成为最佳开源权重模型（仅次于 Gemini-3-Pro），在化学结构（ChemOCR）与乐谱（PDMX-Synth）识别上也与专用模型相当。发布内容包含 vLLM 插件、固定的服务配置、任务提示词与推理示例。
 
-## 图片与视频
+## 媒体
 
-- [图片: tencent/Youtu-Parsing-Omni · Hugging Face](<https://external-preview.redd.it/IOBGwlG1GLeePwVjEukOZAnpm3Exke5IVIyCT999tcc.png?width=640&crop=smart&auto=webp&s=92e43f735caa647c81054cba869632fd1b787ce5>)
+![图片: tencent/Youtu-Parsing-Omni · Hugging Face](<https://external-preview.redd.it/IOBGwlG1GLeePwVjEukOZAnpm3Exke5IVIyCT999tcc.png?width=640&crop=smart&auto=webp&s=92e43f735caa647c81054cba869632fd1b787ce5>)
+
+[图片: tencent/Youtu-Parsing-Omni · Hugging Face](<https://external-preview.redd.it/IOBGwlG1GLeePwVjEukOZAnpm3Exke5IVIyCT999tcc.png?width=640&crop=smart&auto=webp&s=92e43f735caa647c81054cba869632fd1b787ce5>)

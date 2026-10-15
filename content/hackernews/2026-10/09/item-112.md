@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "\"I'm in a Meeting\": Fleeting plays invented meeting audio to ward off interruptions"
-description: "Fleeting is a site that plays long, realistic recordings of invented meetings so that anyone nearby assumes you are busy. Its stated premise is \"workplace self-defence against people stealing your time\": pick a meeting, press play, and let "
+description: "Fleeting is a site that plays long, realistic recordings of invented meetings so that anyone nearby assumes you are busy. Its stated premise is \"workplace self-defence against people stealing your time\": pick a meeting, press play, and l..."
 date: "2026-10-09T09:21:48.000Z"
 updated: "2026-10-10T05:10:37.706Z"
 first_seen: "2026-10-09T14:17:37.221Z"

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "EgoVoice: Proactive Spoken Assistance from Egocentric Multimodal Streams"
-description: "Wearable augmented reality (AR) assistants are moving toward continuous real-world interaction, perceiving the user's activity through first-person video and audio and offering timely spoken guidance without being explicitly asked. Proactiv"
+description: "Wearable augmented reality (AR) assistants are moving toward continuous real-world interaction, perceiving the user's activity through first-person video and audio and offering timely spoken guidance without being explicitly asked. Proac..."
 date: "2026-10-08T16:24:12.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:52.195Z"

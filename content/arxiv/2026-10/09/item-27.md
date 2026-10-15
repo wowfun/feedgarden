@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "A Unified Bellman Operator for Safety-Critical Reinforcement Learning"
-description: "Reinforcement learning in safety-critical domains must maximize task performance while strictly honoring safety constraints. Existing safe RL paradigms typically force a trade-off: they either require a priori knowledge to give strict safet"
+description: "Reinforcement learning in safety-critical domains must maximize task performance while strictly honoring safety constraints. Existing safe RL paradigms typically force a trade-off: they either require a priori knowledge to give strict sa..."
 date: "2026-10-08T17:53:02.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:55.758Z"

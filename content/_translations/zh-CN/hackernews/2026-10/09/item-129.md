@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Oxide Computer 实现应税盈利后完成 4.45 亿美元 D 轮融资"
-description: "Oxide Computer 宣布完成 4.45 亿美元 D 轮融资。公司把这轮融资放在今年春季达成的一个里程碑上：它缴纳了所得税，而且并非来自特殊交易或一次性事件，而是常规经营——销售计算机——在扣除元器件、制造、薪酬及其他成本之后产生了应税收入。文章指出，多数初创公司不缴所得税是因为多数并不盈利，并称盈利能力是产品与市场契合度的滞后指标。 Oxide 表示自己还拥有非常庞大的订单积压。在快速增长的硬件业务中，资金必须在系统交付客户之前很久就投入到元器件和制造环节，因此需求"
+description: "Oxide Computer 宣布完成 4.45 亿美元 D 轮融资。公司把这轮融资放在今年春季达成的一个里程碑上：它缴纳了所得税，而且并非来自特殊交易或一次性事件，而是常规经营——销售计算机——在扣除元器件、制造、薪酬及其他成本之后产生了应税收入。文章指出，多数初创公司不缴所得税是因为多数并不盈利，并称盈利能力是产品与市场契合度的滞后指标。 Oxide 表示自己还拥有非常庞大的订单积压。在快速增长的硬件业务中，资金必须在系统交付客户之前很久就投入到元器件和制造环节，因..."
 date: "2026-10-09T13:12:47.000Z"
 updated: "2026-10-10T05:10:37.706Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -36,6 +36,8 @@ Oxide 表示自己还拥有非常庞大的订单积压。在快速增长的硬�
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50020014>)
 
-## 图片与视频
+## 媒体
 
-- [图片: Six crated Oxide racks lined up on a warehouse floor](<https://oxide.computer/_vercel/image?url=%2Fimg%2Fblog%2Fseries-d%2Fbenchmark-crated-racks.jpeg&w=1440&q=90>)
+![图片: Six crated Oxide racks lined up on a warehouse floor](<https://oxide.computer/_vercel/image?url=%2Fimg%2Fblog%2Fseries-d%2Fbenchmark-crated-racks.jpeg&w=1440&q=90>)
+
+[图片: Six crated Oxide racks lined up on a warehouse floor](<https://oxide.computer/_vercel/image?url=%2Fimg%2Fblog%2Fseries-d%2Fbenchmark-crated-racks.jpeg&w=1440&q=90>)

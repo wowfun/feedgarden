@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Predicting Alignment Generalization with Value Representations"
-description: "LLM developers post-train models to exhibit prosocial values and behavioral traits enumerated in an alignment target, but training on sets of narrow behaviors still influences behavior in unseen contexts in unexpected ways. This paper estab"
+description: "LLM developers post-train models to exhibit prosocial values and behavioral traits enumerated in an alignment target, but training on sets of narrow behaviors still influences behavior in unseen contexts in unexpected ways. This paper es..."
 date: "2026-10-08T17:47:26.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

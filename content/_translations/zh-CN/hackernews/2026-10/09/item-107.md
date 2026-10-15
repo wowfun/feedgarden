@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "面向 OTel 原生的设计：让产品能把遥测导出到任意可观测性平台"
-description: "一篇 OpenTelemetry 博客文章（New Relic 的 Dan Gomez Blanco 亦有贡献）主张，自托管软件和 SaaS 产品应允许用户把日志、追踪和指标导出到任意兼容 OTel 的后端，而不是把可观测性数据锁定在自带仪表盘或少数厂商之中。文章给出的动机包括合规、成本管理以及把遥测数据集中到一处，并把支持导出描述为厂商中立且经得起未来变化的选择。 OpenTelemetry 定义了四类信号，均通过 OpenTelemetry 协议（OTLP）传输：日志（带"
+description: "一篇 OpenTelemetry 博客文章（New Relic 的 Dan Gomez Blanco 亦有贡献）主张，自托管软件和 SaaS 产品应允许用户把日志、追踪和指标导出到任意兼容 OTel 的后端，而不是把可观测性数据锁定在自带仪表盘或少数厂商之中。文章给出的动机包括合规、成本管理以及把遥测数据集中到一处，并把支持导出描述为厂商中立且经得起未来变化的选择。 OpenTelemetry 定义了四类信号，均通过 OpenTelemetry 协议（OTLP）传输：日..."
 date: "2026-10-09T06:54:45.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -32,8 +32,16 @@ OpenTelemetry 定义了四类信号，均通过 OpenTelemetry 协议（OTLP）�
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50016974>)
 
-## 图片与视频
+## 媒体
 
-- [图片: Enabling telemetry export via the OTLP standard allows users to own and analyze their data on the platforms of their choosing.](<https://opentelemetry.io/blog/2026/otel-native-by-design/cover.png>)
-- [图片: The Collector-per-tenant architecture provides strong isolation guarantees at the cost of increased resource usage.](<https://opentelemetry.io/blog/2026/otel-native-by-design/collector-per-tenant.png>)
-- [图片: The shared Collector pattern is easier to monitor and maintain as all exports route through one Collector instance.](<https://opentelemetry.io/blog/2026/otel-native-by-design/shared-collector.png>)
+![图片: Enabling telemetry export via the OTLP standard allows users to own and analyze their data on the platforms of their choosing.](<https://opentelemetry.io/blog/2026/otel-native-by-design/cover.png>)
+
+[图片: Enabling telemetry export via the OTLP standard allows users to own and analyze their data on the platforms of their choosing.](<https://opentelemetry.io/blog/2026/otel-native-by-design/cover.png>)
+
+![图片: The Collector-per-tenant architecture provides strong isolation guarantees at the cost of increased resource usage.](<https://opentelemetry.io/blog/2026/otel-native-by-design/collector-per-tenant.png>)
+
+[图片: The Collector-per-tenant architecture provides strong isolation guarantees at the cost of increased resource usage.](<https://opentelemetry.io/blog/2026/otel-native-by-design/collector-per-tenant.png>)
+
+![图片: The shared Collector pattern is easier to monitor and maintain as all exports route through one Collector instance.](<https://opentelemetry.io/blog/2026/otel-native-by-design/shared-collector.png>)
+
+[图片: The shared Collector pattern is easier to monitor and maintain as all exports route through one Collector instance.](<https://opentelemetry.io/blog/2026/otel-native-by-design/shared-collector.png>)

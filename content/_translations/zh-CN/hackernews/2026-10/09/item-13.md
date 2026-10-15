@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "用新的索引策略扩展并压测关键消息总线"
-description: "本文是 Jane Street 2026 年暑期实习项目系列文章之一。Aria 是该公司内部的通信框架与托管系统，每天处理数 TB 数据，客户端可以订阅实时消息流。随着使用量快速增长，团队需要重新架构以应对数据量和吞吐的上升。实习生 Theodor Totev 今年的重点是降低客户端只读取部分消息的成本，他的优化在生产负载上带来了 30% 的 CPU 使用率下降，同时保持了此类关键系统对正确性的极高要求。 问题出在 tip recovery（追平游标）上。Aria 通过 TC"
+description: "本文是 Jane Street 2026 年暑期实习项目系列文章之一。Aria 是该公司内部的通信框架与托管系统，每天处理数 TB 数据，客户端可以订阅实时消息流。随着使用量快速增长，团队需要重新架构以应对数据量和吞吐的上升。实习生 Theodor Totev 今年的重点是降低客户端只读取部分消息的成本，他的优化在生产负载上带来了 30% 的 CPU 使用率下降，同时保持了此类关键系统对正确性的极高要求。 问题出在 tip recovery（追平游标）上。Aria 通过..."
 date: "2026-10-08T17:39:26.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -30,7 +30,12 @@ tags: ["source/hackernews","topics/coding","topics/research"]
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50009066>)
 
-## 图片与视频
+## 媒体
 
-- [图片](<https://blog.janestreet.com/scaling-and-benchmarking-a-critical-message-bus/image2.png>)
-- [图片](<https://blog.janestreet.com/scaling-and-benchmarking-a-critical-message-bus/image6.png>)
+![图片](<https://blog.janestreet.com/scaling-and-benchmarking-a-critical-message-bus/image2.png>)
+
+[图片](<https://blog.janestreet.com/scaling-and-benchmarking-a-critical-message-bus/image2.png>)
+
+![图片](<https://blog.janestreet.com/scaling-and-benchmarking-a-critical-message-bus/image6.png>)
+
+[图片](<https://blog.janestreet.com/scaling-and-benchmarking-a-critical-message-bus/image6.png>)

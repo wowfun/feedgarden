@@ -15,6 +15,8 @@ tags: ["source/reddit","topics/coding"]
 
 帖子附上了该行为截图，并感谢 Anthropic，认为这是为帮助用户节省 token 而做的改进。该信息来自用户自己的观察，并未附上更新日志或官方文档。
 
-## 图片与视频
+## 媒体
 
-- [图片: Claude Code Compacts Automatically Before Cache Expires, THANK YOU&#33;](<https://preview.redd.it/rkhs9s4avcuh1.png?width=140&height=12&auto=webp&s=5d3fa22ae7d368b20fff7dd7c6dc4584a45498b4>)
+![图片: Claude Code Compacts Automatically Before Cache Expires, THANK YOU&#33;](<https://preview.redd.it/rkhs9s4avcuh1.png?width=140&height=12&auto=webp&s=5d3fa22ae7d368b20fff7dd7c6dc4584a45498b4>)
+
+[图片: Claude Code Compacts Automatically Before Cache Expires, THANK YOU&#33;](<https://preview.redd.it/rkhs9s4avcuh1.png?width=140&height=12&auto=webp&s=5d3fa22ae7d368b20fff7dd7c6dc4584a45498b4>)

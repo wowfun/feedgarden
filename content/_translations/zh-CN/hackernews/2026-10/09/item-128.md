@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Deno 加入 Cloudflare"
-description: "据一篇署名 Ry Dahl 的文章，整个 Deno 团队将加入 Cloudflare。作者给出的理由是 Deno 运行时的演进路径：从 Deno 到 Deno Deploy，再到 celld——一个基于 Cloudflare Workers 编程模型、以 Durable Objects 为核心的系统。他写道，目标是让这套编程模型成为构建服务器的默认方式，既可运行在 Cloudflare 的网络上，也可运行在开发者自有的基础设施上。文中提到，对 Node.js 的兼容性和完整的"
+description: "据一篇署名 Ry Dahl 的文章，整个 Deno 团队将加入 Cloudflare。作者给出的理由是 Deno 运行时的演进路径：从 Deno 到 Deno Deploy，再到 celld——一个基于 Cloudflare Workers 编程模型、以 Durable Objects 为核心的系统。他写道，目标是让这套编程模型成为构建服务器的默认方式，既可运行在 Cloudflare 的网络上，也可运行在开发者自有的基础设施上。文中提到，对 Node.js 的兼容性和..."
 date: "2026-10-09T13:03:48.000Z"
 updated: "2026-10-10T05:10:37.706Z"
 first_seen: "2026-10-09T14:17:37.221Z"

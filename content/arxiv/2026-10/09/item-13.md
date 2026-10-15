@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Prior or Feedback? What an LLM Uses When Adapting Neural Operators"
-description: "Do LLM scientific agents rely only on their initial task context, or do they adapt decisions in response to experimental feedback? The authors study this in neural operator adaptation, where a large language model selects fine-tuning config"
+description: "Do LLM scientific agents rely only on their initial task context, or do they adapt decisions in response to experimental feedback? The authors study this in neural operator adaptation, where a large language model selects fine-tuning con..."
 date: "2026-10-08T17:06:23.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

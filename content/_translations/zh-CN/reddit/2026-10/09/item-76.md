@@ -15,6 +15,8 @@ tags: ["source/reddit","topics/industry"]
 
 全文语气自嘲，结尾用了“穷哥们”和表情符号。该说法没有给出数据来源、样本量或调查方法，也没有讨论具体套餐名称或功能；这条内容是关于感知到的价格档位的观察，而不是一项经过测量的结果。作者是 /u/Imaserventofreps。
 
-## 图片与视频
+## 媒体
 
-- [图片: Reality](<https://preview.redd.it/enlo2az90cuh1.jpeg?width=640&crop=smart&auto=webp&s=8dc4a41529ae5931badbb5a9eab750cc4916ae94>)
+![图片: Reality](<https://preview.redd.it/enlo2az90cuh1.jpeg?width=640&crop=smart&auto=webp&s=8dc4a41529ae5931badbb5a9eab750cc4916ae94>)
+
+[图片: Reality](<https://preview.redd.it/enlo2az90cuh1.jpeg?width=640&crop=smart&auto=webp&s=8dc4a41529ae5931badbb5a9eab750cc4916ae94>)

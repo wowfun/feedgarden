@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "bigarrow：让 AI 智能体在屏幕上画箭头、方框和文字的 macOS 工具"
-description: "bigarrow（big-arrow-on-the-screen）是一个采用 MIT 许可证的 macOS 命令行工具，同时提供面向 Claude Code 和 Codex 的技能，可以在任意窗口之上画出一个箭头和一块标牌。作者描述的问题是：智能体可以重构 monorepo、写数据库迁移，但当它需要人类点一次按钮时，只能把“请点击 Allow”打印到一个没人看着的终端里。该工具是一个 Swift 二进制程序，会创建一个覆盖所有显示器和所有 Space 的透明窗口；鼠标点击会穿"
+description: "bigarrow（big-arrow-on-the-screen）是一个采用 MIT 许可证的 macOS 命令行工具，同时提供面向 Claude Code 和 Codex 的技能，可以在任意窗口之上画出一个箭头和一块标牌。作者描述的问题是：智能体可以重构 monorepo、写数据库迁移，但当它需要人类点一次按钮时，只能把“请点击 Allow”打印到一个没人看着的终端里。该工具是一个 Swift 二进制程序，会创建一个覆盖所有显示器和所有 Space 的透明窗口；鼠标点..."
 date: "2026-10-09T11:03:48.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -34,8 +34,16 @@ bigarrow（big-arrow-on-the-screen）是一个采用 MIT 许可证的 macOS 命�
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50018817>)
 
-## 图片与视频
+## 媒体
 
-- [图片: A real macOS desktop, Hacker News of 2014-06-10 in Chrome, nine bigarrow arrows in nine colours from every side: same since 2007, already argued in 2014, not a lurker? log in, the article is in here, remember me? &#40;Firefox 30&#41;, nothing. noth](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/hero-hn.png>)
-- [图片: bigarrow pointing at a dialog's Allow button](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/demo.gif>)
-- [图片: System Settings, Device Control and Data Access: a green arrow with a close button, Franz, switch this on: Terminal may control your Mac, and an orange zigzag ring on the plus button: Not in the list? Plus. Then find it.](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/real/settings.png>)
+![图片: A real macOS desktop, Hacker News of 2014-06-10 in Chrome, nine bigarrow arrows in nine colours from every side: same since 2007, already argued in 2014, not a lurker? log in, the article is in here, remember me? &#40;Firefox 30&#41;, nothing. noth](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/hero-hn.png>)
+
+[图片: A real macOS desktop, Hacker News of 2014-06-10 in Chrome, nine bigarrow arrows in nine colours from every side: same since 2007, already argued in 2014, not a lurker? log in, the article is in here, remember me? &#40;Firefox 30&#41;, nothing. noth](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/hero-hn.png>)
+
+![图片: bigarrow pointing at a dialog's Allow button](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/demo.gif>)
+
+[图片: bigarrow pointing at a dialog's Allow button](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/demo.gif>)
+
+![图片: System Settings, Device Control and Data Access: a green arrow with a close button, Franz, switch this on: Terminal may control your Mac, and an orange zigzag ring on the plus button: Not in the list? Plus. Then find it.](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/real/settings.png>)
+
+[图片: System Settings, Device Control and Data Access: a green arrow with a close button, Franz, switch this on: Terminal may control your Mac, and an orange zigzag ring on the plus button: Not in the list? Plus. Then find it.](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/real/settings.png>)

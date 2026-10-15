@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Have URMs and UTs been integrated into frontier models? Or did they disappear into the dustbin of forgotten papers? [D]"
-description: "A discussion post on r/MachineLearning asks whether the ideas behind the Universal Transformer (UT) and the Universal Reasoning Model (URM) have been taken up by frontier labs, or whether they remain overlooked research. It links the paper,"
+description: "A discussion post on r/MachineLearning asks whether the ideas behind the Universal Transformer (UT) and the Universal Reasoning Model (URM) have been taken up by frontier labs, or whether they remain overlooked research. It links the pap..."
 date: "2026-10-08T20:28:20.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:47.429Z"
@@ -19,6 +19,8 @@ For the URM, the cited figure shows a standard Transformer layer stack next to a
 
 Note: the performance claim and the framing are the poster's; the source offers no independent benchmark numbers or evidence of adoption.
 
-## Images and video
+## Media
 
-- [Video: https&#58;//www.youtube.com/watch?v=RxNPFCYCFBU](<https://www.youtube.com/watch?v=RxNPFCYCFBU>)
+![Video: https&#58;//www.youtube.com/watch?v=RxNPFCYCFBU](<https://www.youtube.com/watch?v=RxNPFCYCFBU>)
+
+[Video: https&#58;//www.youtube.com/watch?v=RxNPFCYCFBU](<https://www.youtube.com/watch?v=RxNPFCYCFBU>)

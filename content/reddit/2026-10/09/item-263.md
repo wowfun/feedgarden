@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "ASTRAnomical usage..."
-description: "The author describes how they start their 5-hour GPT Plus usage window as soon as they sit down at the PC, so that it resets earlier in the day. In practice, they ask a simple math problem while at work to start the 5-hour clock. On this oc"
+description: "The author describes how they start their 5-hour GPT Plus usage window as soon as they sit down at the PC, so that it resets earlier in the day. In practice, they ask a simple math problem while at work to start the 5-hour clock. On this..."
 date: "2026-10-09T11:15:10.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:22:47.680Z"

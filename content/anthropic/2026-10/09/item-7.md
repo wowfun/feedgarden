@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Interpretability"
-description: "This page introduces Anthropic's Interpretability team, one of six listed research teams. Its stated mission is to discover and understand how large language models work internally, as a foundation for AI safety and for positive outcomes. T"
+description: "This page introduces Anthropic's Interpretability team, one of six listed research teams. Its stated mission is to discover and understand how large language models work internally, as a foundation for AI safety and for positive outcomes..."
 date: "2026-10-09T14:18:15.842Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:15.842Z"

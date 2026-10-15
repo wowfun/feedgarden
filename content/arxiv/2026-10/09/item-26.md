@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "WOVEN: Training Multimodal LLMs on Visual Transition Reasoning"
-description: "Multimodal large language models (MLLMs) perform poorly on spatial, embodied, physical and temporal reasoning. The authors hypothesize these failures share a deficit in visual transition reasoning, and test whether that capability can act a"
+description: "Multimodal large language models (MLLMs) perform poorly on spatial, embodied, physical and temporal reasoning. The authors hypothesize these failures share a deficit in visual transition reasoning, and test whether that capability can ac..."
 date: "2026-10-08T17:52:03.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:52.195Z"

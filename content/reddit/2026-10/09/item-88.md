@@ -13,6 +13,8 @@ tags: ["source/reddit","topics/security-privacy","topics/industry"]
 
 
 
-## Images and video
+## Media
 
-- [Image: Broken safety culture…](<https://preview.redd.it/5rp33l148cuh1.jpg?width=140&height=140&crop=1:1,smart&auto=webp&s=2aa8475d260d25dbeda6f2c1cc0b7e88f4848c01>)
+![Image: Broken safety culture…](<https://preview.redd.it/5rp33l148cuh1.jpg?width=140&height=140&crop=1:1,smart&auto=webp&s=2aa8475d260d25dbeda6f2c1cc0b7e88f4848c01>)
+
+[Image: Broken safety culture…](<https://preview.redd.it/5rp33l148cuh1.jpg?width=140&height=140&crop=1:1,smart&auto=webp&s=2aa8475d260d25dbeda6f2c1cc0b7e88f4848c01>)

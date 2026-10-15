@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Cadence: Adaptive Monitoring and Guidance for Coding Agents"
-description: "Runtime monitors are increasingly used to improve the reliability of LLM-based coding agents by inspecting execution trajectories and delivering corrective guidance when misbehavior is detected. Their effectiveness, however, remains limited"
+description: "Runtime monitors are increasingly used to improve the reliability of LLM-based coding agents by inspecting execution trajectories and delivering corrective guidance when misbehavior is detected. Their effectiveness, however, remains limi..."
 date: "2026-10-08T16:34:02.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:24:03.592Z"

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Whistle: Speech to Text in 16.9 MB"
-description: "Whistle is an open speech-recognition model from the team behind Needle, intended for mobiles, wearables, robots, smart home devices, automotive systems and microcontrollers. It ships as a single 16.9 MB file, runs on the CPU without depend"
+description: "Whistle is an open speech-recognition model from the team behind Needle, intended for mobiles, wearables, robots, smart home devices, automotive systems and microcontrollers. It ships as a single 16.9 MB file, runs on the CPU without dep..."
 date: "2026-10-08T16:59:39.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"

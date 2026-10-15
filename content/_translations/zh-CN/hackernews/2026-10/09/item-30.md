@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Cloudflare 使 1.1.1.1 免于盗版封锁，在法国躲过处罚"
-description: "过去两年，法国法院命令越来越多的中介机构封锁盗版体育直播流的访问。除普通 ISP 外，这些命令如今还针对公共 DNS 解析器、VPN 服务、搜索引擎和 CDN 提供商，因为它们都能帮助用户绕过已有的封锁。 Cloudflare 已收到多份此类命令。今年 4 月，巴黎司法法院命令其封锁与盗版一级方程式直播相关的 21 个域名以及与 MotoGP 相关的 16 个域名，范围涵盖其 DNS 解析器和 CDN。这些命令并未规定具体方式，只要求“以任何有效手段”阻止来自法国的访问。提出"
+description: "过去两年，法国法院命令越来越多的中介机构封锁盗版体育直播流的访问。除普通 ISP 外，这些命令如今还针对公共 DNS 解析器、VPN 服务、搜索引擎和 CDN 提供商，因为它们都能帮助用户绕过已有的封锁。 Cloudflare 已收到多份此类命令。今年 4 月，巴黎司法法院命令其封锁与盗版一级方程式直播相关的 21 个域名以及与 MotoGP 相关的 16 个域名，范围涵盖其 DNS 解析器和 CDN。这些命令并未规定具体方式，只要求“以任何有效手段”阻止来自法国的访问..."
 date: "2026-10-08T18:32:52.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -38,8 +38,16 @@ Cloudflare 已收到多份此类命令。今年 4 月，巴黎司法法院命令
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50009965>)
 
-## 图片与视频
+## 媒体
 
-- [图片: 50k requested by canal+](<https://torrentfreak.com/images/50k.png>)
-- [图片: Not Cloudflare's responsibility](<https://torrentfreak.com/images/shot-cloudflare-not-responsible.png>)
-- [图片: transparency report 1.1.1.1 not blocked](<https://torrentfreak.com/images/transparency-notblocked.png>)
+![图片: 50k requested by canal+](<https://torrentfreak.com/images/50k.png>)
+
+[图片: 50k requested by canal+](<https://torrentfreak.com/images/50k.png>)
+
+![图片: Not Cloudflare's responsibility](<https://torrentfreak.com/images/shot-cloudflare-not-responsible.png>)
+
+[图片: Not Cloudflare's responsibility](<https://torrentfreak.com/images/shot-cloudflare-not-responsible.png>)
+
+![图片: transparency report 1.1.1.1 not blocked](<https://torrentfreak.com/images/transparency-notblocked.png>)
+
+[图片: transparency report 1.1.1.1 not blocked](<https://torrentfreak.com/images/transparency-notblocked.png>)

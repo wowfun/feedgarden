@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Frontier Red Team"
-description: "This page introduces Anthropic's Frontier Red Team, one of six listed research teams. The team says it stress-tests AI systems to understand the full extent of their current capabilities and to anticipate what comes next, providing evidence"
+description: "This page introduces Anthropic's Frontier Red Team, one of six listed research teams. The team says it stress-tests AI systems to understand the full extent of their current capabilities and to anticipate what comes next, providing evide..."
 date: "2026-10-09T14:18:15.842Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:15.842Z"

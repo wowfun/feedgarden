@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "The missing map of the sky"
-description: "Astrophysicist Brice Ménard, a Johns Hopkins University researcher who also works at Anthropic, describes using Claude Science to produce the first complete map of the sky in ultraviolet (UV) light. He says the map will be a valuable educat"
+description: "Astrophysicist Brice Ménard, a Johns Hopkins University researcher who also works at Anthropic, describes using Claude Science to produce the first complete map of the sky in ultraviolet (UV) light. He says the map will be a valuable edu..."
 date: "2026-10-08T20:59:00.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:15.842Z"

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Caught in the Act: Probes Effectively Detect Sabotage and Catch Unverbalized Deception"
-description: "Recent incidents highlight both the difficulty of monitoring LLM agents and the danger of models deceiving people. The authors show that white-box deception detection via probes can scale to frontier monitoring settings, using what they des"
+description: "Recent incidents highlight both the difficulty of monitoring LLM agents and the danger of models deceiving people. The authors show that white-box deception detection via probes can scale to frontier monitoring settings, using what they ..."
 date: "2026-10-08T17:58:13.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

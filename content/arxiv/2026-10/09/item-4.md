@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "DVD: Dynamic Vector Decoding for Efficient MLLM-based Perception"
-description: "Multimodal large language models (MLLMs) increasingly serve perception tasks used in human-machine interaction, robotics and autonomous driving, but existing MLLM-based perception methods usually rely on text-based coordinate representation"
+description: "Multimodal large language models (MLLMs) increasingly serve perception tasks used in human-machine interaction, robotics and autonomous driving, but existing MLLM-based perception methods usually rely on text-based coordinate representat..."
 date: "2026-10-08T16:32:28.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

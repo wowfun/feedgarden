@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "bigarrow: a macOS tool that lets AI agents draw arrows, boxes and text on the screen"
-description: "bigarrow (big-arrow-on-the-screen) is an MIT-licensed macOS command-line tool, paired with a skill for Claude Code and Codex, that draws an arrow and a sign on top of every window. The stated problem is that an agent may refactor a monorepo"
+description: "bigarrow (big-arrow-on-the-screen) is an MIT-licensed macOS command-line tool, paired with a skill for Claude Code and Codex, that draws an arrow and a sign on top of every window. The stated problem is that an agent may refactor a monor..."
 date: "2026-10-09T11:03:48.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -34,8 +34,16 @@ Selected comments: [sicktriple](https://news.ycombinator.com/item?id=50022929) Â
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50018817>)
 
-## Images and video
+## Media
 
-- [Image: A real macOS desktop, Hacker News of 2014-06-10 in Chrome, nine bigarrow arrows in nine colours from every side: same since 2007, already argued in 2014, not a lurker? log in, the article is in here, remember me? &#40;Firefox 30&#41;, nothing. noth](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/hero-hn.png>)
-- [Image: bigarrow pointing at a dialog's Allow button](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/demo.gif>)
-- [Image: System Settings, Device Control and Data Access: a green arrow with a close button, Franz, switch this on: Terminal may control your Mac, and an orange zigzag ring on the plus button: Not in the list? Plus. Then find it.](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/real/settings.png>)
+![Image: A real macOS desktop, Hacker News of 2014-06-10 in Chrome, nine bigarrow arrows in nine colours from every side: same since 2007, already argued in 2014, not a lurker? log in, the article is in here, remember me? &#40;Firefox 30&#41;, nothing. noth](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/hero-hn.png>)
+
+[Image: A real macOS desktop, Hacker News of 2014-06-10 in Chrome, nine bigarrow arrows in nine colours from every side: same since 2007, already argued in 2014, not a lurker? log in, the article is in here, remember me? &#40;Firefox 30&#41;, nothing. noth](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/hero-hn.png>)
+
+![Image: bigarrow pointing at a dialog's Allow button](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/demo.gif>)
+
+[Image: bigarrow pointing at a dialog's Allow button](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/demo.gif>)
+
+![Image: System Settings, Device Control and Data Access: a green arrow with a close button, Franz, switch this on: Terminal may control your Mac, and an orange zigzag ring on the plus button: Not in the list? Plus. Then find it.](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/real/settings.png>)
+
+[Image: System Settings, Device Control and Data Access: a green arrow with a close button, Franz, switch this on: Terminal may control your Mac, and an orange zigzag ring on the plus button: Not in the list? Plus. Then find it.](<https://github.com/franzenzenhofer/big-arrow-on-the-screen/raw/main/docs/images/real/settings.png>)

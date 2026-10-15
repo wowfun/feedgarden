@@ -13,6 +13,8 @@ tags: ["source/reddit","topics/industry","topics/hardware"]
 
 
 
-## Images and video
+## Media
 
-- [Image: Ahh, it all makes sense now for the 64Gb DGX Spark - &#91;Samsung expects 780% quarterly operating profit jump on AI boom&#93;](<https://external-preview.redd.it/fjymjVS_mXxwtXakjDiCQc02rvCnI6e0O8GFADvjkS0.jpeg?width=640&crop=smart&auto=webp&s=cdb719f7f061916060a56e324e1ec1cc1c71115d>)
+![Image: Ahh, it all makes sense now for the 64Gb DGX Spark - &#91;Samsung expects 780% quarterly operating profit jump on AI boom&#93;](<https://external-preview.redd.it/fjymjVS_mXxwtXakjDiCQc02rvCnI6e0O8GFADvjkS0.jpeg?width=640&crop=smart&auto=webp&s=cdb719f7f061916060a56e324e1ec1cc1c71115d>)
+
+[Image: Ahh, it all makes sense now for the 64Gb DGX Spark - &#91;Samsung expects 780% quarterly operating profit jump on AI boom&#93;](<https://external-preview.redd.it/fjymjVS_mXxwtXakjDiCQc02rvCnI6e0O8GFADvjkS0.jpeg?width=640&crop=smart&auto=webp&s=cdb719f7f061916060a56e324e1ec1cc1c71115d>)

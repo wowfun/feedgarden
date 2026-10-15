@@ -15,6 +15,8 @@ tags: ["source/reddit","topics/models","topics/evaluation"]
 
 帖子没有提供基准测试、价格、上下文长度或其他比较标准，因此本条只记录所提出的问题本身。
 
-## 图片与视频
+## 媒体
 
-- [图片: Sonnet 5.5 - GPT 6 instant](<https://preview.redd.it/ll7m2c43weuh1.jpeg?width=640&crop=smart&auto=webp&s=df4ba9289dba0a592262cebb74324d3ae22ed18d>)
+![图片: Sonnet 5.5 - GPT 6 instant](<https://preview.redd.it/ll7m2c43weuh1.jpeg?width=640&crop=smart&auto=webp&s=df4ba9289dba0a592262cebb74324d3ae22ed18d>)
+
+[图片: Sonnet 5.5 - GPT 6 instant](<https://preview.redd.it/ll7m2c43weuh1.jpeg?width=640&crop=smart&auto=webp&s=df4ba9289dba0a592262cebb74324d3ae22ed18d>)

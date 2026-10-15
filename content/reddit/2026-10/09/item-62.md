@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Running coding agents locally, do you sandbox them or trust them?"
-description: "The author asks people who run Claude Code, Codex, or local-model agents directly against their own machines how they limit what those agents can touch. The options they have seen are a dev container, a separate user account, a full VM, or "
+description: "The author asks people who run Claude Code, Codex, or local-model agents directly against their own machines how they limit what those agents can touch. The options they have seen are a dev container, a separate user account, a full VM, ..."
 date: "2026-10-08T22:12:35.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:22:47.680Z"

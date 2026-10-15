@@ -17,6 +17,8 @@ tags: ["source/reddit","topics/products","topics/industry"]
 
 这只是一名用户的个人经历，除套餐价格和 20 倍降至 10 倍之外没有更多数字，也没有说明重置政策已实行多久、是否有保障。
 
-## 图片与视频
+## 媒体
 
-- [图片: ChatGPT keeps giving us full usage resets](<https://preview.redd.it/aka6jtgqvcuh1.png?width=140&height=89&auto=webp&s=3f10e553bc3d83405f60897d4960e68c99e21360>)
+![图片: ChatGPT keeps giving us full usage resets](<https://preview.redd.it/aka6jtgqvcuh1.png?width=140&height=89&auto=webp&s=3f10e553bc3d83405f60897d4960e68c99e21360>)
+
+[图片: ChatGPT keeps giving us full usage resets](<https://preview.redd.it/aka6jtgqvcuh1.png?width=140&height=89&auto=webp&s=3f10e553bc3d83405f60897d4960e68c99e21360>)

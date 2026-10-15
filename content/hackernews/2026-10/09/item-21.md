@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Serverless Horrors: $10,811.41"
-description: "A developer reports being billed US$10,811.41 by Cloudflare after a single Durable Object alarm entered an infinite loop in one project. According to the post, the loop kept rescheduling itself and generated roughly 6 trillion reads and wri"
+description: "A developer reports being billed US$10,811.41 by Cloudflare after a single Durable Object alarm entered an infinite loop in one project. According to the post, the loop kept rescheduling itself and generated roughly 6 trillion reads and ..."
 date: "2026-10-08T18:12:49.000Z"
 updated: "2026-10-10T06:19:28.614Z"
 first_seen: "2026-10-09T14:17:37.221Z"

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "VFold: Symmetry-Aware Cross-Layer Value Cache Compression"
-description: "Caching key-value (KV) states accelerates LLM decoding, but at long context lengths the cache can dominate memory usage. One approach is to compress that memory by exploiting inter-layer cache similarities, yet most existing techniques requ"
+description: "Caching key-value (KV) states accelerates LLM decoding, but at long context lengths the cache can dominate memory usage. One approach is to compress that memory by exploiting inter-layer cache similarities, yet most existing techniques r..."
 date: "2026-10-08T17:14:28.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:52.195Z"

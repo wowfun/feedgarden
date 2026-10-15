@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "TestPrism: Rethinking Test Evaluation Beyond a Single Reference"
-description: "Test generation by large language model coding agents has improved across many programming tasks, but the usual evaluation practice—checking generated tests against one reference solution—ignores other valid implementations and can overstat"
+description: "Test generation by large language model coding agents has improved across many programming tasks, but the usual evaluation practice—checking generated tests against one reference solution—ignores other valid implementations and can overs..."
 date: "2026-10-08T16:44:39.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:24:03.592Z"

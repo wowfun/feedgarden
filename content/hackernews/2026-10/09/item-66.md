@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "I think we might lose public key cryptography"
-description: "The submitted item has no article text, so this is only a synopsis of the supplied comments about the claim that public key cryptography may be lost. One commenter (50012724) clarified that the widely discussed OpenAI math results replace t"
+description: "The submitted item has no article text, so this is only a synopsis of the supplied comments about the claim that public key cryptography may be lost. One commenter (50012724) clarified that the widely discussed OpenAI math results replac..."
 date: "2026-10-08T20:48:37.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -25,3 +25,9 @@ Others defended the field. One &#40;50012729&#41; argued there is as much eviden
 Selected comments: [antics](https://news.ycombinator.com/item?id=50012724) · [DoctorOetker](https://news.ycombinator.com/item?id=50013247) · [abhv](https://news.ycombinator.com/item?id=50012729) · [swerve3815](https://news.ycombinator.com/item?id=50012828) · [LoganDark](https://news.ycombinator.com/item?id=50014249)
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50012043>)
+
+## Media
+
+![Original: I think we might lose public key cryptography](<https://twitter.com/matthew_d_green/status/2108278850555674975>)
+
+[Original: I think we might lose public key cryptography](<https://twitter.com/matthew_d_green/status/2108278850555674975>)

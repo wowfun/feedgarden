@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Accurate but Not Humble: Evaluating Epistemic Humility in LLM Agents under Knowledge Conflict"
-description: "When retrieved evidence contradicts an agent's prior beliefs, does it revise its answer, acknowledge uncertainty, or persist with an incorrect conclusion? Existing evaluations of agentic systems focus primarily on task success and offer lim"
+description: "When retrieved evidence contradicts an agent's prior beliefs, does it revise its answer, acknowledge uncertainty, or persist with an incorrect conclusion? Existing evaluations of agentic systems focus primarily on task success and offer ..."
 date: "2026-10-08T17:25:06.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

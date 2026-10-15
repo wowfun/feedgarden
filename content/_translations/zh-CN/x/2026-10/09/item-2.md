@@ -12,3 +12,9 @@ tags: ["source/x","topics/products","topics/models"]
 ---
 
 OpenAI 的 Thibault Sottiaux 发帖表示，公司今天正式宣布 ChatGPT，并附上一条链接。帖子本身没有提供关于功能、可用性、价格或能力的更多细节，这些内容应在所链接的材料中。
+
+## 媒体
+
+![原文: Thibault Sottiaux 宣布 ChatGPT](<https://x.com/thsottiaux/status/2108349826727588000>)
+
+[原文: Thibault Sottiaux 宣布 ChatGPT](<https://x.com/thsottiaux/status/2108349826727588000>)

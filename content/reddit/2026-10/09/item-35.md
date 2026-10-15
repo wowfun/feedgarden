@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Whatever happened to BABA is AI from 2024? [D]"
-description: "A discussion post revisits \"BABA is AI\", a 2024 paper presented at that year's ICML (held in Austria). The paper tested three state-of-the-art multimodal large language models — GPT-4o, Gemini-1.5-Pro and Gemini-1.5-Flash — and found, in th"
+description: "A discussion post revisits \"BABA is AI\", a 2024 paper presented at that year's ICML (held in Austria). The paper tested three state-of-the-art multimodal large language models — GPT-4o, Gemini-1.5-Pro and Gemini-1.5-Flash — and found, in..."
 date: "2026-10-08T20:00:11.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:47.429Z"

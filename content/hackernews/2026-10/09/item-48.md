@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "The value of not getting to the point (2015)"
-description: "In this 2015 essay, the author reflects on having misread the purpose of everyday conversation. He had read that the point of meeting someone over a beer, coffee, lunch or dinner is that the food and drink spare people from needing to have "
+description: "In this 2015 essay, the author reflects on having misread the purpose of everyday conversation. He had read that the point of meeting someone over a beer, coffee, lunch or dinner is that the food and drink spare people from needing to ha..."
 date: "2026-10-08T19:04:56.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"

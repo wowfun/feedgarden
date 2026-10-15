@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Show HN: Edi Life OS – self-hosted life dashboard with an MCP server for AI"
-description: "Edi Life OS is a self-hosted dashboard that bundles ten workspaces behind one design, one sign-in and one database, aiming to replace a scattered set of to-do, habit, budgeting, Pomodoro and notes apps that do not talk to each other. The st"
+description: "Edi Life OS is a self-hosted dashboard that bundles ten workspaces behind one design, one sign-in and one database, aiming to replace a scattered set of to-do, habit, budgeting, Pomodoro and notes apps that do not talk to each other. The..."
 date: "2026-10-09T00:02:19.000Z"
 updated: "2026-10-10T05:10:37.706Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -32,8 +32,16 @@ Selected comments: [ceejayoz](https://news.ycombinator.com/item?id=50014531) · 
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50014150>)
 
-## Images and video
+## Media
 
-- [Image: Growth workspace with six life dimensions and SMART progress](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/growth.webp>)
-- [Image: Habit checklist with a seven-day completion chart](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/habittify.webp>)
-- [Image: Kanban board with backlog, in progress, review and done columns](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/kanban.webp>)
+![Image: Growth workspace with six life dimensions and SMART progress](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/growth.webp>)
+
+[Image: Growth workspace with six life dimensions and SMART progress](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/growth.webp>)
+
+![Image: Habit checklist with a seven-day completion chart](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/habittify.webp>)
+
+[Image: Habit checklist with a seven-day completion chart](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/habittify.webp>)
+
+![Image: Kanban board with backlog, in progress, review and done columns](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/kanban.webp>)
+
+[Image: Kanban board with backlog, in progress, review and done columns](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/kanban.webp>)

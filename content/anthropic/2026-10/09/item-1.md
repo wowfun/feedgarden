@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Best practices for Claude Code"
-description: "This guide collects patterns that Anthropic says have proven effective across its internal teams and among engineers using Claude Code in various codebases, languages, and environments. It frames Claude Code as an agentic coding environment"
+description: "This guide collects patterns that Anthropic says have proven effective across its internal teams and among engineers using Claude Code in various codebases, languages, and environments. It frames Claude Code as an agentic coding environm..."
 date: "2026-10-09T14:18:33.825Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:33.825Z"

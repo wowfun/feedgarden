@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "ThinkingBox：智能体任务做对一次 vs. 20/20 全对：507 个有状态工作流按终端数据库状态评分 [R]"
-description: "ThinkingBox 是一个基准，用来衡量智能体单次成功率在重复执行后还能保留多少，以及“智能体完成了任务”是否真的意味着后端数据库达到了正确状态。论文、代码、数据集以及 Hugging Face OpenEnv 环境均已公开，但原始评测轨迹未发布。 ThinkingBox-Bench 包含 507 个带策略条件的业务工作流，覆盖五个领域：零售、旅行与酒店、汽车保险、数字银行内部 IT，以及咨询 IT/HR。每个任务从相同的干净后端出发独立执行 20 次，因此每个模型共有 "
+description: "ThinkingBox 是一个基准，用来衡量智能体单次成功率在重复执行后还能保留多少，以及“智能体完成了任务”是否真的意味着后端数据库达到了正确状态。论文、代码、数据集以及 Hugging Face OpenEnv 环境均已公开，但原始评测轨迹未发布。 ThinkingBox-Bench 包含 507 个带策略条件的业务工作流，覆盖五个领域：零售、旅行与酒店、汽车保险、数字银行内部 IT，以及咨询 IT/HR。每个任务从相同的干净后端出发独立执行 20 次，因此每个模型..."
 date: "2026-10-09T00:50:36.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:47.429Z"
@@ -21,6 +21,8 @@ ThinkingBox-Bench 包含 507 个带策略条件的业务工作流，覆盖五个
 
 作者提醒：任务是企业工作流模式的合成重建，而非生产流量；试验预算下的 20/20 并不保证未来可靠性；模拟用户是固定的 LLM，这是方差的来源之一，附录中有讨论。失败类别是确定性的诊断标签，而非因果解释。任何人都可以通过 HF OpenEnv 环境用自己模型运行这 507 个任务。附录同时报告观测到的 all-20 计数和插件式 pass^k 估计，两者回答不同问题：前者记录固定 20 次试验中实际发生的情况，后者在额外假设下估计重复成功率。作者提问：可靠性排行榜上应强调哪一个，或两者都展示？
 
-## 图片与视频
+## 媒体
 
-- [图片: ThinkingBox: Solving an agent task once vs. solving it 20/20: 507 stateful workflows graded on terminal database state &#91;R&#93;](<https://external-preview.redd.it/q3evP6JeDpAC2MdSQHWYxnCYTqbJkElIQsLFqVSdkss.png?width=140&height=81&auto=webp&s=d39c4c208d55b26179446aa55ac5f84224359090>)
+![图片: ThinkingBox: Solving an agent task once vs. solving it 20/20: 507 stateful workflows graded on terminal database state &#91;R&#93;](<https://external-preview.redd.it/q3evP6JeDpAC2MdSQHWYxnCYTqbJkElIQsLFqVSdkss.png?width=140&height=81&auto=webp&s=d39c4c208d55b26179446aa55ac5f84224359090>)
+
+[图片: ThinkingBox: Solving an agent task once vs. solving it 20/20: 507 stateful workflows graded on terminal database state &#91;R&#93;](<https://external-preview.redd.it/q3evP6JeDpAC2MdSQHWYxnCYTqbJkElIQsLFqVSdkss.png?width=140&height=81&auto=webp&s=d39c4c208d55b26179446aa55ac5f84224359090>)

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Receipt for sale of Jane, age 18, and her son, Henry, age 1"
-description: "The discussion centered on a transcription of the 1849 document and on how to read such records. One commenter supplied a full transcription: a receipt for six hundred dollars paid by Judge S. Williams for \"Jane, a negro woman 18 years old "
+description: "The discussion centered on a transcription of the 1849 document and on how to read such records. One commenter supplied a full transcription: a receipt for six hundred dollars paid by Judge S. Williams for \"Jane, a negro woman 18 years o..."
 date: "2026-10-09T01:56:52.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"

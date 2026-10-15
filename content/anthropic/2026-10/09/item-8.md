@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Anthropic research team page: Societal Impacts"
-description: "Anthropic's Societal Impacts group is a technical research team that studies how AI is used in the real world, working closely with the company's Policy and Safeguards teams. It sits alongside other research teams listed on the page: Alignm"
+description: "Anthropic's Societal Impacts group is a technical research team that studies how AI is used in the real world, working closely with the company's Policy and Safeguards teams. It sits alongside other research teams listed on the page: Ali..."
 date: "2026-10-09T14:18:15.842Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:15.842Z"

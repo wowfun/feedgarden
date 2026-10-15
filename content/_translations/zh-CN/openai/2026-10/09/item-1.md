@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Oracle 如何借助 ChatGPT 与 Codex 把数天工作量压缩到几分钟"
-description: "OpenAI 发布了一份关于 Oracle 使用 ChatGPT Work 与 Codex 的案例研究，应用范围覆盖招聘、内部业务分析和工程开发。据 OpenAI 报告，Oracle 拥有 130,000 名 ChatGPT 活跃用户，Codex 活跃用户超过 95,000 名。 在招聘方面，基于这些产品构建的工具会读取职位描述，并据此比较岗位、对标薪酬并按地区评估人才库。Oracle 表示，原本需要两到四天的准备工作现在大约只需 15 至 20 分钟，文章将其表述为研究时间"
+description: "OpenAI 发布了一份关于 Oracle 使用 ChatGPT Work 与 Codex 的案例研究，应用范围覆盖招聘、内部业务分析和工程开发。据 OpenAI 报告，Oracle 拥有 130,000 名 ChatGPT 活跃用户，Codex 活跃用户超过 95,000 名。 在招聘方面，基于这些产品构建的工具会读取职位描述，并据此比较岗位、对标薪酬并按地区评估人才库。Oracle 表示，原本需要两到四天的准备工作现在大约只需 15 至 20 分钟，文章将其表述为研..."
 date: "2026-10-08T16:00:00.000Z"
 updated: "2026-10-09T13:12:05.734Z"
 first_seen: "2026-10-09T04:20:40.013Z"

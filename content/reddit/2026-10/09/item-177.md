@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "What are the most common vibecoding patterns?"
-description: "A Reddit user asks which patterns and architectural defaults keep showing up in vibe-coded apps, meaning applications built largely by prompting an AI assistant. They say \"local-first\" appears in almost every post they see about such apps, "
+description: "A Reddit user asks which patterns and architectural defaults keep showing up in vibe-coded apps, meaning applications built largely by prompting an AI assistant. They say \"local-first\" appears in almost every post they see about such app..."
 date: "2026-10-09T06:29:11.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:19:48.561Z"

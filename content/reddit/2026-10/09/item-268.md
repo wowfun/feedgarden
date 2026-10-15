@@ -13,7 +13,12 @@ tags: ["source/reddit","topics/products"]
 
 
 
-## Images and video
+## Media
 
-- [Image: Introduction Claude Dashboards and Claude Motion](<https://external-preview.redd.it/XCQNyp6xVonlqd0iS4o72KO1w45abmYtStlJck9zc_w.jpeg?width=320&crop=smart&auto=webp&s=76e154066cfb9ca3c4270d59e6f3fb625a6a324b>)
-- [Video: &#91;link&#93;](<https://youtu.be/en0GuyhieQk>)
+![Image: Introduction Claude Dashboards and Claude Motion](<https://external-preview.redd.it/XCQNyp6xVonlqd0iS4o72KO1w45abmYtStlJck9zc_w.jpeg?width=320&crop=smart&auto=webp&s=76e154066cfb9ca3c4270d59e6f3fb625a6a324b>)
+
+[Image: Introduction Claude Dashboards and Claude Motion](<https://external-preview.redd.it/XCQNyp6xVonlqd0iS4o72KO1w45abmYtStlJck9zc_w.jpeg?width=320&crop=smart&auto=webp&s=76e154066cfb9ca3c4270d59e6f3fb625a6a324b>)
+
+![Video: &#91;link&#93;](<https://youtu.be/en0GuyhieQk>)
+
+[Video: &#91;link&#93;](<https://youtu.be/en0GuyhieQk>)

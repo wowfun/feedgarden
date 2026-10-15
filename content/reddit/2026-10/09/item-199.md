@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "DLoop: Looped Speculative Decoding"
-description: "A new paper, DLoop, targets wasted computation in speculative decoding for large language models. Speculative decoding accelerates autoregressive generation by having a lightweight draft model propose tokens in a drafting stage, which the t"
+description: "A new paper, DLoop, targets wasted computation in speculative decoding for large language models. Speculative decoding accelerates autoregressive generation by having a lightweight draft model propose tokens in a drafting stage, which th..."
 date: "2026-10-09T07:18:42.000Z"
 updated: "2026-10-09T15:11:45.369Z"
 first_seen: "2026-10-09T14:18:44.332Z"
@@ -21,6 +21,8 @@ DLoop addresses this as a looped form of speculative decoding that performs mult
 
 Across speculative decoding methods including EAGLE-3, DFlash, Domino, DSpark and multi-token prediction modules, DLoop is reported to improve wall-clock speedup by 5 to 41 percent while preserving lossless decoding. The code is under internal review and will be released soon.
 
-## Images and video
+## Media
 
-- [Image: &#91;Paper&#93; DLoop: Looped Speculative Decoding](<https://preview.redd.it/qt7fjeyd7euh1.png?width=140&height=72&auto=webp&s=28336cf2022f41d9d09c7311db0f5738931eda30>)
+![Image: &#91;Paper&#93; DLoop: Looped Speculative Decoding](<https://preview.redd.it/qt7fjeyd7euh1.png?width=140&height=72&auto=webp&s=28336cf2022f41d9d09c7311db0f5738931eda30>)
+
+[Image: &#91;Paper&#93; DLoop: Looped Speculative Decoding](<https://preview.redd.it/qt7fjeyd7euh1.png?width=140&height=72&auto=webp&s=28336cf2022f41d9d09c7311db0f5738931eda30>)

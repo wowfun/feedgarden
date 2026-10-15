@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Anthropic 研究团队页面：社会影响团队"
-description: "Anthropic 的“社会影响”（Societal Impacts）团队是一支技术研究团队，研究与政策与安全团队（Policy and Safeguards）紧密合作，考察 AI 在真实世界中的使用方式。页面还列出了其他研究团队：对齐（Alignment）、经济学（Economics）、可解释性（Interpretability）、社会影响、前沿红队（Frontier Red Team）以及社会技术对齐（Sociotechnical alignment）。 该团队提出的问题"
+description: "Anthropic 的“社会影响”（Societal Impacts）团队是一支技术研究团队，研究与政策与安全团队（Policy and Safeguards）紧密合作，考察 AI 在真实世界中的使用方式。页面还列出了其他研究团队：对齐（Alignment）、经济学（Economics）、可解释性（Interpretability）、社会影响、前沿红队（Frontier Red Team）以及社会技术对齐（Sociotechnical alignment）。 该团队提出..."
 date: "2026-10-09T14:18:15.842Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:15.842Z"

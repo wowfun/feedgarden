@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Stop complaining about enshittification. Use the alternatives"
-description: "A first-person essay argues that digital enshittification is real but less inescapable than people assume, and that a few deliberate habit changes produce a noticeably better experience. The author concedes that not all of it can be escaped"
+description: "A first-person essay argues that digital enshittification is real but less inescapable than people assume, and that a few deliberate habit changes produce a noticeably better experience. The author concedes that not all of it can be esca..."
 date: "2026-10-09T02:17:18.000Z"
 updated: "2026-10-10T06:19:28.614Z"
 first_seen: "2026-10-09T14:17:37.221Z"

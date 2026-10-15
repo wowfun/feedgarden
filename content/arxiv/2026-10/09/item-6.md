@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Unlocking the Regulatory Genome by ARGUS: An Evidence-Constrained Agentic Framework for Interpreting Single Nucleotide Variants"
-description: "More than 90% of disease-associated variants from genome-wide association studies fall in noncoding regulatory regions, yet interpreting their function remains a central open problem in genomic medicine. Large language models prompted to in"
+description: "More than 90% of disease-associated variants from genome-wide association studies fall in noncoding regulatory regions, yet interpreting their function remains a central open problem in genomic medicine. Large language models prompted to..."
 date: "2026-10-08T16:38:32.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

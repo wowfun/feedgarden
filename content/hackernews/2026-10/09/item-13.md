@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Scaling and benchmarking a critical message bus using a new indexing strategy"
-description: "This post is part of a series about 2026 summer intern projects at Jane Street. Aria, the firm's internal messaging framework and hosted system, processes multiple terabytes of data per day and lets clients subscribe to a live stream of mes"
+description: "This post is part of a series about 2026 summer intern projects at Jane Street. Aria, the firm's internal messaging framework and hosted system, processes multiple terabytes of data per day and lets clients subscribe to a live stream of ..."
 date: "2026-10-08T17:39:26.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -30,7 +30,12 @@ Selected comments: [rtpg](https://news.ycombinator.com/item?id=50016325) · [sol
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50009066>)
 
-## Images and video
+## Media
 
-- [Image](<https://blog.janestreet.com/scaling-and-benchmarking-a-critical-message-bus/image2.png>)
-- [Image](<https://blog.janestreet.com/scaling-and-benchmarking-a-critical-message-bus/image6.png>)
+![Image](<https://blog.janestreet.com/scaling-and-benchmarking-a-critical-message-bus/image2.png>)
+
+[Image](<https://blog.janestreet.com/scaling-and-benchmarking-a-critical-message-bus/image2.png>)
+
+![Image](<https://blog.janestreet.com/scaling-and-benchmarking-a-critical-message-bus/image6.png>)
+
+[Image](<https://blog.janestreet.com/scaling-and-benchmarking-a-critical-message-bus/image6.png>)

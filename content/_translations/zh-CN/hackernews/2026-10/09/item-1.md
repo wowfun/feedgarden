@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "全球范围内，四小时电池储能的安装成本已低于燃气轮机"
-description: "Wood Mackenzie 最新的全球平准化度电成本（LCOE）报告发现，在同时建模了两种技术的全部 43 个市场中，四小时电池储能如今都比开式循环燃气轮机更便宜。该公司首席分析师 Ahmed Jameel Abdullah 称这一经济转变“具有决定性且仍在扩大”，并将其归因于燃气轮机短缺与燃料价格波动推高了调峰成本，而电池制造规模扩大则持续压低储能成本。 报告覆盖欧洲、北美、拉丁美洲、亚太以及中东和非洲。其中提到的区域要点包括： - 中东和非洲：公用事业规模光伏已以 37"
+description: "Wood Mackenzie 最新的全球平准化度电成本（LCOE）报告发现，在同时建模了两种技术的全部 43 个市场中，四小时电池储能如今都比开式循环燃气轮机更便宜。该公司首席分析师 Ahmed Jameel Abdullah 称这一经济转变“具有决定性且仍在扩大”，并将其归因于燃气轮机短缺与燃料价格波动推高了调峰成本，而电池制造规模扩大则持续压低储能成本。 报告覆盖欧洲、北美、拉丁美洲、亚太以及中东和非洲。其中提到的区域要点包括： - 中东和非洲：公用事业规模光伏已以..."
 date: "2026-10-08T16:03:33.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -39,7 +39,12 @@ Wood Mackenzie 最新的全球平准化度电成本（LCOE）报告发现，在�
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50007519>)
 
-## 图片与视频
+## 媒体
 
-- [图片](<https://www.solarpowerworldonline.com/wp-content/uploads/2026/10/image003.png>)
-- [图片](<https://www.solarpowerworldonline.com/wp-content/uploads/2026/06/stock-Holy-Cross-Energy-High-Mesa-Solar-Storage-site-in-Parachute-Colorado-500x325.jpg>)
+![图片](<https://www.solarpowerworldonline.com/wp-content/uploads/2026/10/image003.png>)
+
+[图片](<https://www.solarpowerworldonline.com/wp-content/uploads/2026/10/image003.png>)
+
+![图片](<https://www.solarpowerworldonline.com/wp-content/uploads/2026/06/stock-Holy-Cross-Energy-High-Mesa-Solar-Storage-site-in-Parachute-Colorado-500x325.jpg>)
+
+[图片](<https://www.solarpowerworldonline.com/wp-content/uploads/2026/06/stock-Holy-Cross-Energy-High-Mesa-Solar-Storage-site-in-Parachute-Colorado-500x325.jpg>)

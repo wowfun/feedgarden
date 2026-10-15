@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Your coding agent finished. What would make you reject the result?"
-description: "The author proposes a set of review scenarios for judging agent-generated work, built around the idea that passing tests and an approval are not sufficient evidence of correctness. The motivating example is an agent that builds a CSV export"
+description: "The author proposes a set of review scenarios for judging agent-generated work, built around the idea that passing tests and an approval are not sufficient evidence of correctness. The motivating example is an agent that builds a CSV exp..."
 date: "2026-10-09T00:57:24.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:22:47.680Z"

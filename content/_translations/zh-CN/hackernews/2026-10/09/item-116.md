@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "OpenAI 以“对研究信息处理不当”为由解雇三名安全研究员"
-description: "OpenAI 的三名安全研究员 Jasmine Wang、Tomek Korbak 和 Mikita Balesni 上周被解雇，随后发表公开信，否认公司关于他们在既定流程之外不当处理敏感信息的说法。OpenAI 表示调查发现他们违反了“访问和处理公司敏感信息”的政策，将机密材料分享给了第三方 AI 安全组织；一位发言人还告诉 TechCrunch，除该分享行为外，调查还揭示了“一系列不当行为”。这封信写给 OpenAI 的安全与安保委员会、安全顾问组以及使命顾问委员会。 三"
+description: "OpenAI 的三名安全研究员 Jasmine Wang、Tomek Korbak 和 Mikita Balesni 上周被解雇，随后发表公开信，否认公司关于他们在既定流程之外不当处理敏感信息的说法。OpenAI 表示调查发现他们违反了“访问和处理公司敏感信息”的政策，将机密材料分享给了第三方 AI 安全组织；一位发言人还告诉 TechCrunch，除该分享行为外，调查还揭示了“一系列不当行为”。这封信写给 OpenAI 的安全与安保委员会、安全顾问组以及使命顾问委员会..."
 date: "2026-10-09T10:00:26.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"

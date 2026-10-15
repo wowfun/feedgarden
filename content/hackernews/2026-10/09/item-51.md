@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Vitalik Buterin backs crypto 'bunker mode' amid rapid AI math advances"
-description: "Ethereum co-founder Vitalik Buterin has endorsed a warning from Ethereum researcher Justin Drake that advances in artificial intelligence could undermine the cryptography securing today's blockchains sooner than quantum computers do. Drake "
+description: "Ethereum co-founder Vitalik Buterin has endorsed a warning from Ethereum researcher Justin Drake that advances in artificial intelligence could undermine the cryptography securing today's blockchains sooner than quantum computers do. Dra..."
 date: "2026-10-08T19:17:51.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"

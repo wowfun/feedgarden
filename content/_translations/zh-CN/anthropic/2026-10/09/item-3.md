@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "推出面向开源软件的可选漏洞发现服务"
-description: "Anthropic 的 Frontier Red Team 于 2026 年 10 月 8 日推出 OSS Scanner，这是一项面向开源项目、可选择加入的漏洞扫描服务。加入的项目可免费获得由 Anthropic 最强模型进行的定期安全扫描。团队表示，该服务借鉴了在 Project Glasswing 中使用 Claude 寻找漏洞的经验。 团队称语言模型的漏洞发现能力提升迅速：在学术性漏洞发现基准 CyberGym 上，LLM 的漏洞发现率从去年初的不足 20% 上升到今"
+description: "Anthropic 的 Frontier Red Team 于 2026 年 10 月 8 日推出 OSS Scanner，这是一项面向开源项目、可选择加入的漏洞扫描服务。加入的项目可免费获得由 Anthropic 最强模型进行的定期安全扫描。团队表示，该服务借鉴了在 Project Glasswing 中使用 Claude 寻找漏洞的经验。 团队称语言模型的漏洞发现能力提升迅速：在学术性漏洞发现基准 CyberGym 上，LLM 的漏洞发现率从去年初的不足 20% 上..."
 date: "2026-10-08T19:00:00.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:15.842Z"

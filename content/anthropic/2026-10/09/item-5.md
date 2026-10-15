@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Economics"
-description: "This page introduces Anthropic's Economics team, one of six listed research teams. The team studies how AI is reshaping the economy, including work, productivity and economic opportunity, and says it aims to build the empirical foundation f"
+description: "This page introduces Anthropic's Economics team, one of six listed research teams. The team studies how AI is reshaping the economy, including work, productivity and economic opportunity, and says it aims to build the empirical foundatio..."
 date: "2026-10-09T14:18:15.842Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:15.842Z"

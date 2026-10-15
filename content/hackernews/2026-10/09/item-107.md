@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "OTel-Native by Design: Building Products That Export to Any Observability Stack"
-description: "An OpenTelemetry blog post, written with contributions from Dan Gomez Blanco of New Relic, argues that self-hosted software and SaaS products should let users export logs, traces and metrics to any OTel-compatible backend rather than lockin"
+description: "An OpenTelemetry blog post, written with contributions from Dan Gomez Blanco of New Relic, argues that self-hosted software and SaaS products should let users export logs, traces and metrics to any OTel-compatible backend rather than loc..."
 date: "2026-10-09T06:54:45.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -32,8 +32,16 @@ Selected comments: [yearesadpeople](https://news.ycombinator.com/item?id=5001839
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50016974>)
 
-## Images and video
+## Media
 
-- [Image: Enabling telemetry export via the OTLP standard allows users to own and analyze their data on the platforms of their choosing.](<https://opentelemetry.io/blog/2026/otel-native-by-design/cover.png>)
-- [Image: The Collector-per-tenant architecture provides strong isolation guarantees at the cost of increased resource usage.](<https://opentelemetry.io/blog/2026/otel-native-by-design/collector-per-tenant.png>)
-- [Image: The shared Collector pattern is easier to monitor and maintain as all exports route through one Collector instance.](<https://opentelemetry.io/blog/2026/otel-native-by-design/shared-collector.png>)
+![Image: Enabling telemetry export via the OTLP standard allows users to own and analyze their data on the platforms of their choosing.](<https://opentelemetry.io/blog/2026/otel-native-by-design/cover.png>)
+
+[Image: Enabling telemetry export via the OTLP standard allows users to own and analyze their data on the platforms of their choosing.](<https://opentelemetry.io/blog/2026/otel-native-by-design/cover.png>)
+
+![Image: The Collector-per-tenant architecture provides strong isolation guarantees at the cost of increased resource usage.](<https://opentelemetry.io/blog/2026/otel-native-by-design/collector-per-tenant.png>)
+
+[Image: The Collector-per-tenant architecture provides strong isolation guarantees at the cost of increased resource usage.](<https://opentelemetry.io/blog/2026/otel-native-by-design/collector-per-tenant.png>)
+
+![Image: The shared Collector pattern is easier to monitor and maintain as all exports route through one Collector instance.](<https://opentelemetry.io/blog/2026/otel-native-by-design/shared-collector.png>)
+
+[Image: The shared Collector pattern is easier to monitor and maintain as all exports route through one Collector instance.](<https://opentelemetry.io/blog/2026/otel-native-by-design/shared-collector.png>)

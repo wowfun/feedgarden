@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "US Plans Livestreamed Firing-Squad Execution of Fort Hood Attacker"
-description: "US Defence Secretary Pete Hegseth said the public will be able to watch the execution of Nidal Hasan by firing squad, and a Defence Department official told the BBC the execution would be livestreamed. Hasan, a former US Army major and psyc"
+description: "US Defence Secretary Pete Hegseth said the public will be able to watch the execution of Nidal Hasan by firing squad, and a Defence Department official told the BBC the execution would be livestreamed. Hasan, a former US Army major and p..."
 date: "2026-10-08T23:01:32.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -34,6 +34,8 @@ Selected comments: [thomassmith65](https://news.ycombinator.com/item?id=50015621
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50013637>)
 
-## Images and video
+## Media
 
-- [Image: An undated handout image of Hasan that was released by authorities in 2012](<https://ichef.bbci.co.uk/news/480/cpsprodpb/9c36/live/42b73e80-c363-11f1-adf9-5f790696e20a.png.webp>)
+![Image: An undated handout image of Hasan that was released by authorities in 2012](<https://ichef.bbci.co.uk/news/480/cpsprodpb/9c36/live/42b73e80-c363-11f1-adf9-5f790696e20a.png.webp>)
+
+[Image: An undated handout image of Hasan that was released by authorities in 2012](<https://ichef.bbci.co.uk/news/480/cpsprodpb/9c36/live/42b73e80-c363-11f1-adf9-5f790696e20a.png.webp>)

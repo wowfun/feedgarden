@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Iran's drones hit America's Achilles heel"
-description: "Commenters largely pushed back on the framing of the submission rather than its substance. One top-level reply (iAMkenough) objects to the phrase \"drone terrorism,\" arguing it follows a decade of drone strikes with civilian casualties and a"
+description: "Commenters largely pushed back on the framing of the submission rather than its substance. One top-level reply (iAMkenough) objects to the phrase \"drone terrorism,\" arguing it follows a decade of drone strikes with civilian casualties an..."
 date: "2026-10-09T02:25:19.000Z"
 updated: "2026-10-10T05:10:37.706Z"
 first_seen: "2026-10-09T14:17:37.221Z"

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "我们该对学生说什么？一位数学教授谈 AI 与学术职业"
-description: "这是 Álvaro Lozano-Robledo 在陶哲轩（Terry Tao）博客上的客座文章，原文以另一种文件格式撰写，并经 AI 转换。其明确的 TL;DR 是：保持冷静，继续学数学。作者写作的对象是那些仅在几个月前还梦想从事数学学术职业、如今却觉得这一目标遥远、对部分人甚至已不可能实现的本科生和研究生。 文章的缘起是一封学生的来信（经许可全文引用）。这位学生说自己已经迷茫了数月，并提出两个问题：数学学术界是否会大到、开放到足以容纳任何凭着纯粹热情、即使不是最聪明的人也"
+description: "这是 Álvaro Lozano-Robledo 在陶哲轩（Terry Tao）博客上的客座文章，原文以另一种文件格式撰写，并经 AI 转换。其明确的 TL;DR 是：保持冷静，继续学数学。作者写作的对象是那些仅在几个月前还梦想从事数学学术职业、如今却觉得这一目标遥远、对部分人甚至已不可能实现的本科生和研究生。 文章的缘起是一封学生的来信（经许可全文引用）。这位学生说自己已经迷茫了数月，并提出两个问题：数学学术界是否会大到、开放到足以容纳任何凭着纯粹热情、即使不是最聪明..."
 date: "2026-10-09T02:27:45.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -36,8 +36,16 @@ Lozano-Robledo 表示，大语言模型的进展正在扰动数学研究与教�
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50015236>)
 
-## 图片与视频
+## 媒体
 
-- [图片](<https://terrytao.wordpress.com/wp-content/uploads/2026/10/lozano-polytope-of-ideas.jpg>)
-- [图片](<https://terrytao.wordpress.com/wp-content/uploads/2026/10/lozano-convex-hull-of-ideas.jpg>)
-- [视频: the full interview](<https://youtu.be/bqh4ihdanbI?si=idresVO-xZEqjfja>)
+![图片](<https://terrytao.wordpress.com/wp-content/uploads/2026/10/lozano-polytope-of-ideas.jpg>)
+
+[图片](<https://terrytao.wordpress.com/wp-content/uploads/2026/10/lozano-polytope-of-ideas.jpg>)
+
+![图片](<https://terrytao.wordpress.com/wp-content/uploads/2026/10/lozano-convex-hull-of-ideas.jpg>)
+
+[图片](<https://terrytao.wordpress.com/wp-content/uploads/2026/10/lozano-convex-hull-of-ideas.jpg>)
+
+![视频: the full interview](<https://youtu.be/bqh4ihdanbI?si=idresVO-xZEqjfja>)
+
+[视频: the full interview](<https://youtu.be/bqh4ihdanbI?si=idresVO-xZEqjfja>)

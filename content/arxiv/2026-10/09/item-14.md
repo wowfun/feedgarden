@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "SparseDecoding: Decoding-Aware Pruning for Accurate and Efficient LLM Inference"
-description: "The decoding stage of LLM inference is memory-bound and therefore slow. Layer-wise, training-free pruning guided by the Hessian has been a prominent fix, because pruning reduces the nonzero parameters read from memory during decoding. But s"
+description: "The decoding stage of LLM inference is memory-bound and therefore slow. Layer-wise, training-free pruning guided by the Hessian has been a prominent fix, because pruning reduces the nonzero parameters read from memory during decoding. Bu..."
 date: "2026-10-08T17:06:32.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:52.195Z"

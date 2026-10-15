@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Benchmarking four open decision models on one RTX 4090"
-description: "A user benchmarked four recently released open \"decision\" models on the same rented RTX 4090 (driver 580.119.02, 32 vCPU), using llama.cpp build b11495 (commit 37ac63456, CUDA 12.8) with -ngl 99 and otherwise default settings. The task: rea"
+description: "A user benchmarked four recently released open \"decision\" models on the same rented RTX 4090 (driver 580.119.02, 32 vCPU), using llama.cpp build b11495 (commit 37ac63456, CUDA 12.8) with -ngl 99 and otherwise default settings. The task: ..."
 date: "2026-10-08T17:04:32.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:44.332Z"
@@ -22,6 +22,8 @@ Reported results &#40;per-word p50 latency, words processed in 32 seconds, accur
 
 The author cautions that accuracy is inflated because answering "no" also counts as correct and centipede-naming words are rare, so task-specific catch rate matters more. Lev caught the most names but was about 13x slower than Laya, partly because it runs in its own PyTorch server rather than llama.cpp; the author also measured 68 ms for it on a different 4090, suggesting CPU sensitivity. Model size is noted as a major but not sole factor. The author's pick is Laya, citing speed and ease of fine-tuning, though the conclusion rests on a single task and one hardware configuration.
 
-## Images and video
+## Media
 
-- [Image: Running decision model locally on an RTX 4090 to find out which one is the fastest](<https://external-preview.redd.it/M2F5N2Q4NHl5OXVoMfURPj1VUjR_LLxIDVHzPfgGD8G3mPOdqioS8x-hwSV8.png?width=640&crop=smart&auto=webp&s=71d097399779e063f49dc47fa3afab062b3fa375>)
+![Image: Running decision model locally on an RTX 4090 to find out which one is the fastest](<https://external-preview.redd.it/M2F5N2Q4NHl5OXVoMfURPj1VUjR_LLxIDVHzPfgGD8G3mPOdqioS8x-hwSV8.png?width=640&crop=smart&auto=webp&s=71d097399779e063f49dc47fa3afab062b3fa375>)
+
+[Image: Running decision model locally on an RTX 4090 to find out which one is the fastest](<https://external-preview.redd.it/M2F5N2Q4NHl5OXVoMfURPj1VUjR_LLxIDVHzPfgGD8G3mPOdqioS8x-hwSV8.png?width=640&crop=smart&auto=webp&s=71d097399779e063f49dc47fa3afab062b3fa375>)

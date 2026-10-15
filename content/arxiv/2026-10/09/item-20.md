@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Which Skill to Distill? SGUID: Selecting a Compact Skill Bank for Model-Skill Co-Evolution"
-description: "Skills are reusable procedural guidance added at inference time that can substantially improve LLM downstream performance. Prior work retrieves skills from a bank by semantic relevance, then uses them as inference-time patches or for model "
+description: "Skills are reusable procedural guidance added at inference time that can substantially improve LLM downstream performance. Prior work retrieves skills from a bank by semantic relevance, then uses them as inference-time patches or for mod..."
 date: "2026-10-08T17:27:53.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:52.195Z"

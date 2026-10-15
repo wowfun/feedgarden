@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "2026 Usage Policy update"
-description: "Anthropic published a new version of its Usage Policy, saying most changes clarify existing rules rather than impose new ones. The update responds to the past year's evolution of Claude's capabilities and to customer feedback, and takes eff"
+description: "Anthropic published a new version of its Usage Policy, saying most changes clarify existing rules rather than impose new ones. The update responds to the past year's evolution of Claude's capabilities and to customer feedback, and takes ..."
 date: "2026-10-08T17:00:00.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:05.539Z"

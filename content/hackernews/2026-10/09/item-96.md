@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "What Should We Tell Our Students? A Math Professor on AI and Academic Careers"
-description: "This is a guest post by Álvaro Lozano-Robledo on Terry Tao's blog, originally written in a different file format and converted with AI. Its stated TL;DR is to keep calm and carry on studying math. The author writes to undergraduate and grad"
+description: "This is a guest post by Álvaro Lozano-Robledo on Terry Tao's blog, originally written in a different file format and converted with AI. Its stated TL;DR is to keep calm and carry on studying math. The author writes to undergraduate and g..."
 date: "2026-10-09T02:27:45.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -36,8 +36,16 @@ Selected comments: [unknownian](https://news.ycombinator.com/item?id=50017306) �
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50015236>)
 
-## Images and video
+## Media
 
-- [Image](<https://terrytao.wordpress.com/wp-content/uploads/2026/10/lozano-polytope-of-ideas.jpg>)
-- [Image](<https://terrytao.wordpress.com/wp-content/uploads/2026/10/lozano-convex-hull-of-ideas.jpg>)
-- [Video: the full interview](<https://youtu.be/bqh4ihdanbI?si=idresVO-xZEqjfja>)
+![Image](<https://terrytao.wordpress.com/wp-content/uploads/2026/10/lozano-polytope-of-ideas.jpg>)
+
+[Image](<https://terrytao.wordpress.com/wp-content/uploads/2026/10/lozano-polytope-of-ideas.jpg>)
+
+![Image](<https://terrytao.wordpress.com/wp-content/uploads/2026/10/lozano-convex-hull-of-ideas.jpg>)
+
+[Image](<https://terrytao.wordpress.com/wp-content/uploads/2026/10/lozano-convex-hull-of-ideas.jpg>)
+
+![Video: the full interview](<https://youtu.be/bqh4ihdanbI?si=idresVO-xZEqjfja>)
+
+[Video: the full interview](<https://youtu.be/bqh4ihdanbI?si=idresVO-xZEqjfja>)

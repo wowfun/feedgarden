@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Oxide Computer raises a $445M Series D after reaching taxable profitability"
-description: "Oxide Computer announced a $445M Series D round. The company frames the raise around a milestone reached in the spring: it paid income tax, not because of an unusual transaction but because ordinary operations — selling computers — produced"
+description: "Oxide Computer announced a $445M Series D round. The company frames the raise around a milestone reached in the spring: it paid income tax, not because of an unusual transaction but because ordinary operations — selling computers — produ..."
 date: "2026-10-09T13:12:47.000Z"
 updated: "2026-10-10T05:10:37.706Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -36,6 +36,8 @@ Selected comments: [SoftTalker](https://news.ycombinator.com/item?id=50021174) �
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50020014>)
 
-## Images and video
+## Media
 
-- [Image: Six crated Oxide racks lined up on a warehouse floor](<https://oxide.computer/_vercel/image?url=%2Fimg%2Fblog%2Fseries-d%2Fbenchmark-crated-racks.jpeg&w=1440&q=90>)
+![Image: Six crated Oxide racks lined up on a warehouse floor](<https://oxide.computer/_vercel/image?url=%2Fimg%2Fblog%2Fseries-d%2Fbenchmark-crated-racks.jpeg&w=1440&q=90>)
+
+[Image: Six crated Oxide racks lined up on a warehouse floor](<https://oxide.computer/_vercel/image?url=%2Fimg%2Fblog%2Fseries-d%2Fbenchmark-crated-racks.jpeg&w=1440&q=90>)

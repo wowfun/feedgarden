@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Deno Is Joining Cloudflare"
-description: "The entire Deno team is joining Cloudflare, according to a post attributed to Ry Dahl. The stated rationale is a progression the author traces from the Deno runtime to Deno Deploy to celld, a system built on Cloudflare's Workers programming"
+description: "The entire Deno team is joining Cloudflare, according to a post attributed to Ry Dahl. The stated rationale is a progression the author traces from the Deno runtime to Deno Deploy to celld, a system built on Cloudflare's Workers programm..."
 date: "2026-10-09T13:03:48.000Z"
 updated: "2026-10-10T05:10:37.706Z"
 first_seen: "2026-10-09T14:17:37.221Z"

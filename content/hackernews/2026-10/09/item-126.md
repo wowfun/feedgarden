@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Study: Exercise increases cancer survival rates"
-description: "Commenters largely attack the headline rather than the study. One points out the paper is actually \"Structured Exercise after Adjuvant Chemotherapy for Colon Cancer,\" so the news framing overstates a narrow colon-cancer trial as a general c"
+description: "Commenters largely attack the headline rather than the study. One points out the paper is actually \"Structured Exercise after Adjuvant Chemotherapy for Colon Cancer,\" so the news framing overstates a narrow colon-cancer trial as a genera..."
 date: "2026-10-09T12:49:41.000Z"
 updated: "2026-10-10T06:19:28.614Z"
 first_seen: "2026-10-09T14:17:37.221Z"

@@ -13,7 +13,12 @@ tags: ["source/reddit","topics/products"]
 
 
 
-## 图片与视频
+## 媒体
 
-- [图片: Introduction Claude Dashboards and Claude Motion](<https://external-preview.redd.it/XCQNyp6xVonlqd0iS4o72KO1w45abmYtStlJck9zc_w.jpeg?width=320&crop=smart&auto=webp&s=76e154066cfb9ca3c4270d59e6f3fb625a6a324b>)
-- [视频: &#91;link&#93;](<https://youtu.be/en0GuyhieQk>)
+![图片: Introduction Claude Dashboards and Claude Motion](<https://external-preview.redd.it/XCQNyp6xVonlqd0iS4o72KO1w45abmYtStlJck9zc_w.jpeg?width=320&crop=smart&auto=webp&s=76e154066cfb9ca3c4270d59e6f3fb625a6a324b>)
+
+[图片: Introduction Claude Dashboards and Claude Motion](<https://external-preview.redd.it/XCQNyp6xVonlqd0iS4o72KO1w45abmYtStlJck9zc_w.jpeg?width=320&crop=smart&auto=webp&s=76e154066cfb9ca3c4270d59e6f3fb625a6a324b>)
+
+![视频: &#91;link&#93;](<https://youtu.be/en0GuyhieQk>)
+
+[视频: &#91;link&#93;](<https://youtu.be/en0GuyhieQk>)

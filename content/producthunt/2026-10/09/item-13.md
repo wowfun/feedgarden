@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "BrightBean Studio"
-description: "BrightBean Studio is presented as an open-source alternative to Buffer for social media teams. The listing positions it as a tool aimed at teams managing social media publishing, competing with Buffer on an open-source basis; no feature lis"
+description: "BrightBean Studio is presented as an open-source alternative to Buffer for social media teams. The listing positions it as a tool aimed at teams managing social media publishing, competing with Buffer on an open-source basis; no feature ..."
 date: "2026-10-09T07:00:00.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:24:55.221Z"

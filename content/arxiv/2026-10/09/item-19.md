@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Cited but Not Consulted: A Counterfactual Audit of Legal Chain-of-Thought Faithfulness"
-description: "Large language models increasingly justify legal decisions by naming the statute or precedent behind a verdict, and this citation is treated as evidence that the decision follows from it. The authors test that directly: holding case facts f"
+description: "Large language models increasingly justify legal decisions by naming the statute or precedent behind a verdict, and this citation is treated as evidence that the decision follows from it. The authors test that directly: holding case fact..."
 date: "2026-10-08T17:26:17.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

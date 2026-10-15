@@ -30,7 +30,12 @@ Selected comments: [IG&#95;Semmelweiss](https://news.ycombinator.com/item?id=500
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50009295>)
 
-## Images and video
+## Media
 
-- [Image: Office desk with a MacBook, iPhone, Theranos instrument, and a clear cup of green juice in front of the laptop](<https://www.theranos.world/assets/scene.optimized.webp>)
-- [Image: Come see the documentary with us on Oct 22nd in SF -Bo](<https://www.theranos.world/assets/paper-note-documentary-v2.optimized.webp>)
+![Image: Office desk with a MacBook, iPhone, Theranos instrument, and a clear cup of green juice in front of the laptop](<https://www.theranos.world/assets/scene.optimized.webp>)
+
+[Image: Office desk with a MacBook, iPhone, Theranos instrument, and a clear cup of green juice in front of the laptop](<https://www.theranos.world/assets/scene.optimized.webp>)
+
+![Image: Come see the documentary with us on Oct 22nd in SF -Bo](<https://www.theranos.world/assets/paper-note-documentary-v2.optimized.webp>)
+
+[Image: Come see the documentary with us on Oct 22nd in SF -Bo](<https://www.theranos.world/assets/paper-note-documentary-v2.optimized.webp>)

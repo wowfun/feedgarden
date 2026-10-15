@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "OpenAI fires three safety researchers for \"mishandling research information\""
-description: "Three OpenAI safety researchers — Jasmine Wang, Tomek Korbak and Mikita Balesni — were fired last week and have published an open letter denying the company's claim that they mishandled sensitive information outside established procedures. "
+description: "Three OpenAI safety researchers — Jasmine Wang, Tomek Korbak and Mikita Balesni — were fired last week and have published an open letter denying the company's claim that they mishandled sensitive information outside established procedure..."
 date: "2026-10-09T10:00:26.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"

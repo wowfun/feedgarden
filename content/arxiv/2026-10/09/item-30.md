@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "BrickBench: Evaluating Agentic Brick Design"
-description: "BrickBench is a benchmark for agentic, text-conditioned LEGO-set design. Given a prompt, an agent must produce an assembly that satisfies semantic and design criteria and can also be physically built, which requires selecting parts from a d"
+description: "BrickBench is a benchmark for agentic, text-conditioned LEGO-set design. Given a prompt, an agent must produce an assembly that satisfies semantic and design criteria and can also be physically built, which requires selecting parts from ..."
 date: "2026-10-08T17:58:56.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

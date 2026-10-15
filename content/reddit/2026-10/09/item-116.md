@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Building an AI workflow with GitHub checkpoints and human approval. Looking for feedback!"
-description: "A university student from Brazil, currently learning about AI agents and automation, describes an experimental workflow that uses ChatGPT, GitHub, and Google Sheets to manage AI-generated work across different conversations. The division of"
+description: "A university student from Brazil, currently learning about AI agents and automation, describes an experimental workflow that uses ChatGPT, GitHub, and Google Sheets to manage AI-generated work across different conversations. The division..."
 date: "2026-10-09T01:50:39.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:22:47.680Z"

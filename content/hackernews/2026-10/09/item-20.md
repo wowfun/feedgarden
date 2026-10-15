@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Show HN: Pocketty – iPhone SSH terminal that pings you when an agent is blocked"
-description: "Pocketty is an iPhone and iPad SSH terminal built around herdr, a tool for managing coding-agent sessions. The premise is that you should not have to sit at your desk to know when an agent needs you: the app shows every agent and pane on a "
+description: "Pocketty is an iPhone and iPad SSH terminal built around herdr, a tool for managing coding-agent sessions. The premise is that you should not have to sit at your desk to know when an agent needs you: the app shows every agent and pane on..."
 date: "2026-10-08T18:11:52.000Z"
 updated: "2026-10-10T06:16:53.378Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -32,8 +32,16 @@ Selected comments: [antoniomika](https://news.ycombinator.com/item?id=50014638) 
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50009634>)
 
-## Images and video
+## Media
 
-- [Image: The Changes tab with Last turn selected: one Rust file, 3 lines added and 2 removed.](<https://pocketty.app/_astro/changes.BuYlktL2_ZjWyKk.webp>)
-- [Image: The diff of that file: a named constant replaces two copies of 60.](<https://pocketty.app/_astro/diff.BiXQR0GY_Z1gU4PG.webp>)
-- [Image: The pocketty website, served on localhost, open in the preview.](<https://pocketty.app/_astro/preview.DTyLt12-_Z1W2Azm.webp>)
+![Image: The Changes tab with Last turn selected: one Rust file, 3 lines added and 2 removed.](<https://pocketty.app/_astro/changes.BuYlktL2_ZjWyKk.webp>)
+
+[Image: The Changes tab with Last turn selected: one Rust file, 3 lines added and 2 removed.](<https://pocketty.app/_astro/changes.BuYlktL2_ZjWyKk.webp>)
+
+![Image: The diff of that file: a named constant replaces two copies of 60.](<https://pocketty.app/_astro/diff.BiXQR0GY_Z1gU4PG.webp>)
+
+[Image: The diff of that file: a named constant replaces two copies of 60.](<https://pocketty.app/_astro/diff.BiXQR0GY_Z1gU4PG.webp>)
+
+![Image: The pocketty website, served on localhost, open in the preview.](<https://pocketty.app/_astro/preview.DTyLt12-_Z1W2Azm.webp>)
+
+[Image: The pocketty website, served on localhost, open in the preview.](<https://pocketty.app/_astro/preview.DTyLt12-_Z1W2Azm.webp>)

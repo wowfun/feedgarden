@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Windows 与 Mac 键盘差异参考"
-description: "作者把多年来积累的 macOS 与 Windows 键盘处理差异整理成一份参考，特别针对需要用同一套代码同时服务两个平台的 Web 应用。 首先是命名差异。Windows 的 Backspace 在 Mac 上叫 Delete，Windows 的 Delete 在 Mac 上叫 Forward Delete，因此只说“Delete”而不指明平台会产生歧义。Windows 的 Enter 对应 Mac 的 Return；Mac 只在数字小键盘上还有一个独立的 Enter，可用 "
+description: "作者把多年来积累的 macOS 与 Windows 键盘处理差异整理成一份参考，特别针对需要用同一套代码同时服务两个平台的 Web 应用。 首先是命名差异。Windows 的 Backspace 在 Mac 上叫 Delete，Windows 的 Delete 在 Mac 上叫 Forward Delete，因此只说“Delete”而不指明平台会产生歧义。Windows 的 Enter 对应 Mac 的 Return；Mac 只在数字小键盘上还有一个独立的 Enter，..."
 date: "2026-10-09T03:08:05.000Z"
 updated: "2026-10-10T06:19:28.614Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -36,8 +36,16 @@ tags: ["source/hackernews","topics/hardware","topics/communication","topics/cult
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50015515>)
 
-## 图片与视频
+## 媒体
 
-- [图片](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/3.1088w.avif>)
-- [图片](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/4.1088w.avif>)
-- [图片](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/7.1088w.avif>)
+![图片](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/3.1088w.avif>)
+
+[图片](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/3.1088w.avif>)
+
+![图片](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/4.1088w.avif>)
+
+[图片](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/4.1088w.avif>)
+
+![图片](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/7.1088w.avif>)
+
+[图片](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/7.1088w.avif>)

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Prompting Claude for \"infinite API tokens and GPU\" led to crashed machines and burned usage"
-description: "The author warns against telling Claude to pretend it has infinite API tokens and infinite GPU capacity for overnight work. Setting that up on a Max x20 plan, they expected the plan and a fairly high-end PC to be more than sufficient. The r"
+description: "The author warns against telling Claude to pretend it has infinite API tokens and infinite GPU capacity for overnight work. Setting that up on a Max x20 plan, they expected the plan and a fairly high-end PC to be more than sufficient. Th..."
 date: "2026-10-09T07:16:28.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:21:48.097Z"

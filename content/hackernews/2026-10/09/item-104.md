@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "MXC: A cross-platform sandboxed code execution system for untrusted code"
-description: "MXC is an SDK-based sandboxed code execution system for running untrusted code — model output, plugins and tools — on Windows, Linux and macOS. It wraps multiple containment backends behind a unified containment model and typed SDKs, so an "
+description: "MXC is an SDK-based sandboxed code execution system for running untrusted code — model output, plugins and tools — on Windows, Linux and macOS. It wraps multiple containment backends behind a unified containment model and typed SDKs, so ..."
 date: "2026-10-09T05:51:29.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "OpenAI annualised revenues $20B less than previously signalled"
-description: "OpenAI told investors that it reached roughly $50 billion in annualized revenue at the end of September, CNBC confirmed, lower than the $68 billion figure widely reported late last month. The Financial Times first reported the $50 billion n"
+description: "OpenAI told investors that it reached roughly $50 billion in annualized revenue at the end of September, CNBC confirmed, lower than the $68 billion figure widely reported late last month. The Financial Times first reported the $50 billio..."
 date: "2026-10-08T16:45:58.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"

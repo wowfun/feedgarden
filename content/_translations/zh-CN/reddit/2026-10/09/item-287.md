@@ -13,6 +13,8 @@ tags: ["source/reddit","topics/industry"]
 
 
 
-## 图片与视频
+## 媒体
 
-- [图片: The OpenAI employees: "We were fired for prioritizing safety over the near-term interests of OpenAI as a corporation."](<https://preview.redd.it/lnuev620rfuh1.png?width=640&crop=smart&auto=webp&s=cc5c51e29df4445794f431b9813dc581f5315177>)
+![图片: The OpenAI employees: "We were fired for prioritizing safety over the near-term interests of OpenAI as a corporation."](<https://preview.redd.it/lnuev620rfuh1.png?width=640&crop=smart&auto=webp&s=cc5c51e29df4445794f431b9813dc581f5315177>)
+
+[图片: The OpenAI employees: "We were fired for prioritizing safety over the near-term interests of OpenAI as a corporation."](<https://preview.redd.it/lnuev620rfuh1.png?width=640&crop=smart&auto=webp&s=cc5c51e29df4445794f431b9813dc581f5315177>)

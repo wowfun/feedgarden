@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "From What to Which: Decoding Modifier Grounding in Frozen MLLMs"
-description: "As multimodal large language models (MLLMs) describe ever more complex visual scenes, token-level grounding becomes important. When a model generates \"the yellow banana on the left\", established grounding approaches focus on what is in the "
+description: "As multimodal large language models (MLLMs) describe ever more complex visual scenes, token-level grounding becomes important. When a model generates \"the yellow banana on the left\", established grounding approaches focus on what is in t..."
 date: "2026-10-08T16:53:59.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:59.851Z"

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "AI-ready biological data: $1.8B global commitment"
-description: "Biohub, the U.S. Department of Energy, the National Institutes of Health and new funding partners announced an expansion of an international effort to generate and openly share data for predictive AI models of biology, totaling $1.8 billion"
+description: "Biohub, the U.S. Department of Energy, the National Institutes of Health and new funding partners announced an expansion of an international effort to generate and openly share data for predictive AI models of biology, totaling $1.8 bill..."
 date: "2026-10-08T20:46:25.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"

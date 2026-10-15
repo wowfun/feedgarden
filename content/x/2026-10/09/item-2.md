@@ -12,3 +12,9 @@ tags: ["source/x","topics/products","topics/models"]
 ---
 
 OpenAI's Thibault Sottiaux posts that the company is announcing ChatGPT today and provides a link. The post itself gives no further detail about features, availability, pricing or capabilities; those would be in the linked material.
+
+## Media
+
+![Original: Thibault Sottiaux announces ChatGPT](<https://x.com/thsottiaux/status/2108349826727588000>)
+
+[Original: Thibault Sottiaux announces ChatGPT](<https://x.com/thsottiaux/status/2108349826727588000>)

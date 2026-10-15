@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "FastBench: Benchmarking Streaming VLMs on High-Dynamic Real-World Video"
-description: "Streaming video large language models (VLMs) support continuous video understanding, but existing benchmarks emphasize low-dynamic scenarios. Under bounded context budgets, models must trade off temporal history, spatial resolution and temp"
+description: "Streaming video large language models (VLMs) support continuous video understanding, but existing benchmarks emphasize low-dynamic scenarios. Under bounded context budgets, models must trade off temporal history, spatial resolution and t..."
 date: "2026-10-08T17:55:20.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:52.195Z"

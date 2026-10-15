@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "OpenAI, the Partition Principle, and Mathematics"
-description: "A set theorist who has worked on the Partition Principle explains why he is unhappy with OpenAI's announcement that the principle does not imply the Axiom of Choice, a problem he has publicly offered a bottle of whisky to anyone who solves."
+description: "A set theorist who has worked on the Partition Principle explains why he is unhappy with OpenAI's announcement that the principle does not imply the Axiom of Choice, a problem he has publicly offered a bottle of whisky to anyone who solv..."
 date: "2026-10-08T23:29:43.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"

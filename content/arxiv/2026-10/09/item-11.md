@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "SiGMA: Multi-Agent Spatially Grounded Anomaly Understanding in Industry"
-description: "A single multimodal large language model (MLLM) struggles to excel at detection, localization, description and reasoning at the same time in multimodal industrial anomaly understanding (MM-IAU). The authors show in-domain training does not "
+description: "A single multimodal large language model (MLLM) struggles to excel at detection, localization, description and reasoning at the same time in multimodal industrial anomaly understanding (MM-IAU). The authors show in-domain training does n..."
 date: "2026-10-08T16:59:29.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:59.851Z"

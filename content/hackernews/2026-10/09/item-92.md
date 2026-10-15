@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Richard Garriott confirms he will regain Ultima copyright from EA"
-description: "Game designer Richard Garriott has confirmed he will soon regain the rights to Ultima, the influential RPG and MMO series he created, from Electronic Arts. He sold the series and his studio Origin Systems to EA in 1992 for $30 million; EA r"
+description: "Game designer Richard Garriott has confirmed he will soon regain the rights to Ultima, the influential RPG and MMO series he created, from Electronic Arts. He sold the series and his studio Origin Systems to EA in 1992 for $30 million; E..."
 date: "2026-10-09T02:06:11.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"

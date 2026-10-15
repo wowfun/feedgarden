@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "KDD 2027 rebuttal experiences? [D]"
-description: "A post on r/MachineLearning asks for experiences with the KDD 2027 review process, with a focus on whether rebuttals changed outcomes. The specific questions: whether authors submitted a rebuttal or chose to withdraw, whether reviewers resp"
+description: "A post on r/MachineLearning asks for experiences with the KDD 2027 review process, with a focus on whether rebuttals changed outcomes. The specific questions: whether authors submitted a rebuttal or chose to withdraw, whether reviewers r..."
 date: "2026-10-08T18:52:15.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:47.429Z"

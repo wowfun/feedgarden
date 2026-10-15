@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "The Hetzner Cloud network stack – history and technical overview"
-description: "Commenters largely read the piece as a technical history, with one noting the architecture resembles BGP EVPN over VXLAN, except the VTEPs run on the hypervisors rather than the top-of-rack switches, as in OpenStack. Another recalls impleme"
+description: "Commenters largely read the piece as a technical history, with one noting the architecture resembles BGP EVPN over VXLAN, except the VTEPs run on the hypervisors rather than the top-of-rack switches, as in OpenStack. Another recalls impl..."
 date: "2026-10-09T12:20:55.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"

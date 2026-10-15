@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "What ArtCraft's Vibe-Coded Apps Say About Adobe"
-description: "The author, a long-time creative, describes a deteriorating relationship with Adobe: the company ignored Mac design conventions, made subscriptions its only real option, kept raising prices, and oriented its offerings toward customers buyin"
+description: "The author, a long-time creative, describes a deteriorating relationship with Adobe: the company ignored Mac design conventions, made subscriptions its only real option, kept raising prices, and oriented its offerings toward customers bu..."
 date: "2026-10-08T18:44:29.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -35,6 +35,8 @@ Selected comments: [liuliu](https://news.ycombinator.com/item?id=50011123) · [r
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50010170>)
 
-## Images and video
+## Media
 
-- [Image: Here’s how fast this project is moving. When I initially started messing around with this, it didn’t show my list of fonts. I then went to the GitHub page for DesignCraft, downloaded a new version that had just been released, and all of a s](<https://proxy.tedium.co/TlsUZ3Z1kth_BJ5g-VEEG3t-hJE=/1014x1001/filters:quality(80)/uploads/screenshot_2026-10-08_10-57-55.png>)
+![Image: Here’s how fast this project is moving. When I initially started messing around with this, it didn’t show my list of fonts. I then went to the GitHub page for DesignCraft, downloaded a new version that had just been released, and all of a s](<https://proxy.tedium.co/TlsUZ3Z1kth_BJ5g-VEEG3t-hJE=/1014x1001/filters:quality(80)/uploads/screenshot_2026-10-08_10-57-55.png>)
+
+[Image: Here’s how fast this project is moving. When I initially started messing around with this, it didn’t show my list of fonts. I then went to the GitHub page for DesignCraft, downloaded a new version that had just been released, and all of a s](<https://proxy.tedium.co/TlsUZ3Z1kth_BJ5g-VEEG3t-hJE=/1014x1001/filters:quality(80)/uploads/screenshot_2026-10-08_10-57-55.png>)

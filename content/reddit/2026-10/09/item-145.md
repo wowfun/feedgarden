@@ -13,6 +13,8 @@ tags: ["source/reddit","topics/products","topics/models"]
 
 
 
-## Images and video
+## Media
 
-- [Image: Model picker in ChatGPT has moved to Settings -&gt; General. Bad UX already, but again which model is the default GPT-6? When was it released? What are its benchmarks?](<https://preview.redd.it/7g377vke7duh1.jpeg?width=640&crop=smart&auto=webp&s=bef129a80b5de8ac2e06ccbc44e7470a18f658e4>)
+![Image: Model picker in ChatGPT has moved to Settings -&gt; General. Bad UX already, but again which model is the default GPT-6? When was it released? What are its benchmarks?](<https://preview.redd.it/7g377vke7duh1.jpeg?width=640&crop=smart&auto=webp&s=bef129a80b5de8ac2e06ccbc44e7470a18f658e4>)
+
+[Image: Model picker in ChatGPT has moved to Settings -&gt; General. Bad UX already, but again which model is the default GPT-6? When was it released? What are its benchmarks?](<https://preview.redd.it/7g377vke7duh1.jpeg?width=640&crop=smart&auto=webp&s=bef129a80b5de8ac2e06ccbc44e7470a18f658e4>)

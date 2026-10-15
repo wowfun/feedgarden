@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "LLM-BlockFE: Turning Long Text into Executable Feature Programs with LLM-Guided Search"
-description: "Industrial risk-control systems usually predict with structured-data models, but much of the useful signal lives in unstructured long text. Manually engineering features from that text is labor-intensive, and calling a large language model "
+description: "Industrial risk-control systems usually predict with structured-data models, but much of the useful signal lives in unstructured long text. Manually engineering features from that text is labor-intensive, and calling a large language mod..."
 date: "2026-10-08T17:39:11.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:52.195Z"

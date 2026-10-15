@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Show HN：Pocketty——iPhone 上的 SSH 终端，智能体被阻塞时通知你"
-description: "Pocketty 是一款面向 iPhone 和 iPad 的 SSH 终端，围绕用于管理编程智能体会话的 herdr 构建。它的出发点是：不必守在桌前才能知道智能体什么时候需要你——应用会列出某台主机上的所有智能体和窗格（Pane），把每个标记为“工作中”“需要你”或“已完成”，并在某个窗格被阻塞或结束时通知你。 据作者介绍，客户端通过 SSH 直连你的电脑，中间没有服务器。隧道和密钥处理使用 Secure Enclave 与 Face ID，演示中出现了类似“pane w1"
+description: "Pocketty 是一款面向 iPhone 和 iPad 的 SSH 终端，围绕用于管理编程智能体会话的 herdr 构建。它的出发点是：不必守在桌前才能知道智能体什么时候需要你——应用会列出某台主机上的所有智能体和窗格（Pane），把每个标记为“工作中”“需要你”或“已完成”，并在某个窗格被阻塞或结束时通知你。 据作者介绍，客户端通过 SSH 直连你的电脑，中间没有服务器。隧道和密钥处理使用 Secure Enclave 与 Face ID，演示中出现了类似“pane..."
 date: "2026-10-08T18:11:52.000Z"
 updated: "2026-10-10T06:16:53.378Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -32,8 +32,16 @@ Pocketty 是一款面向 iPhone 和 iPad 的 SSH 终端，围绕用于管理编�
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50009634>)
 
-## 图片与视频
+## 媒体
 
-- [图片: The Changes tab with Last turn selected: one Rust file, 3 lines added and 2 removed.](<https://pocketty.app/_astro/changes.BuYlktL2_ZjWyKk.webp>)
-- [图片: The diff of that file: a named constant replaces two copies of 60.](<https://pocketty.app/_astro/diff.BiXQR0GY_Z1gU4PG.webp>)
-- [图片: The pocketty website, served on localhost, open in the preview.](<https://pocketty.app/_astro/preview.DTyLt12-_Z1W2Azm.webp>)
+![图片: The Changes tab with Last turn selected: one Rust file, 3 lines added and 2 removed.](<https://pocketty.app/_astro/changes.BuYlktL2_ZjWyKk.webp>)
+
+[图片: The Changes tab with Last turn selected: one Rust file, 3 lines added and 2 removed.](<https://pocketty.app/_astro/changes.BuYlktL2_ZjWyKk.webp>)
+
+![图片: The diff of that file: a named constant replaces two copies of 60.](<https://pocketty.app/_astro/diff.BiXQR0GY_Z1gU4PG.webp>)
+
+[图片: The diff of that file: a named constant replaces two copies of 60.](<https://pocketty.app/_astro/diff.BiXQR0GY_Z1gU4PG.webp>)
+
+![图片: The pocketty website, served on localhost, open in the preview.](<https://pocketty.app/_astro/preview.DTyLt12-_Z1W2Azm.webp>)
+
+[图片: The pocketty website, served on localhost, open in the preview.](<https://pocketty.app/_astro/preview.DTyLt12-_Z1W2Azm.webp>)

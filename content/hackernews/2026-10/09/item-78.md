@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Bevy 0.20 Released: Solari Pathtracer Gains DLSS and Metal Support"
-description: "Bevy, the data-driven game engine written in Rust, shipped version 0.20 on crates.io, crediting 227 contributors and 817 pull requests since the previous release a few months ago. The project publishes a migration guide from 0.19 and remain"
+description: "Bevy, the data-driven game engine written in Rust, shipped version 0.20 on crates.io, crediting 227 contributors and 817 pull requests since the previous release a few months ago. The project publishes a migration guide from 0.19 and rem..."
 date: "2026-10-08T22:57:50.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -34,8 +34,16 @@ Selected comments: [pcwalton](https://news.ycombinator.com/item?id=50015521) · 
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50013610>)
 
-## Images and video
+## Media
 
-- [Image: color input](<https://bevy.org/news/bevy-0-20/color_input.jpg>)
-- [Image: scrollbar listview](<https://bevy.org/news/bevy-0-20/scrollbar_listview.jpg>)
-- [Image: A Bevy fog shader with WESL syntax highlighting](<https://bevy.org/news/bevy-0-20/wesl_analyzer.png>)
+![Image: color input](<https://bevy.org/news/bevy-0-20/color_input.jpg>)
+
+[Image: color input](<https://bevy.org/news/bevy-0-20/color_input.jpg>)
+
+![Image: scrollbar listview](<https://bevy.org/news/bevy-0-20/scrollbar_listview.jpg>)
+
+[Image: scrollbar listview](<https://bevy.org/news/bevy-0-20/scrollbar_listview.jpg>)
+
+![Image: A Bevy fog shader with WESL syntax highlighting](<https://bevy.org/news/bevy-0-20/wesl_analyzer.png>)
+
+[Image: A Bevy fog shader with WESL syntax highlighting](<https://bevy.org/news/bevy-0-20/wesl_analyzer.png>)

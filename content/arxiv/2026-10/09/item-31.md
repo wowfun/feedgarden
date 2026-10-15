@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "OmniCapBench: Deep-Structured Evaluation for Fine-Grained Audio-Visual Captioning"
-description: "Multimodal large language models (MLLMs) are moving toward continuous audio-visual reasoning, creating an urgent need for evaluations that expose their capability limits. Audio-visual captioning is seen as an ideal diagnostic task, but curr"
+description: "Multimodal large language models (MLLMs) are moving toward continuous audio-visual reasoning, creating an urgent need for evaluations that expose their capability limits. Audio-visual captioning is seen as an ideal diagnostic task, but c..."
 date: "2026-10-08T17:59:21.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:59.851Z"

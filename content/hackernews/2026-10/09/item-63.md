@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "ADHD as a circadian rhythm disorder: evidence and implications for chronotherapy (2025)"
-description: "A Frontiers in Psychiatry perspective article argues that circadian rhythm dysfunction is a prevalent, clinically relevant phenotype in a substantial subgroup of people with ADHD, and proposes behavioral circadian interventions as adjuncts "
+description: "A Frontiers in Psychiatry perspective article argues that circadian rhythm dysfunction is a prevalent, clinically relevant phenotype in a substantial subgroup of people with ADHD, and proposes behavioral circadian interventions as adjunc..."
 date: "2026-10-08T20:42:16.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"

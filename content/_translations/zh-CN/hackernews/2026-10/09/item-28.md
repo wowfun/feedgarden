@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Show HN：K10s —— 可点击的 Kubernetes 终端界面（Go、Bubble Tea）"
-description: "K10s 是一个用 Go 和 Bubble Tea 编写的 Kubernetes 终端界面，其核心论点是：集群仪表盘一天要打开很多次，而且通常是在出事故的时候，因此真正重要的是打开速度和需要记住的东西有多少。它最显著的选择是把点击当作一等交互：没有任何功能藏在需要记忆的按键后面。适用于所选对象的操作会单独列在一个面板里，你可以点击某一项，也可以按它旁边的字母键。行、面板、缩放和命名空间选择器都可点击，每个边框按钮都是真的。一个搜索框覆盖整个集群——ctrl+p 同时搜索资源类"
+description: "K10s 是一个用 Go 和 Bubble Tea 编写的 Kubernetes 终端界面，其核心论点是：集群仪表盘一天要打开很多次，而且通常是在出事故的时候，因此真正重要的是打开速度和需要记住的东西有多少。它最显著的选择是把点击当作一等交互：没有任何功能藏在需要记忆的按键后面。适用于所选对象的操作会单独列在一个面板里，你可以点击某一项，也可以按它旁边的字母键。行、面板、缩放和命名空间选择器都可点击，每个边框按钮都是真的。一个搜索框覆盖整个集群——ctrl+p 同时搜索..."
 date: "2026-10-08T18:29:06.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -34,6 +34,8 @@ K10s 是一个用 Go 和 Bubble Tea 编写的 Kubernetes 终端界面，其核�
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50009904>)
 
-## 图片与视频
+## 媒体
 
-- [图片: k10s running in a terminal: resource sidebar, pod table with live status, and an action pane for the selected pod](<https://github.com/p10node/k10s/raw/main/assets/screenshot.png>)
+![图片: k10s running in a terminal: resource sidebar, pod table with live status, and an action pane for the selected pod](<https://github.com/p10node/k10s/raw/main/assets/screenshot.png>)
+
+[图片: k10s running in a terminal: resource sidebar, pod table with live status, and an action pane for the selected pod](<https://github.com/p10node/k10s/raw/main/assets/screenshot.png>)

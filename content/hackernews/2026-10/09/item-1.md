@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "4-hour battery storage is cheaper to install than gas turbines all across globe"
-description: "Wood Mackenzie's latest global levelized cost of electricity (LCOE) report finds that four-hour battery storage is now cheaper than open-cycle gas turbines in all 43 markets where both technologies were modeled. The firm's principal analyst"
+description: "Wood Mackenzie's latest global levelized cost of electricity (LCOE) report finds that four-hour battery storage is now cheaper than open-cycle gas turbines in all 43 markets where both technologies were modeled. The firm's principal anal..."
 date: "2026-10-08T16:03:33.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -39,7 +39,12 @@ Selected comments: [alwa](https://news.ycombinator.com/item?id=50008441) · [sam
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50007519>)
 
-## Images and video
+## Media
 
-- [Image](<https://www.solarpowerworldonline.com/wp-content/uploads/2026/10/image003.png>)
-- [Image](<https://www.solarpowerworldonline.com/wp-content/uploads/2026/06/stock-Holy-Cross-Energy-High-Mesa-Solar-Storage-site-in-Parachute-Colorado-500x325.jpg>)
+![Image](<https://www.solarpowerworldonline.com/wp-content/uploads/2026/10/image003.png>)
+
+[Image](<https://www.solarpowerworldonline.com/wp-content/uploads/2026/10/image003.png>)
+
+![Image](<https://www.solarpowerworldonline.com/wp-content/uploads/2026/06/stock-Holy-Cross-Energy-High-Mesa-Solar-Storage-site-in-Parachute-Colorado-500x325.jpg>)
+
+[Image](<https://www.solarpowerworldonline.com/wp-content/uploads/2026/06/stock-Holy-Cross-Energy-High-Mesa-Solar-Storage-site-in-Parachute-Colorado-500x325.jpg>)

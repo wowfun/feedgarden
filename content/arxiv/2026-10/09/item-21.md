@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Embodied Turing Machines: Stateful Code as Robot Policy for Recursive Self-Improvement"
-description: "Most robot policies keep a model in the control loop: a vision-language-action (VLA) model maps observations to actions, or an agent harness such as Agent-as-Policy or Harness VLA queries a vision-language model for decisions at run time. T"
+description: "Most robot policies keep a model in the control loop: a vision-language-action (VLA) model maps observations to actions, or an agent harness such as Agent-as-Policy or Harness VLA queries a vision-language model for decisions at run time..."
 date: "2026-10-08T17:29:08.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:59.851Z"

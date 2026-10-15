@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Tencent releases Youtu-Parsing-Omni, a 5B omni-modal document parsing model"
-description: "Tencent has published Youtu-Parsing-Omni, described as a compact 5B omni-modal parsing model. Given a single input — a document page, natural image, chart or flowchart, geometry figure, audio clip, or audio-visual video — it emits one struc"
+description: "Tencent has published Youtu-Parsing-Omni, described as a compact 5B omni-modal parsing model. Given a single input — a document page, natural image, chart or flowchart, geometry figure, audio clip, or audio-visual video — it emits one st..."
 date: "2026-10-09T12:03:32.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:44.332Z"
@@ -27,6 +27,8 @@ The supported task families and their key contents:
 
 Reported highlights: a unified schema, one JSON envelope for seven parsing families driven by the task prompt; an omni encoder handling image, audio and interleaved audio-visual inputs &#40;frames plus audio track&#41; in one model; and strong small-model results, with state of the art on OmniDocBench v1.6 &#40;96.96 Overall&#41;, best open-weight model on OmniParsingBench &#40;75.08 average, second only to Gemini-3-Pro&#41;, and competitive results against specialized models on chemical-structure &#40;ChemOCR&#41; and music-score &#40;PDMX-Synth&#41; recognition. The release includes a vLLM plugin, pinned serving settings, task prompts and inference examples.
 
-## Images and video
+## Media
 
-- [Image: tencent/Youtu-Parsing-Omni · Hugging Face](<https://external-preview.redd.it/IOBGwlG1GLeePwVjEukOZAnpm3Exke5IVIyCT999tcc.png?width=640&crop=smart&auto=webp&s=92e43f735caa647c81054cba869632fd1b787ce5>)
+![Image: tencent/Youtu-Parsing-Omni · Hugging Face](<https://external-preview.redd.it/IOBGwlG1GLeePwVjEukOZAnpm3Exke5IVIyCT999tcc.png?width=640&crop=smart&auto=webp&s=92e43f735caa647c81054cba869632fd1b787ce5>)
+
+[Image: tencent/Youtu-Parsing-Omni · Hugging Face](<https://external-preview.redd.it/IOBGwlG1GLeePwVjEukOZAnpm3Exke5IVIyCT999tcc.png?width=640&crop=smart&auto=webp&s=92e43f735caa647c81054cba869632fd1b787ce5>)

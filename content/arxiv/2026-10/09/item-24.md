@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "GeoReform: Reflective Formalization Evolution for Multimodal Geometry Problem Solving"
-description: "Multimodal large language models (MLLMs) often struggle to identify and use geometric relations in diagrams. A common remedy is to convert geometric entities, relations and constraints into explicit text the model can reason over, but the p"
+description: "Multimodal large language models (MLLMs) often struggle to identify and use geometric relations in diagrams. A common remedy is to convert geometric entities, relations and constraints into explicit text the model can reason over, but th..."
 date: "2026-10-08T17:39:12.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

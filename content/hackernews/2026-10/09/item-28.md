@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Show HN: K10s – A Clickable Kubernetes TUI (Go, Bubble Tea)"
-description: "K10s is a Kubernetes terminal UI written in Go with Bubble Tea, built around the argument that a cluster dashboard is opened many times a day, usually while something is on fire, so what matters is how fast it opens and how little you have "
+description: "K10s is a Kubernetes terminal UI written in Go with Bubble Tea, built around the argument that a cluster dashboard is opened many times a day, usually while something is on fire, so what matters is how fast it opens and how little you ha..."
 date: "2026-10-08T18:29:06.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -34,6 +34,8 @@ Selected comments: [bearjaws](https://news.ycombinator.com/item?id=50010426) · 
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50009904>)
 
-## Images and video
+## Media
 
-- [Image: k10s running in a terminal: resource sidebar, pod table with live status, and an action pane for the selected pod](<https://github.com/p10node/k10s/raw/main/assets/screenshot.png>)
+![Image: k10s running in a terminal: resource sidebar, pod table with live status, and an action pane for the selected pod](<https://github.com/p10node/k10s/raw/main/assets/screenshot.png>)
+
+[Image: k10s running in a terminal: resource sidebar, pod table with live status, and an action pane for the selected pod](<https://github.com/p10node/k10s/raw/main/assets/screenshot.png>)

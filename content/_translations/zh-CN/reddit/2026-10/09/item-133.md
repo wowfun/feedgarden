@@ -15,6 +15,8 @@ tags: ["source/reddit","topics/industry","topics/products"]
 
 帖子本身没有进一步说明替代条款或生效时间。
 
-## 图片与视频
+## 媒体
 
-- [图片: Claude Startup Program no longer offering a year of Claude Team and &#36;1K in API Credits](<https://preview.redd.it/swixa52uxcuh1.png?width=640&crop=smart&auto=webp&s=e170883b0b865bcb53e39ed7a366e9597c677e77>)
+![图片: Claude Startup Program no longer offering a year of Claude Team and &#36;1K in API Credits](<https://preview.redd.it/swixa52uxcuh1.png?width=640&crop=smart&auto=webp&s=e170883b0b865bcb53e39ed7a366e9597c677e77>)
+
+[图片: Claude Startup Program no longer offering a year of Claude Team and &#36;1K in API Credits](<https://preview.redd.it/swixa52uxcuh1.png?width=640&crop=smart&auto=webp&s=e170883b0b865bcb53e39ed7a366e9597c677e77>)

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Just fucking love herdr!!"
-description: "A user praises herdr, a terminal tool they had wanted for a long time, saying they now use it for personal projects and for work, which takes up about 80% of their time. They run it on WSL through Windows Terminal alongside Codex, Claude, a"
+description: "A user praises herdr, a terminal tool they had wanted for a long time, saying they now use it for personal projects and for work, which takes up about 80% of their time. They run it on WSL through Windows Terminal alongside Codex, Claude..."
 date: "2026-10-09T01:41:23.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:21:48.097Z"

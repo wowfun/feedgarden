@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Show HN: Jevman – AI decision models play Pac-Man"
-description: "Jevman is an open-source benchmark that pits AI decision models against the classic arcade ghosts in Pac-Man. Seven models played 100 games each, and the project publishes a leaderboard ranking them by mean score, alongside replays of every"
+description: "Jevman is an open-source benchmark that pits AI decision models against the classic arcade ghosts in Pac-Man. Seven models played 100 games each, and the project publishes a leaderboard ranking them by mean score, alongside replays of ev..."
 date: "2026-10-08T16:34:13.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"

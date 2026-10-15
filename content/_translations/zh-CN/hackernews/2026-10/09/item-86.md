@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Show HN：Edi Life OS——自带 AI MCP 服务器的自托管生活仪表盘"
-description: "Edi Life OS 是一个自托管仪表盘，把十个工作区整合到同一套设计、同一个登录入口和同一个数据库之下，目标是取代互不相通的一堆待办、习惯、预算、番茄钟和笔记应用。作者强调的设计取向是“连接”而非“收集”：习惯会推动目标进度，看板卡片会出现在日历中，概览页则把各项活动汇总成单一的每日效率评分。 十个工作区包括：概览（效率评分、专注与习惯趋势、财务以及七日天气预报）、成长（六个生活维度关联长期目标与 SMART 目标、习惯和任务，并提供每周、每月、每季度复盘）、专注（含短休"
+description: "Edi Life OS 是一个自托管仪表盘，把十个工作区整合到同一套设计、同一个登录入口和同一个数据库之下，目标是取代互不相通的一堆待办、习惯、预算、番茄钟和笔记应用。作者强调的设计取向是“连接”而非“收集”：习惯会推动目标进度，看板卡片会出现在日历中，概览页则把各项活动汇总成单一的每日效率评分。 十个工作区包括：概览（效率评分、专注与习惯趋势、财务以及七日天气预报）、成长（六个生活维度关联长期目标与 SMART 目标、习惯和任务，并提供每周、每月、每季度复盘）、专注（..."
 date: "2026-10-09T00:02:19.000Z"
 updated: "2026-10-10T05:10:37.706Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -32,8 +32,16 @@ Edi Life OS 是一个自托管仪表盘，把十个工作区整合到同一套�
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50014150>)
 
-## 图片与视频
+## 媒体
 
-- [图片: Growth workspace with six life dimensions and SMART progress](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/growth.webp>)
-- [图片: Habit checklist with a seven-day completion chart](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/habittify.webp>)
-- [图片: Kanban board with backlog, in progress, review and done columns](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/kanban.webp>)
+![图片: Growth workspace with six life dimensions and SMART progress](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/growth.webp>)
+
+[图片: Growth workspace with six life dimensions and SMART progress](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/growth.webp>)
+
+![图片: Habit checklist with a seven-day completion chart](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/habittify.webp>)
+
+[图片: Habit checklist with a seven-day completion chart](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/habittify.webp>)
+
+![图片: Kanban board with backlog, in progress, review and done columns](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/kanban.webp>)
+
+[图片: Kanban board with backlog, in progress, review and done columns](<https://github.com/edrisranjbar/lifeos/raw/main/docs/media/kanban.webp>)

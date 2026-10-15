@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "8 张 Radeon Pro V620 配定制 vLLM 分支，解码达 60-100 t/s"
-description: "一位用户用八张 Radeon Pro V620 组了一台约 2,800 美元的机器。这些是较老的 RDNA2 企业级云游戏显卡，单卡 32GB 显存，合计 256GB。作者提醒标题中的价格略有误导，因为现在大概已经买不到每张 350 美元的价格。图中还可见一块 RTX 4090，但仅用于图像与视频生成模型，不跑 LLM。 这些卡最初是一次赌博式尝试，想用较低成本搭建大显存机器。llama.cpp 勉强能用但 prefill 很差（同一模型约 350-450 t/s），并发能力"
+description: "一位用户用八张 Radeon Pro V620 组了一台约 2,800 美元的机器。这些是较老的 RDNA2 企业级云游戏显卡，单卡 32GB 显存，合计 256GB。作者提醒标题中的价格略有误导，因为现在大概已经买不到每张 350 美元的价格。图中还可见一块 RTX 4090，但仅用于图像与视频生成模型，不跑 LLM。 这些卡最初是一次赌博式尝试，想用较低成本搭建大显存机器。llama.cpp 勉强能用但 prefill 很差（同一模型约 350-450 t/s），并..."
 date: "2026-10-08T17:12:46.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:44.332Z"
@@ -22,6 +22,8 @@ tags: ["source/reddit","topics/inference","topics/models"]
 
 作者计划继续优化，并验证 DeepSeek 与 GLM-5.3-Flash 是否同样可用。这些均为单机自报的 llama-benchy 测量结果，并非独立评测。
 
-## 图片与视频
+## 媒体
 
-- [图片: &#36;2800 rig with 8x Radeon Pro V620 &#40;256 GB VRAM&#41; + custom vLLM fork = Qwen3.8-Flash-Next at 60 to 100 t/s decode and 3000+ t/s prefill](<https://preview.redd.it/wqt70wfzx9uh1.jpeg?width=640&crop=smart&auto=webp&s=b01f54c06793ca6dbd1cc9a3d18c1af0df4b68f8>)
+![图片: &#36;2800 rig with 8x Radeon Pro V620 &#40;256 GB VRAM&#41; + custom vLLM fork = Qwen3.8-Flash-Next at 60 to 100 t/s decode and 3000+ t/s prefill](<https://preview.redd.it/wqt70wfzx9uh1.jpeg?width=640&crop=smart&auto=webp&s=b01f54c06793ca6dbd1cc9a3d18c1af0df4b68f8>)
+
+[图片: &#36;2800 rig with 8x Radeon Pro V620 &#40;256 GB VRAM&#41; + custom vLLM fork = Qwen3.8-Flash-Next at 60 to 100 t/s decode and 3000+ t/s prefill](<https://preview.redd.it/wqt70wfzx9uh1.jpeg?width=640&crop=smart&auto=webp&s=b01f54c06793ca6dbd1cc9a3d18c1af0df4b68f8>)

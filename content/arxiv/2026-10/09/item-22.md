@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "OnTrack: Real-Time Monitoring and Intervention in LLM Agent Trajectories via Streaming Structure-Aware Optimal Transport"
-description: "LLM agents are increasingly deployed in domains such as trip planning, stock trading and IT incident triage, and most run autonomously with little rule-based safeguarding, so irreversible actions can burn cost or cause harm. Existing fixes "
+description: "LLM agents are increasingly deployed in domains such as trip planning, stock trading and IT incident triage, and most run autonomously with little rule-based safeguarding, so irreversible actions can burn cost or cause harm. Existing fix..."
 date: "2026-10-08T17:32:08.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

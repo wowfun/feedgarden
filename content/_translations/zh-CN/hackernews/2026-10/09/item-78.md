@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Bevy 0.20 发布：Solari 路径追踪渲染器支持 DLSS 与 Metal"
-description: "基于 Rust 的数据驱动游戏引擎 Bevy 在 crates.io 上发布了 0.20 版本。自几个月前的上一个版本以来，共有 227 位贡献者提交了 817 个拉取请求。项目提供了从 0.19 到 0.20 的迁移指南，引擎永久免费开源，社区插件、游戏和学习资源汇集在 Bevy Assets 中。 本次发布的重点在 Solari——Bevy 的实时路径追踪渲染器。ReSTIR 实现的改进让渲染基本无偏，光照更准确；运动物体不再出现滞后的阴影，反射在运动中闪烁明显减少，对非"
+description: "基于 Rust 的数据驱动游戏引擎 Bevy 在 crates.io 上发布了 0.20 版本。自几个月前的上一个版本以来，共有 227 位贡献者提交了 817 个拉取请求。项目提供了从 0.19 到 0.20 的迁移指南，引擎永久免费开源，社区插件、游戏和学习资源汇集在 Bevy Assets 中。 本次发布的重点在 Solari——Bevy 的实时路径追踪渲染器。ReSTIR 实现的改进让渲染基本无偏，光照更准确；运动物体不再出现滞后的阴影，反射在运动中闪烁明显减少..."
 date: "2026-10-08T22:57:50.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -34,8 +34,16 @@ WESL 的开发者表示团队很享受与 Bevy 合作构建着色器语言，并
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50013610>)
 
-## 图片与视频
+## 媒体
 
-- [图片: color input](<https://bevy.org/news/bevy-0-20/color_input.jpg>)
-- [图片: scrollbar listview](<https://bevy.org/news/bevy-0-20/scrollbar_listview.jpg>)
-- [图片: A Bevy fog shader with WESL syntax highlighting](<https://bevy.org/news/bevy-0-20/wesl_analyzer.png>)
+![图片: color input](<https://bevy.org/news/bevy-0-20/color_input.jpg>)
+
+[图片: color input](<https://bevy.org/news/bevy-0-20/color_input.jpg>)
+
+![图片: scrollbar listview](<https://bevy.org/news/bevy-0-20/scrollbar_listview.jpg>)
+
+[图片: scrollbar listview](<https://bevy.org/news/bevy-0-20/scrollbar_listview.jpg>)
+
+![图片: A Bevy fog shader with WESL syntax highlighting](<https://bevy.org/news/bevy-0-20/wesl_analyzer.png>)
+
+[图片: A Bevy fog shader with WESL syntax highlighting](<https://bevy.org/news/bevy-0-20/wesl_analyzer.png>)

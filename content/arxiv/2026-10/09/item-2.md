@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "TokenRouter: Efficient Serving System for Token-Level LLM Routing"
-description: "LLM routing distributes inference work across models to advance the cost-quality Pareto frontier of serving. Coarse-grained routing at the session or query level is widely used in production, while recent algorithmic work shows fine-grained"
+description: "LLM routing distributes inference work across models to advance the cost-quality Pareto frontier of serving. Coarse-grained routing at the session or query level is widely used in production, while recent algorithmic work shows fine-grai..."
 date: "2026-10-08T16:21:50.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:52.195Z"

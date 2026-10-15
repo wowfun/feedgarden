@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "8x Radeon Pro V620 rig with a custom vLLM fork serves Qwen3.8-Flash-Next at 60-100 t/s decode"
-description: "A user assembled a roughly $2,800 machine from eight Radeon Pro V620 cards, older RDNA2 enterprise cloud-gaming GPUs with 32 GB of VRAM each, for a total of 256 GB of VRAM. The author notes the headline price is slightly misleading since th"
+description: "A user assembled a roughly $2,800 machine from eight Radeon Pro V620 cards, older RDNA2 enterprise cloud-gaming GPUs with 32 GB of VRAM each, for a total of 256 GB of VRAM. The author notes the headline price is slightly misleading since..."
 date: "2026-10-08T17:12:46.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:44.332Z"
@@ -22,6 +22,8 @@ Reported results with the orcarouter uncensored Qwen3.8-Flash-Next, self-quantiz
 
 The author plans to keep optimizing and to verify that DeepSeek and GLM-5.3-Flash also work. These are single-rig, self-reported llama-benchy measurements, not independent evaluations.
 
-## Images and video
+## Media
 
-- [Image: &#36;2800 rig with 8x Radeon Pro V620 &#40;256 GB VRAM&#41; + custom vLLM fork = Qwen3.8-Flash-Next at 60 to 100 t/s decode and 3000+ t/s prefill](<https://preview.redd.it/wqt70wfzx9uh1.jpeg?width=640&crop=smart&auto=webp&s=b01f54c06793ca6dbd1cc9a3d18c1af0df4b68f8>)
+![Image: &#36;2800 rig with 8x Radeon Pro V620 &#40;256 GB VRAM&#41; + custom vLLM fork = Qwen3.8-Flash-Next at 60 to 100 t/s decode and 3000+ t/s prefill](<https://preview.redd.it/wqt70wfzx9uh1.jpeg?width=640&crop=smart&auto=webp&s=b01f54c06793ca6dbd1cc9a3d18c1af0df4b68f8>)
+
+[Image: &#36;2800 rig with 8x Radeon Pro V620 &#40;256 GB VRAM&#41; + custom vLLM fork = Qwen3.8-Flash-Next at 60 to 100 t/s decode and 3000+ t/s prefill](<https://preview.redd.it/wqt70wfzx9uh1.jpeg?width=640&crop=smart&auto=webp&s=b01f54c06793ca6dbd1cc9a3d18c1af0df4b68f8>)

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "From Prompting to Composing: A Spatial Canvas Interface for Poster Generation"
-description: "Text prompting is an indirect interface for poster generation: users must encode inherently two-dimensional layout intent into a one-dimensional word sequence. The authors propose a Spatial Canvas Interface that lets users compose generatio"
+description: "Text prompting is an indirect interface for poster generation: users must encode inherently two-dimensional layout intent into a one-dimensional word sequence. The authors propose a Spatial Canvas Interface that lets users compose genera..."
 date: "2026-10-08T16:16:06.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

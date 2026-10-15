@@ -13,6 +13,8 @@ tags: ["source/reddit","topics/industry"]
 
 
 
-## 图片与视频
+## 媒体
 
-- [图片: Tech stocks drop after report that OpenAI’s revenue is lower than expected](<https://external-preview.redd.it/PvLme1ay1KSFNhAT4gNU7SuNbQTQhYz3k66EpFRiQ-c.jpeg?width=640&crop=smart&auto=webp&s=0324a6a77a8fca731e5baa989d57a919d5902cb9>)
+![图片: Tech stocks drop after report that OpenAI’s revenue is lower than expected](<https://external-preview.redd.it/PvLme1ay1KSFNhAT4gNU7SuNbQTQhYz3k66EpFRiQ-c.jpeg?width=640&crop=smart&auto=webp&s=0324a6a77a8fca731e5baa989d57a919d5902cb9>)
+
+[图片: Tech stocks drop after report that OpenAI’s revenue is lower than expected](<https://external-preview.redd.it/PvLme1ay1KSFNhAT4gNU7SuNbQTQhYz3k66EpFRiQ-c.jpeg?width=640&crop=smart&auto=webp&s=0324a6a77a8fca731e5baa989d57a919d5902cb9>)

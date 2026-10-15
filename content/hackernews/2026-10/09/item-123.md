@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Iranian campaign planted fake articles in real U.S. publications using ChatGPT"
-description: "Several commenters argue that fake opinion pieces and sock-puppet accounts are old tactics, and that what is new is a highly centralized tool that also logs usage and reports to authorities and news outlets. One reply pushes back, saying th"
+description: "Several commenters argue that fake opinion pieces and sock-puppet accounts are old tactics, and that what is new is a highly centralized tool that also logs usage and reports to authorities and news outlets. One reply pushes back, saying..."
 date: "2026-10-09T12:21:24.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"

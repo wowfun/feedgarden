@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Looking Inside LLMs: Small-World Connectivity as a Signature of Reasoning Performance"
-description: "Understanding large language model reasoning requires looking beyond behavioral performance to how reasoning ability is reflected in internal organization. Inspired by neuroscience findings linking higher intelligence to stronger small-worl"
+description: "Understanding large language model reasoning requires looking beyond behavioral performance to how reasoning ability is reflected in internal organization. Inspired by neuroscience findings linking higher intelligence to stronger small-w..."
 date: "2026-10-08T16:53:45.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Programming Isn't Special"
-description: "The essay argues that programmers' willingness to adopt AI tools is inconsistent with the resistance seen across other creative fields, and that the inconsistency rests on a mistaken premise: that programming is not Art. Writers have struck"
+description: "The essay argues that programmers' willingness to adopt AI tools is inconsistent with the resistance seen across other creative fields, and that the inconsistency rests on a mistaken premise: that programming is not Art. Writers have str..."
 date: "2026-10-09T07:44:36.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"

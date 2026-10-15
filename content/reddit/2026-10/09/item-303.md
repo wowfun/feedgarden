@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Qwen-Image-2.1-Turbo released with open weights and 8-step generation"
-description: "Qwen has released Qwen-Image-2.1-Turbo, an accelerated image generation and editing checkpoint whose open weights are now available. According to the announcement, it can create and edit images in just 8 denoising steps. The model is built "
+description: "Qwen has released Qwen-Image-2.1-Turbo, an accelerated image generation and editing checkpoint whose open weights are now available. According to the announcement, it can create and edit images in just 8 denoising steps. The model is bui..."
 date: "2026-10-09T13:27:18.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:44.332Z"
@@ -17,6 +17,8 @@ The model is built on Qwen-Image-2.1 and is described as an accelerated checkpoi
 
 For getting started, the announcement points to Diffusers: loading QwenImage21Pipeline brings the checkpoint's recommended 8-step sampling schedule ready to use. The weights are published on Hugging Face under the Qwen organization.
 
-## Images and video
+## Media
 
-- [Image: Qwen-Image-2.1-Turbo released&#33;](<https://preview.redd.it/ukcowgd71guh1.jpg?width=140&height=78&auto=webp&s=b909032cd8c6dfb8e77d933b7d147a17c7582794>)
+![Image: Qwen-Image-2.1-Turbo released&#33;](<https://preview.redd.it/ukcowgd71guh1.jpg?width=140&height=78&auto=webp&s=b909032cd8c6dfb8e77d933b7d147a17c7582794>)
+
+[Image: Qwen-Image-2.1-Turbo released&#33;](<https://preview.redd.it/ukcowgd71guh1.jpg?width=140&height=78&auto=webp&s=b909032cd8c6dfb8e77d933b7d147a17c7582794>)

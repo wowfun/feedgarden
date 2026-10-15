@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Comparing Haiku 5.5, Sonnet 5.5 and Opus 5.5 as subagents on 6 real tasks"
-description: "A user reran six tasks that Opus 5.5 had already completed in their project, using Sonnet 5.5 and Haiku 5.5 with high effort, same prompts and same files, then checked every result against the real answer. Code search (locating every file t"
+description: "A user reran six tasks that Opus 5.5 had already completed in their project, using Sonnet 5.5 and Haiku 5.5 with high effort, same prompts and same files, then checked every result against the real answer. Code search (locating every fil..."
 date: "2026-10-09T06:39:53.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:21:48.097Z"

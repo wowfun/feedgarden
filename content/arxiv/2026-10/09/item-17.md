@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Overcoming Prior Barriers: Supervised Fine-Tuning under Long-Tail Distribution"
-description: "Supervised fine-tuning (SFT) adapts pretrained large language models to downstream tasks, but the concepts a task needs receive very different levels of pretrained support: frequent concepts are more likely to be well learned, while rare co"
+description: "Supervised fine-tuning (SFT) adapts pretrained large language models to downstream tasks, but the concepts a task needs receive very different levels of pretrained support: frequent concepts are more likely to be well learned, while rare..."
 date: "2026-10-08T17:16:45.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

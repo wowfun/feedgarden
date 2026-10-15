@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "理查德·加里奥特确认将夺回《创世纪》版权"
-description: "游戏设计师理查德·加里奥特（Richard Garriott）确认，他将很快从美国艺电（EA）手中收回自己创作的知名 RPG 与 MMO 系列《创世纪》（Ultima）的版权。1992 年，他将该系列连同自己的工作室 Origin Systems 以 3000 万美元卖给 EA；EA 在 90 年代推出了多款《创世纪》作品，包括网络游戏《网络创世纪》（Ultima Online），但在 2000 年取消了 Origin 的所有项目，加里奥特随后离开。系列最后一部正传是 199"
+description: "游戏设计师理查德·加里奥特（Richard Garriott）确认，他将很快从美国艺电（EA）手中收回自己创作的知名 RPG 与 MMO 系列《创世纪》（Ultima）的版权。1992 年，他将该系列连同自己的工作室 Origin Systems 以 3000 万美元卖给 EA；EA 在 90 年代推出了多款《创世纪》作品，包括网络游戏《网络创世纪》（Ultima Online），但在 2000 年取消了 Origin 的所有项目，加里奥特随后离开。系列最后一部正传是 ..."
 date: "2026-10-09T02:06:11.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"

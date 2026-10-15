@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "LGTM (Looks Good to Me) – Claude Opus 5.5 Music Video"
-description: "Commenters largely read the video as a marker of where generative media is heading. One notes the song was actually made with Suno v6 rather than Opus, calling Suno impressive but \"one huge copyright violation\" (ofrzeta). Reflecting on a li"
+description: "Commenters largely read the video as a marker of where generative media is heading. One notes the song was actually made with Suno v6 rather than Opus, calling Suno impressive but \"one huge copyright violation\" (ofrzeta). Reflecting on a..."
 date: "2026-10-08T18:55:18.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -21,3 +21,9 @@ Commenters largely read the video as a marker of where generative media is headi
 Selected comments: [ofrzeta](https://news.ycombinator.com/item?id=50016080) · [glimshe](https://news.ycombinator.com/item?id=50012645) · [Charly&#95;HW](https://news.ycombinator.com/item?id=50024018) · [anilgulecha](https://news.ycombinator.com/item?id=50015369) · [karim79](https://news.ycombinator.com/item?id=50012994)
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50010330>)
+
+## Media
+
+![Original: LGTM &#40;Looks Good to Me&#41; – Claude Opus 5.5 Music Video](<https://www.youtube.com/watch?v=3TNpOD6bov8>)
+
+[Original: LGTM &#40;Looks Good to Me&#41; – Claude Opus 5.5 Music Video](<https://www.youtube.com/watch?v=3TNpOD6bov8>)

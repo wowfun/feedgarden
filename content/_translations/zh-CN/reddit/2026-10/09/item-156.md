@@ -15,6 +15,8 @@ tags: ["source/reddit","topics/industry","topics/products"]
 
 除这句道歉和一个指涉外，帖子没有提供任何细节：没有说明发生了什么变化、影响了谁、此前的条款是什么，也没有说明是否提供任何补救措施。标题和截图就是这条内容全部的信息。
 
-## 图片与视频
+## 媒体
 
-- [图片: We know this is disappointing and we’re very sorry](<https://preview.redd.it/m7cjgtunhduh1.png?width=640&crop=smart&auto=webp&s=3e90ce2eef29a852339b5ef87a9d9620a84622b7>)
+![图片: We know this is disappointing and we’re very sorry](<https://preview.redd.it/m7cjgtunhduh1.png?width=640&crop=smart&auto=webp&s=3e90ce2eef29a852339b5ef87a9d9620a84622b7>)
+
+[图片: We know this is disappointing and we’re very sorry](<https://preview.redd.it/m7cjgtunhduh1.png?width=640&crop=smart&auto=webp&s=3e90ce2eef29a852339b5ef87a9d9620a84622b7>)

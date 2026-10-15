@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "How do you handle reviewing large amounts of AI-generated code?"
-description: "The author has been using Codex for development and reports growing fatigue with code review as a result. The prompt for the question is that AI agents can produce code very quickly — sometimes hundreds or even thousands of lines — and the "
+description: "The author has been using Codex for development and reports growing fatigue with code review as a result. The prompt for the question is that AI agents can produce code very quickly — sometimes hundreds or even thousands of lines — and t..."
 date: "2026-10-09T00:38:50.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:22:47.680Z"

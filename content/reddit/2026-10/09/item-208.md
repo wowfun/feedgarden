@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "I built MaRN: a PyTorch library for training neural networks through low-dimensional parameter mappings [P]"
-description: "MaRN (Mapping Networks) is a PyTorch library that lets users optimize a compact latent representation instead of directly training every model parameter. The author reports results from current exploratory benchmarks, including synthetic da"
+description: "MaRN (Mapping Networks) is a PyTorch library that lets users optimize a compact latent representation instead of directly training every model parameter. The author reports results from current exploratory benchmarks, including synthetic..."
 date: "2026-10-09T08:05:23.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:47.429Z"

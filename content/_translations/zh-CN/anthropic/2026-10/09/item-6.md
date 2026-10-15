@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Frontier Red Team"
-description: "该页面介绍 Anthropic 的 Frontier Red Team，它是页面列出的六个研究团队之一。团队表示其工作是对 AI 系统进行压力测试，以了解其当前能力的全貌并预判下一步发展，并就 AI 在网络安全、国家安全和自主系统方面的影响提供有证据支撑的分析。 页面把 Project Fetch 第二阶段列为当前工作，这是检验 Claude 能否帮助 Anthropic 员工完成复杂（且有趣）机器人任务的测试结果。列出的近期出版物覆盖安全与自主性等多个主题：《推出面向开源软"
+description: "该页面介绍 Anthropic 的 Frontier Red Team，它是页面列出的六个研究团队之一。团队表示其工作是对 AI 系统进行压力测试，以了解其当前能力的全貌并预判下一步发展，并就 AI 在网络安全、国家安全和自主系统方面的影响提供有证据支撑的分析。 页面把 Project Fetch 第二阶段列为当前工作，这是检验 Claude 能否帮助 Anthropic 员工完成复杂（且有趣）机器人任务的测试结果。列出的近期出版物覆盖安全与自主性等多个主题：《推出面向..."
 date: "2026-10-09T14:18:15.842Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:15.842Z"

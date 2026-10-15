@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "ThinkingBox: Solving an agent task once vs. solving it 20/20: 507 stateful workflows graded on terminal database state [R]"
-description: "ThinkingBox is a benchmark that measures how much of an agent's single success rate survives repetition, and whether \"the agent finished the task\" means the backend database actually reached the correct state. The paper, code, dataset, and "
+description: "ThinkingBox is a benchmark that measures how much of an agent's single success rate survives repetition, and whether \"the agent finished the task\" means the backend database actually reached the correct state. The paper, code, dataset, a..."
 date: "2026-10-09T00:50:36.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:47.429Z"
@@ -21,6 +21,8 @@ Failures often look clean. In a retrospective ablation over 121,680 valid trials
 
 The authors caution that tasks are synthetic reconstructions of enterprise workflow patterns rather than production traffic, that 20/20 on the trial budget is not a guarantee of future reliability, and that the simulated user is a fixed LLM, a source of variance discussed in the appendix. Failure categories are deterministic diagnostic labels, not causal explanations. Anyone can run the 507 tasks against their own model through the HF OpenEnv environment. The appendix reports both the observed all-20 count and a plug-in pass^k estimate, which answer different questions: one records what happened in a fixed 20-attempt campaign, the other estimates repeated success under additional assumptions. The authors ask which should be emphasized on a reliability leaderboard, or whether both should be shown.
 
-## Images and video
+## Media
 
-- [Image: ThinkingBox: Solving an agent task once vs. solving it 20/20: 507 stateful workflows graded on terminal database state &#91;R&#93;](<https://external-preview.redd.it/q3evP6JeDpAC2MdSQHWYxnCYTqbJkElIQsLFqVSdkss.png?width=140&height=81&auto=webp&s=d39c4c208d55b26179446aa55ac5f84224359090>)
+![Image: ThinkingBox: Solving an agent task once vs. solving it 20/20: 507 stateful workflows graded on terminal database state &#91;R&#93;](<https://external-preview.redd.it/q3evP6JeDpAC2MdSQHWYxnCYTqbJkElIQsLFqVSdkss.png?width=140&height=81&auto=webp&s=d39c4c208d55b26179446aa55ac5f84224359090>)
+
+[Image: ThinkingBox: Solving an agent task once vs. solving it 20/20: 507 stateful workflows graded on terminal database state &#91;R&#93;](<https://external-preview.redd.it/q3evP6JeDpAC2MdSQHWYxnCYTqbJkElIQsLFqVSdkss.png?width=140&height=81&auto=webp&s=d39c4c208d55b26179446aa55ac5f84224359090>)

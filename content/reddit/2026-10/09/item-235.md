@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "SAC tickets non-transferable? [D]"
-description: "A community member asks whether NeurIPS student activities or volunteer tickets are transferable this year, noting that in the past NeurIPS allowed such tickets to be transferred, but that this apparently does not apply this time. The poste"
+description: "A community member asks whether NeurIPS student activities or volunteer tickets are transferable this year, noting that in the past NeurIPS allowed such tickets to be transferred, but that this apparently does not apply this time. The po..."
 date: "2026-10-09T09:45:38.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:47.429Z"

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Cloudflare Keeps 1.1.1.1 Out of Piracy Blocking, Escapes Penalties in France"
-description: "Over the past two years, French courts have ordered a widening set of intermediaries to block access to pirate sports streams. Besides regular ISPs, the orders now target public DNS resolvers, VPN services, search engines and CDN providers,"
+description: "Over the past two years, French courts have ordered a widening set of intermediaries to block access to pirate sports streams. Besides regular ISPs, the orders now target public DNS resolvers, VPN services, search engines and CDN provide..."
 date: "2026-10-08T18:32:52.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -38,8 +38,16 @@ Selected comments: [Zenul&#95;Abidin](https://news.ycombinator.com/item?id=50010
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50009965>)
 
-## Images and video
+## Media
 
-- [Image: 50k requested by canal+](<https://torrentfreak.com/images/50k.png>)
-- [Image: Not Cloudflare's responsibility](<https://torrentfreak.com/images/shot-cloudflare-not-responsible.png>)
-- [Image: transparency report 1.1.1.1 not blocked](<https://torrentfreak.com/images/transparency-notblocked.png>)
+![Image: 50k requested by canal+](<https://torrentfreak.com/images/50k.png>)
+
+[Image: 50k requested by canal+](<https://torrentfreak.com/images/50k.png>)
+
+![Image: Not Cloudflare's responsibility](<https://torrentfreak.com/images/shot-cloudflare-not-responsible.png>)
+
+[Image: Not Cloudflare's responsibility](<https://torrentfreak.com/images/shot-cloudflare-not-responsible.png>)
+
+![Image: transparency report 1.1.1.1 not blocked](<https://torrentfreak.com/images/transparency-notblocked.png>)
+
+[Image: transparency report 1.1.1.1 not blocked](<https://torrentfreak.com/images/transparency-notblocked.png>)

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "ArtCraft 的“氛围编程”应用对 Adobe 意味着什么"
-description: "作者是一位长期使用创意软件的用户，描述了自己与 Adobe 关系不断恶化的过程：公司无视 Mac 的设计惯例，把订阅变成唯一现实选择，持续涨价，并把服务重心转向每年购买数百个许可的客户。大量高级用户转向 Linux，却基本被忽视；Adobe 的许多 AI 功能也常常违背创意人的意愿推出。 这一背景解释了 ArtCraft 的吸引力：它是一个用“氛围编程”方式、以净室方法重建 Creative Cloud 全套应用的开源项目。应用名称陌生，但对应关系清晰——分别对标 Photo"
+description: "作者是一位长期使用创意软件的用户，描述了自己与 Adobe 关系不断恶化的过程：公司无视 Mac 的设计惯例，把订阅变成唯一现实选择，持续涨价，并把服务重心转向每年购买数百个许可的客户。大量高级用户转向 Linux，却基本被忽视；Adobe 的许多 AI 功能也常常违背创意人的意愿推出。 这一背景解释了 ArtCraft 的吸引力：它是一个用“氛围编程”方式、以净室方法重建 Creative Cloud 全套应用的开源项目。应用名称陌生，但对应关系清晰——分别对标 Ph..."
 date: "2026-10-08T18:44:29.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -35,6 +35,8 @@ tags: ["source/hackernews","topics/products","topics/coding"]
 
 [查看完整 HN 讨论](<https://news.ycombinator.com/item?id=50010170>)
 
-## 图片与视频
+## 媒体
 
-- [图片: Here’s how fast this project is moving. When I initially started messing around with this, it didn’t show my list of fonts. I then went to the GitHub page for DesignCraft, downloaded a new version that had just been released, and all of a s](<https://proxy.tedium.co/TlsUZ3Z1kth_BJ5g-VEEG3t-hJE=/1014x1001/filters:quality(80)/uploads/screenshot_2026-10-08_10-57-55.png>)
+![图片: Here’s how fast this project is moving. When I initially started messing around with this, it didn’t show my list of fonts. I then went to the GitHub page for DesignCraft, downloaded a new version that had just been released, and all of a s](<https://proxy.tedium.co/TlsUZ3Z1kth_BJ5g-VEEG3t-hJE=/1014x1001/filters:quality(80)/uploads/screenshot_2026-10-08_10-57-55.png>)
+
+[图片: Here’s how fast this project is moving. When I initially started messing around with this, it didn’t show my list of fonts. I then went to the GitHub page for DesignCraft, downloaded a new version that had just been released, and all of a s](<https://proxy.tedium.co/TlsUZ3Z1kth_BJ5g-VEEG3t-hJE=/1014x1001/filters:quality(80)/uploads/screenshot_2026-10-08_10-57-55.png>)

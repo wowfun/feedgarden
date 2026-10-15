@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Reducing undefined behavior in the C language"
-description: "Martin Uecker, a biomedical engineering professor who writes free software for controlling MRI scanners, spoke at Kernel Recipes about undefined behavior (UB) in C and whether the language can eventually be made memory-safe. He argued C rem"
+description: "Martin Uecker, a biomedical engineering professor who writes free software for controlling MRI scanners, spoke at Kernel Recipes about undefined behavior (UB) in C and whether the language can eventually be made memory-safe. He argued C ..."
 date: "2026-10-09T02:02:53.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -38,7 +38,12 @@ Selected comments: [pizlonator](https://news.ycombinator.com/item?id=50016256) Â
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50015074>)
 
-## Images and video
+## Media
 
-- [Image: &#91;Martin Uecker&#93;](<https://static.lwn.net/images/conf/2026/kr/MartinUecker-sm.png>)
-- [Video: video](<https://www.youtube.com/watch?v=dhlYcmX_oBQ&list=PLEVVgAZOU9P8&index=14>)
+![Image: &#91;Martin Uecker&#93;](<https://static.lwn.net/images/conf/2026/kr/MartinUecker-sm.png>)
+
+[Image: &#91;Martin Uecker&#93;](<https://static.lwn.net/images/conf/2026/kr/MartinUecker-sm.png>)
+
+![Video: video](<https://www.youtube.com/watch?v=dhlYcmX_oBQ&list=PLEVVgAZOU9P8&index=14>)
+
+[Video: video](<https://www.youtube.com/watch?v=dhlYcmX_oBQ&list=PLEVVgAZOU9P8&index=14>)

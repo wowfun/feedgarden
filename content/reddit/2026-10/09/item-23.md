@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Ultrafast rolling out for GPT-6.1 Sol in API, Codex and ChatGPT Work"
-description: "A short post announces that Ultrafast is rolling out today for GPT-6.1 Sol across the API, Codex and ChatGPT Work. It describes the offering as near-Astra intelligence at up to 8x faster speeds than Sol Standard. No benchmarks, pricing, ava"
+description: "A short post announces that Ultrafast is rolling out today for GPT-6.1 Sol across the API, Codex and ChatGPT Work. It describes the offering as near-Astra intelligence at up to 8x faster speeds than Sol Standard. No benchmarks, pricing, ..."
 date: "2026-10-08T18:49:51.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:19:48.561Z"

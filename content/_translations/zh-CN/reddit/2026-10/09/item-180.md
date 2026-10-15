@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "把 Haiku 5.5、Sonnet 5.5 与 Opus 5.5 当子智能体实测 6 个真实任务"
-description: "一位用户把 Opus 5.5 在项目中已经完成的 6 个任务重新跑了一遍，改用 Sonnet 5.5 和 Haiku 5.5，全部采用 high effort，提示词和文件完全相同，再把每个结果与真实答案核对。 代码检索（为一个新功能找出所有需要改动的文件，真实改动数为 48 个）：Opus 找到 45 个，Sonnet 44 个，Haiku 44 个。成本为 Opus 6.17 美元、Sonnet 1.38 美元、Haiku 0.44 美元，因此作者认为在质量相当的情况下，"
+description: "一位用户把 Opus 5.5 在项目中已经完成的 6 个任务重新跑了一遍，改用 Sonnet 5.5 和 Haiku 5.5，全部采用 high effort，提示词和文件完全相同，再把每个结果与真实答案核对。 代码检索（为一个新功能找出所有需要改动的文件，真实改动数为 48 个）：Opus 找到 45 个，Sonnet 44 个，Haiku 44 个。成本为 Opus 6.17 美元、Sonnet 1.38 美元、Haiku 0.44 美元，因此作者认为在质量相当的情..."
 date: "2026-10-09T06:39:53.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:21:48.097Z"

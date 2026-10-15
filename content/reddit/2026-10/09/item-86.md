@@ -13,6 +13,8 @@ tags: ["source/reddit","topics/industry","topics/products","topics/evaluation"]
 
 
 
-## Images and video
+## Media
 
-- [Image: Anthropic Bans “Abusive or Cruel Behavior” Toward Claude](<https://preview.redd.it/xsr7m9a08cuh1.jpeg?width=640&crop=smart&auto=webp&s=7e0181454e2f1d0caaee9d36fc351689714628c2>)
+![Image: Anthropic Bans “Abusive or Cruel Behavior” Toward Claude](<https://preview.redd.it/xsr7m9a08cuh1.jpeg?width=640&crop=smart&auto=webp&s=7e0181454e2f1d0caaee9d36fc351689714628c2>)
+
+[Image: Anthropic Bans “Abusive or Cruel Behavior” Toward Claude](<https://preview.redd.it/xsr7m9a08cuh1.jpeg?width=640&crop=smart&auto=webp&s=7e0181454e2f1d0caaee9d36fc351689714628c2>)

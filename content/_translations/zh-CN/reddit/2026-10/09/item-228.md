@@ -15,6 +15,8 @@ tags: ["source/reddit","topics/products"]
 
 除幽默之外，这条内容没有技术主张或事实细节，唯一实质内容就是这句被当作提示词的假威胁。
 
-## 图片与视频
+## 媒体
 
-- [图片: Why does Claude need to see my ovulation cycle? 🥺](<https://preview.redd.it/ulkkojdhteuh1.jpeg?width=640&crop=smart&auto=webp&s=479fce5e494c3dfe0f8a9bb7b9f0972a4c185069>)
+![图片: Why does Claude need to see my ovulation cycle? 🥺](<https://preview.redd.it/ulkkojdhteuh1.jpeg?width=640&crop=smart&auto=webp&s=479fce5e494c3dfe0f8a9bb7b9f0972a4c185069>)
+
+[图片: Why does Claude need to see my ovulation cycle? 🥺](<https://preview.redd.it/ulkkojdhteuh1.jpeg?width=640&crop=smart&auto=webp&s=479fce5e494c3dfe0f8a9bb7b9f0972a4c185069>)

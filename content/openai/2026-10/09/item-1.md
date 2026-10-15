@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "How Oracle turns days of work into minutes with ChatGPT and Codex"
-description: "OpenAI published a case study on Oracle's use of ChatGPT Work and Codex across recruiting, internal business analysis and engineering. OpenAI reports that Oracle has 130,000 active ChatGPT users and more than 95,000 active Codex users. In r"
+description: "OpenAI published a case study on Oracle's use of ChatGPT Work and Codex across recruiting, internal business analysis and engineering. OpenAI reports that Oracle has 130,000 active ChatGPT users and more than 95,000 active Codex users. I..."
 date: "2026-10-08T16:00:00.000Z"
 updated: "2026-10-09T13:12:05.734Z"
 first_seen: "2026-10-09T04:20:40.013Z"

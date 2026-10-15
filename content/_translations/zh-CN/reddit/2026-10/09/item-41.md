@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "URM 和 UT 是否已被整合进前沿模型？还是被丢进了被遗忘论文的故纸堆？[D]"
-description: "r/MachineLearning 上的一篇讨论帖询问，通用 Transformer（Universal Transformer，UT）和通用推理模型（Universal Reasoning Model，URM）背后的思路是否已被前沿实验室采用，还是仍属于被忽视的研究。帖子附有论文、一篇简化解读博客和一段视频演讲的链接。 帖子复述了 UT 的机制：UT 不堆叠 L 个不同的 Transformer 层，而是反复应用同一个转换模块来不断精炼 token 表示。从嵌入矩阵 H0 "
+description: "r/MachineLearning 上的一篇讨论帖询问，通用 Transformer（Universal Transformer，UT）和通用推理模型（Universal Reasoning Model，URM）背后的思路是否已被前沿实验室采用，还是仍属于被忽视的研究。帖子附有论文、一篇简化解读博客和一段视频演讲的链接。 帖子复述了 UT 的机制：UT 不堆叠 L 个不同的 Transformer 层，而是反复应用同一个转换模块来不断精炼 token 表示。从嵌入矩阵 ..."
 date: "2026-10-08T20:28:20.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:47.429Z"
@@ -19,6 +19,8 @@ r/MachineLearning 上的一篇讨论帖询问，通用 Transformer（Universal T
 
 注意：性能主张和整体表述来自发帖人；来源没有提供独立的基准数值或采用情况的证据。
 
-## 图片与视频
+## 媒体
 
-- [视频: https&#58;//www.youtube.com/watch?v=RxNPFCYCFBU](<https://www.youtube.com/watch?v=RxNPFCYCFBU>)
+![视频: https&#58;//www.youtube.com/watch?v=RxNPFCYCFBU](<https://www.youtube.com/watch?v=RxNPFCYCFBU>)
+
+[视频: https&#58;//www.youtube.com/watch?v=RxNPFCYCFBU](<https://www.youtube.com/watch?v=RxNPFCYCFBU>)

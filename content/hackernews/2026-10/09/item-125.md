@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Meadows – a small language for stock-and-flow diagrams that run"
-description: "The submitter, jjsalamon, describes building a small language for Donella Meadows-style stock-and-flow diagrams while reading \"Thinking in Systems\" and wanting to manipulate its diagrams rather than just look at them. You type a model such "
+description: "The submitter, jjsalamon, describes building a small language for Donella Meadows-style stock-and-flow diagrams while reading \"Thinking in Systems\" and wanting to manipulate its diagrams rather than just look at them. You type a model su..."
 date: "2026-10-09T12:29:40.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"

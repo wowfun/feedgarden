@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Verdict Without the Rule: Diagnosing and Auditing Regulatory Rule Sensitivity in LLM Compliance Systems"
-description: "Large language model compliance systems are deployed on the assumption that a verdict depends on the regulatory rule it is given. The authors test this directly across five models and 20 regulatory and platform-policy domains: they delete, "
+description: "Large language model compliance systems are deployed on the assumption that a verdict depends on the regulatory rule it is given. The authors test this directly across five models and 20 regulatory and platform-policy domains: they delet..."
 date: "2026-10-08T16:59:40.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Show HN: Making a flexible neon t-shirt with LED filaments"
-description: "When his employer announced a neon-themed event less than a week in advance, the author used the deadline to turn LED filaments that had sat in his parts bin for years into a wearable neon shirt. The write-up covers parts, technique and con"
+description: "When his employer announced a neon-themed event less than a week in advance, the author used the deadline to turn LED filaments that had sat in his parts bin for years into a wearable neon shirt. The write-up covers parts, technique and ..."
 date: "2026-10-08T16:37:24.000Z"
 updated: "2026-10-10T04:14:41.546Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -32,8 +32,16 @@ Selected comments: [wolvoleo](https://news.ycombinator.com/item?id=50015985) · 
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50008047>)
 
-## Images and video
+## Media
 
-- [Image](<https://scottbez1.github.io/LedNeonShirt/IMG_0582%202.jpeg>)
-- [Image](<https://blogger.googleusercontent.com/img/a/AVvXsEgs97-o3J1ajkrgSlL30Hi0TEdzSvL-0gPDR_GZX2oN0XAuFdG4264P2tlPh2fVHuyS_Q0neFBiChV43SyFa1_2Mo-2k2mdla1Eh4pCt-q30Z1dRTqpfarkzVJhUilzCMTwz1jJ-XiaiS7v9MwEf_8j1wo7qm39Dcxb0zgIjIfYZhznmWIJHy-OQMzwDGo=w640-h480>)
-- [Image](<https://blogger.googleusercontent.com/img/a/AVvXsEi9sSVYZFaXBVnzyDY7JFKH_PXSKFgPuwiMEbao5G14IOvU-iLHJrnENqK6IYsVb6U9Vi5q0bEWB8LmhpI_hzExGMppLnKwk6edb43TZCITUdk2LJZdwjIQ790SRRuZ5hS5Gss0dhtdFItcaKf4A_kVmcP7VCyZC0E08_AEfe3_dv-3qnnlgMh4_z_whEw=w640-h374>)
+![Image](<https://scottbez1.github.io/LedNeonShirt/IMG_0582%202.jpeg>)
+
+[Image](<https://scottbez1.github.io/LedNeonShirt/IMG_0582%202.jpeg>)
+
+![Image](<https://blogger.googleusercontent.com/img/a/AVvXsEgs97-o3J1ajkrgSlL30Hi0TEdzSvL-0gPDR_GZX2oN0XAuFdG4264P2tlPh2fVHuyS_Q0neFBiChV43SyFa1_2Mo-2k2mdla1Eh4pCt-q30Z1dRTqpfarkzVJhUilzCMTwz1jJ-XiaiS7v9MwEf_8j1wo7qm39Dcxb0zgIjIfYZhznmWIJHy-OQMzwDGo=w640-h480>)
+
+[Image](<https://blogger.googleusercontent.com/img/a/AVvXsEgs97-o3J1ajkrgSlL30Hi0TEdzSvL-0gPDR_GZX2oN0XAuFdG4264P2tlPh2fVHuyS_Q0neFBiChV43SyFa1_2Mo-2k2mdla1Eh4pCt-q30Z1dRTqpfarkzVJhUilzCMTwz1jJ-XiaiS7v9MwEf_8j1wo7qm39Dcxb0zgIjIfYZhznmWIJHy-OQMzwDGo=w640-h480>)
+
+![Image](<https://blogger.googleusercontent.com/img/a/AVvXsEi9sSVYZFaXBVnzyDY7JFKH_PXSKFgPuwiMEbao5G14IOvU-iLHJrnENqK6IYsVb6U9Vi5q0bEWB8LmhpI_hzExGMppLnKwk6edb43TZCITUdk2LJZdwjIQ790SRRuZ5hS5Gss0dhtdFItcaKf4A_kVmcP7VCyZC0E08_AEfe3_dv-3qnnlgMh4_z_whEw=w640-h374>)
+
+[Image](<https://blogger.googleusercontent.com/img/a/AVvXsEi9sSVYZFaXBVnzyDY7JFKH_PXSKFgPuwiMEbao5G14IOvU-iLHJrnENqK6IYsVb6U9Vi5q0bEWB8LmhpI_hzExGMppLnKwk6edb43TZCITUdk2LJZdwjIQ790SRRuZ5hS5Gss0dhtdFItcaKf4A_kVmcP7VCyZC0E08_AEfe3_dv-3qnnlgMh4_z_whEw=w640-h374>)

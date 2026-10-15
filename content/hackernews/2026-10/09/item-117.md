@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Nobel Peace Prize for 2026 to Navanethem \"NAVI\" Pillay"
-description: "The Norwegian Nobel Committee awarded the 2026 Nobel Peace Prize to Navanethem \"Navi\" Pillay, citing exceptional courage and integrity in leading the way toward a more comprehensive global legal order and her role in ensuring that war crime"
+description: "The Norwegian Nobel Committee awarded the 2026 Nobel Peace Prize to Navanethem \"Navi\" Pillay, citing exceptional courage and integrity in leading the way toward a more comprehensive global legal order and her role in ensuring that war cr..."
 date: "2026-10-09T10:12:11.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -34,6 +34,8 @@ Selected comments: [killingtime74](https://news.ycombinator.com/item?id=50018685
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50018420>)
 
-## Images and video
+## Media
 
-- [Image: Watch the 2026 Nobel Prize announcements live](<https://www.nobelprize.org/images/195121-landscape-large.jpg>)
+![Image: Watch the 2026 Nobel Prize announcements live](<https://www.nobelprize.org/images/195121-landscape-large.jpg>)
+
+[Image: Watch the 2026 Nobel Prize announcements live](<https://www.nobelprize.org/images/195121-landscape-large.jpg>)

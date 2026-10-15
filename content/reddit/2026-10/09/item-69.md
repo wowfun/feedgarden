@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Strata rewrote their GitHub history to wipe evidence of Claude-authoring"
-description: "A user reports that Strata rewrote its repository history so that all previous commits had the \"Co-Authored by Claude\" text stripped from their descriptions. The evidence described is indirect: they noticed it when running the project's bui"
+description: "A user reports that Strata rewrote its repository history so that all previous commits had the \"Co-Authored by Claude\" text stripped from their descriptions. The evidence described is indirect: they noticed it when running the project's ..."
 date: "2026-10-08T22:52:03.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:18:44.332Z"

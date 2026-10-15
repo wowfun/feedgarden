@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "South Africa's Navanethem 'Navi' Pillay Wins 2026 Nobel Peace Prize"
-description: "The Norwegian Nobel Committee awarded the 2026 Nobel Peace Prize to South African judge Navanethem \"Navi\" Pillay, it announced Friday in Oslo. Committee chair Jorgen Watne Frydnes said Pillay had been \"instrumental in ensuring that war crim"
+description: "The Norwegian Nobel Committee awarded the 2026 Nobel Peace Prize to South African judge Navanethem \"Navi\" Pillay, it announced Friday in Oslo. Committee chair Jorgen Watne Frydnes said Pillay had been \"instrumental in ensuring that war c..."
 date: "2026-10-09T09:05:40.000Z"
 updated: "2026-10-10T04:57:54.048Z"
 first_seen: "2026-10-09T14:17:37.221Z"

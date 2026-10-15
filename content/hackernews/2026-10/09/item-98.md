@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Keyboard differences between Windows and Macs"
-description: "The author compiles a reference of the key-handling differences between macOS and Windows that trip up cross-platform software, especially web apps that must serve the same codebase to both. Naming diverges first. What Windows calls Backspa"
+description: "The author compiles a reference of the key-handling differences between macOS and Windows that trip up cross-platform software, especially web apps that must serve the same codebase to both. Naming diverges first. What Windows calls Back..."
 date: "2026-10-09T03:08:05.000Z"
 updated: "2026-10-10T06:19:28.614Z"
 first_seen: "2026-10-09T14:17:37.221Z"
@@ -36,8 +36,16 @@ Selected comments: [RobGR](https://news.ycombinator.com/item?id=50016411) · [ha
 
 [Read the full HN discussion](<https://news.ycombinator.com/item?id=50015515>)
 
-## Images and video
+## Media
 
-- [Image](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/3.1088w.avif>)
-- [Image](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/4.1088w.avif>)
-- [Image](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/7.1088w.avif>)
+![Image](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/3.1088w.avif>)
+
+[Image](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/3.1088w.avif>)
+
+![Image](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/4.1088w.avif>)
+
+[Image](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/4.1088w.avif>)
+
+![Image](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/7.1088w.avif>)
+
+[Image](<https://unsung.aresluna.org/_media/deeper-dive-keyboard-differences-between-windows-and-macs/7.1088w.avif>)

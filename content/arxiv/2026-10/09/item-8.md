@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Learning Probabilistic Logic Programs with Functional Gradient Guided Language Models"
-description: "Declarative logic programs offer a powerful and interpretable abstraction for encoding relational structure and neurosymbolic reasoning by expressing dependencies as weighted compositional rules. However, inducing them from data remains fun"
+description: "Declarative logic programs offer a powerful and interpretable abstraction for encoding relational structure and neurosymbolic reasoning by expressing dependencies as weighted compositional rules. However, inducing them from data remains ..."
 date: "2026-10-08T16:53:32.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:23:47.674Z"

@@ -2,7 +2,7 @@
 publish: true
 content_type: "post"
 title: "Subscriber reports easier-to-reach Opus 5.5 usage limits"
-description: "A user on the $20 plan says they have been using Opus 5.5 heavily and find it harder than before to max out a five-hour session, describing the limits experience as better than ever and thanking the provider. They note they have not read mu"
+description: "A user on the $20 plan says they have been using Opus 5.5 heavily and find it harder than before to max out a five-hour session, describing the limits experience as better than ever and thanking the provider. They note they have not read..."
 date: "2026-10-09T01:22:09.000Z"
 updated: "2026-10-09T14:29:13.445Z"
 first_seen: "2026-10-09T14:21:48.097Z"

@@ -21,11 +21,15 @@ website:
     relations: false
     previews: false
     outline: true
+    favorites: true
   home:
     layout: archive
   blog:
     page_size: 50
     utc_offset: "+08:00"
+    timeline_granularity: day
+    ledger_group_by: day
+    export_max_days: 7
     facets:
       source: source/
       topic: topics/

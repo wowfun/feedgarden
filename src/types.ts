@@ -20,4 +20,3 @@ export interface Item {
 export interface RawResponse { url: string; resolvedUrl?: string; status: number; body: string; fetchedAt: string; headers: Record<string, string> }
 export interface Coverage { status: 'complete' | 'partial' | 'stale' | 'failed'; from?: string; to: string; notes: string[] }
 export interface Collection { items: Item[]; raw: RawResponse[]; cursor?: string; coverage: Coverage; ranking?: { method: SelectionMethod; window: RankingWindow; size: number } }
-export interface Translation { title: string; summary: string }

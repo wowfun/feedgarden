@@ -23,11 +23,6 @@ export async function applyTopics(path: string, next: Registry, expectedHash?: s
   if (hash(previous) === hash(valid)) return;
   await atomicWrite(path, JSON.stringify(valid, null, 2) + '\n', signal);
 }
-export const resolveTopic = (registry: Registry, id: string): string => {
-  const topic = registry.topics.find(topic => topic.id === id);
-  if (!topic) throw new Error('Unknown stored topic: ' + id);
-  return topic.replacedBy ?? topic.id;
-};
 export function mergeTopics(base: Registry, local: Registry, remote: Registry): Registry {
   const indexed = [base, local, remote].map(registry => new Map(registry.topics.map(topic => [topic.id, topic])));
   const ids = new Set([...base.topics, ...local.topics, ...remote.topics].map(topic => topic.id));

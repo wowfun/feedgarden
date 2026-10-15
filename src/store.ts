@@ -222,9 +222,6 @@ export class Store {
     const rows = this.db.prepare(`SELECT data FROM items WHERE source=? ${clauses.length ? 'AND ' + clauses.join(' AND ') : ''} ORDER BY julianday(published_at),id`).all(...args) as { data: string }[];
     return rows.map(row => JSON.parse(row.data) as Item);
   }
-  observations(source: string, start: string, end: string): Item[] {
-    return (this.db.prepare('SELECT data FROM observations WHERE source=? AND observed_at>=? AND observed_at<? ORDER BY observed_at,id').all(source, start, end) as { data: string }[]).map(row => JSON.parse(row.data) as Item);
-  }
   states(): ChannelState[] { return this.db.prepare('SELECT * FROM channel_state ORDER BY source,stream,channel').all() as ChannelState[]; }
   meta(key: string): string | undefined { return (this.statement('SELECT value FROM feed_meta WHERE key=?').get(key) as { value: string } | undefined)?.value; }
   setMeta(key: string, value: string): void { this.db.prepare('INSERT OR REPLACE INTO feed_meta VALUES (?,?)').run(key, value); }

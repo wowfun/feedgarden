@@ -20,8 +20,8 @@ const api = 'https://hacker-news.firebaseio.com/v0/item/';
 const item = { source: 'hackernews', stream: 'frontpage', channel: 'firebase', id: '100', title: 'Original article', text: '', url: 'https://example.com/article', publishedAt: '2026-10-09T00:00:00Z', observedAt: '2026-10-09T01:00:00Z', basis: 'published', metrics: {} } as const;
 const topics = { version: 1 as const, topics: [{ id: 'coding', name: { en: 'Coding', 'zh-CN': '编程' }, description: 'Tools', aliases: [], deprecated: false }] };
 function cache(store: Store, url: string, body: unknown, type = 'application/json') { store.saveCache({ url, status: 200, fetchedAt: new Date().toISOString(), headers: { 'content-type': type }, body: typeof body === 'string' ? body : JSON.stringify(body) }); }
-function seed(store: Store) {
-  cache(store, item.url, '<article><h1>Design</h1><p>' + 'A bounded system uses evidence to explain its behavior. '.repeat(30) + '</p><img src="/diagram.png" alt="Architecture diagram"></article>', 'text/html');
+function seed(store: Store, articleUrl: string = item.url) {
+  cache(store, articleUrl, '<article><h1>Design</h1><p>' + 'A bounded system uses evidence to explain its behavior. '.repeat(30) + '</p><img src="/diagram.png" alt="Architecture diagram"></article>', 'text/html');
   cache(store, api + item.id + '.json', { id: 100, type: 'story', descendants: 9, kids: [5, 2, 3, 4] });
   cache(store, api + '5.json', { id: 5, type: 'comment', parent: 100, by: 'deleted', deleted: true });
   cache(store, api + '2.json', { id: 2, type: 'comment', parent: 100, by: 'first', text: 'First argument.<p>Practical experience.', kids: [20] });
@@ -121,16 +121,18 @@ test('HN native post paragraphs retain spacing even when the older feed parser j
 
 test('failed article and discussion refresh retain accepted evidence; successful removal does not revive old comments', async () => {
   const store = new Store(':memory:');
+  // The HTTP response is mocked; a public literal also keeps DNS out of this test.
+  const publicItem = { ...item, url: 'https://8.8.8.8/article' };
   try {
-    seed(store); const original = await enrichItem(item, store, new Http(store));
+    seed(store, publicItem.url); const original = await enrichItem(publicItem, store, new Http(store));
     store.db.prepare('INSERT INTO feed_summaries VALUES (?,?,?,?,?)').run(item.source, item.id, 'key', JSON.stringify({ item: original }), item.observedAt);
     const http = new Http(store, async () => new Response('Unavailable', { status: 403 }));
-    const retained = await enrichItem(item, store, http, true);
+    const retained = await enrichItem(publicItem, store, http, true);
     assert.equal(retained.text, original.text); assert.deepEqual(retained.discussion, original.discussion);
     assert.match(String(retained.metadata?.hnArticleError), /403/); assert.match(String(retained.metadata?.hnDiscussionError), /403/);
     assert.equal(http.raw.length, 0);
     cache(store, api + '100.json', { id: 100, deleted: true });
-    assert.deepEqual((await enrichItem(item, store, new Http(store))).discussion?.comments, []);
+    assert.deepEqual((await enrichItem(publicItem, store, new Http(store))).discussion?.comments, []);
   } finally { store.close(); }
 });
 

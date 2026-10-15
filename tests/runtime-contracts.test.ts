@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile, stat } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { reportSkill } from '../src/report-skill.js';
 import { run, validationEnvironment } from '../src/build-site.js';
 import { iso, isoDate } from '../src/util.js';
@@ -11,7 +12,20 @@ import { DateTime } from 'luxon';
 import { apply as plugin } from '../src/dsh-plugin.mjs';
 import { validateArtifact } from '../src/topics-contract.mjs';
 import type { SummaryInput } from '../src/agent.js';
+import { processCommand } from '../src/process-command.js';
 import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools';
+
+test('Windows npm entrypoints use the running Node even when the shim directory has no node.exe', { skip: process.platform !== 'win32' }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'feedgarden-npm-shim-'));
+  try {
+    await mkdir(join(root, 'node_modules/npm/bin'), { recursive: true });
+    await writeFile(join(root, 'node_modules/npm/bin/npm-cli.js'), 'console.log(JSON.stringify(process.argv.slice(2)))');
+    const [program, args] = processCommand('npm', ['a b', 'x&y'], { PATH: root });
+    assert.equal(program, process.execPath);
+    assert.deepEqual(JSON.parse(execFileSync(program, args, { encoding: 'utf8' })), ['a b', 'x&y']);
+    assert.throws(() => processCommand('npm', [], { PATH: '' }), /PATH/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
 
 test('site validation children receive a fixed environment without provider, Git or proxy credentials', async () => {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-build-env-'));
@@ -53,14 +67,14 @@ test('missing report skills identify the required file and a manual restoration 
   try {
     process.chdir(root);
     await assert.rejects(reportSkill(['one']), /MANUAL_ACTION: Restore.*SKILL\.md/);
-    assert.match(execFileSync(process.execPath, ['--import', join(previous, 'node_modules/tsx/dist/loader.mjs'), join(previous, 'scripts/live-collect.ts'), '--help'], { encoding: 'utf8' }), /Usage:/);
+    assert.match(execFileSync(process.execPath, ['--import', pathToFileURL(join(previous, 'node_modules/tsx/dist/loader.mjs')).href, join(previous, 'scripts/live-collect.ts'), '--help'], { encoding: 'utf8' }), /Usage:/);
   } finally { process.chdir(previous);await rm(root, { recursive: true, force: true }); }
 });
 test('live collection rejects mistyped source IDs before creating an evidence directory', async () => {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-collect-args-'));
   try {
     await writeFile(join(root, 'feedgarden.jsonc'), JSON.stringify({ version: 2, agent: { model: 'deepseek/deepseek-flash' }, sources: [{ id: 'one', name: 'One', intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'rss', kind: 'feed' }] }] }] }));
-    assert.throws(() => execFileSync(process.execPath, ['--import', join(process.cwd(), 'node_modules/tsx/dist/loader.mjs'), join(process.cwd(), 'scripts/live-collect.ts'), 'typo'], { cwd: root, encoding: 'utf8', env: { ...process.env, FEEDGARDEN_VALIDATION_DIR: join(root, 'evidence') }, stdio: 'pipe' }), error => {
+    assert.throws(() => execFileSync(process.execPath, ['--import', pathToFileURL(join(process.cwd(), 'node_modules/tsx/dist/loader.mjs')).href, join(process.cwd(), 'scripts/live-collect.ts'), 'typo'], { cwd: root, encoding: 'utf8', env: { ...process.env, FEEDGARDEN_VALIDATION_DIR: join(root, 'evidence') }, stdio: 'pipe' }), error => {
       assert.match(String((error as { stderr: string }).stderr), /Unknown or disabled source: typo/);return true;
     });
     await assert.rejects(stat(join(root, 'evidence')), { code: 'ENOENT' });

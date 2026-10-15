@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { mkdtemp, readFile, rm, writeFile, lstat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { DateTime } from 'luxon';
 import { createServer } from 'node:http';
 import { configSchema } from '../src/config.js';
@@ -12,6 +13,9 @@ import { Store } from '../src/store.js';
 import type { Item } from '../src/types.js';
 
 const exec = promisify(execFile);
+// Cold SDK/rendering imports are part of process startup. Bound that separately
+// from the cancellation latency measured after the fixture receives a request.
+const cliStartupTimeout = 30_000;
 test('quota deferral exits zero, retains pending items and finishes render/backup', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'feedgarden-cli-'));
   const config = configSchema.parse({ version: 2, storage: { directory, database: join(directory, 'data.sqlite') },
@@ -73,15 +77,17 @@ test('CLI collection succeeds with a fallback and reports partial when all chann
 
 test('lease renewal failure cancels collection, finishes the run and releases the runner lock', async () => {
   const directory=await mkdtemp(join(tmpdir(),'feedgarden-lease-'));
-  const server=createServer((_request,response)=>{response.writeHead(200);response.write('<rss>');});
+  let requestStarted=0;
+  const server=createServer((_request,response)=>{requestStarted ||= performance.now();response.writeHead(200);response.write('<rss>');});
   await new Promise<void>(done=>server.listen(0,'127.0.0.1',done));
   const address=server.address();assert.ok(address&&typeof address!=='string');
   const config=configSchema.parse({version:2,storage:{directory,database:join(directory,'data.sqlite')},agent:{model:'deepseek/deepseek-flash'},sources:[{id:'fixture',name:'Fixture',intervalHours:1,streams:[{id:'main',channels:[{id:'rss',kind:'feed',url:`http://127.0.0.1:${address.port}/stall`}]}]}]});
   const file=join(directory,'config.json'),preload=join(directory,'fault.mjs');
   await writeFile(file,JSON.stringify(config));
-  await writeFile(preload,`import { Store } from ${JSON.stringify(resolve('src/store.ts'))};\nconst interval=globalThis.setInterval;\nglobalThis.setInterval=(fn,ms,...args)=>interval(fn,ms===30000?20:ms,...args);\nStore.prototype.renewLease=()=>{throw new Error('Injected lease renewal failure');};\n`);
+  await writeFile(preload,`import { Store } from ${JSON.stringify(pathToFileURL(resolve('src/store.ts')).href)};\nconst interval=globalThis.setInterval;\nglobalThis.setInterval=(fn,ms,...args)=>interval(fn,ms===30000?20:ms,...args);\nStore.prototype.renewLease=()=>{throw new Error('Injected lease renewal failure');};\n`);
   try {
-    await assert.rejects(exec(process.execPath,['--import','tsx','--import',preload,resolve('src/cli.ts'),'collect','--config',file],{env:{...process.env,NO_PROXY:'127.0.0.1',no_proxy:'127.0.0.1'},timeout:5000}),error=>Number((error as any).code)===1);
+    await assert.rejects(exec(process.execPath,['--import','tsx','--import',pathToFileURL(preload).href,resolve('src/cli.ts'),'collect','--config',file],{env:{...process.env,NO_PROXY:'127.0.0.1',no_proxy:'127.0.0.1'},timeout:cliStartupTimeout}),error=>Number((error as any).code)===1);
+    if(requestStarted) assert.ok(performance.now()-requestStarted<5000,'collection must stop within five seconds of the active request');
     const store=new Store(config.storage.database);
     try {
       const run=store.db.prepare('SELECT status,details FROM runs').get() as {status:string;details:string};
@@ -95,13 +101,15 @@ test('lease renewal failure cancels collection, finishes the run and releases th
 
 test('a compromised filesystem lock cancels work and its already released state does not mask the failure', async () => {
  const directory=await mkdtemp(join(tmpdir(),'feedgarden-lock-'));
- const server=createServer((_request,response)=>{response.writeHead(200);response.write('<rss>');void rm(join(directory,'runner.lock'),{recursive:true});});
+ let requestStarted=0;
+ const server=createServer((_request,response)=>{requestStarted ||= performance.now();response.writeHead(200);response.write('<rss>');void rm(join(directory,'runner.lock'),{recursive:true});});
  await new Promise<void>(done=>server.listen(0,'127.0.0.1',done));const address=server.address();assert.ok(address&&typeof address!=='string');
  const config=configSchema.parse({version:2,storage:{directory,database:join(directory,'data.sqlite')},agent:{model:'deepseek/deepseek-flash'},sources:[{id:'fixture',name:'Fixture',intervalHours:1,streams:[{id:'main',channels:[{id:'rss',kind:'feed',url:`http://127.0.0.1:${address.port}/stall`}]}]}]});
  const file=join(directory,'config.json'),preload=join(directory,'fault.mjs');await writeFile(file,JSON.stringify(config));
  await writeFile(preload,'const timeout=globalThis.setTimeout;globalThis.setTimeout=(fn,ms,...args)=>timeout(fn,ms===10000?20:ms,...args);');
  try {
-  await assert.rejects(exec(process.execPath,['--import','tsx','--import',preload,resolve('src/cli.ts'),'collect','--config',file],{env:{...process.env,NO_PROXY:'127.0.0.1',no_proxy:'127.0.0.1'},timeout:5000}),error=>{assert.equal((error as any).code,1);assert.ok(!(error as any).stderr.includes('Lock is already released'));return true;});
+  await assert.rejects(exec(process.execPath,['--import','tsx','--import',pathToFileURL(preload).href,resolve('src/cli.ts'),'collect','--config',file],{env:{...process.env,NO_PROXY:'127.0.0.1',no_proxy:'127.0.0.1'},timeout:cliStartupTimeout}),error=>{assert.equal((error as any).code,1);assert.ok(!(error as any).stderr.includes('Lock is already released'));return true;});
+  assert.ok(requestStarted && performance.now()-requestStarted<5000,'a compromised lock must stop the active request within five seconds');
   const store=new Store(config.storage.database);try {assert.equal((store.db.prepare('SELECT status FROM runs').get() as any).status,'failed');assert.equal(store.states().length,0);assert.deepEqual(store.db.prepare('SELECT * FROM job_lease').all(),[]);}finally{store.close();}
  }finally{server.closeAllConnections();await new Promise<void>(done=>server.close(()=>done()));await rm(directory,{recursive:true,force:true});}
 });

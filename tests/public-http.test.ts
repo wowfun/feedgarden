@@ -12,6 +12,7 @@ import { readFile } from 'node:fs/promises';
 import { once } from 'node:events';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 import type { AddressInfo } from 'node:net';
 
 test('public requests carry their validated connection dispatcher and original Host', async () => {
@@ -110,7 +111,7 @@ test('HTTP and HTTPS proxy CONNECT use the validated IP while origin Host and TL
     // Exercise the entire production Http path in a fresh process whose
     // environment proxy and trusted fixture CA are set before module loading.
     const { stdout } = await promisify(execFile)(process.execPath, ['--import', 'tsx', 'tests/fixtures/public-http/request.ts'], {
-      env: { ...process.env, http_proxy: proxyUrl, https_proxy: proxyUrl, no_proxy: '', NODE_EXTRA_CA_CERTS: new URL('./fixtures/public-http/cert.pem', import.meta.url).pathname },
+      env: { ...process.env, HTTP_PROXY: proxyUrl, HTTPS_PROXY: proxyUrl, NO_PROXY: '', http_proxy: proxyUrl, https_proxy: proxyUrl, no_proxy: '', NODE_EXTRA_CA_CERTS: fileURLToPath(new URL('./fixtures/public-http/cert.pem', import.meta.url)) },
       timeout: 15000,
     });
     assert.deepEqual(JSON.parse(stdout), { body: 'Public article', resolutions: 1 });

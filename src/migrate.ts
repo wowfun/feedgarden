@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { existsSync, createReadStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { cp, mkdir, readFile, readdir, rm, copyFile } from 'node:fs/promises';
-import { resolve, join, dirname, relative } from 'node:path';
+import { resolve, join, dirname, relative, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { DateTime } from 'luxon';
 import { parse } from 'jsonc-parser';
@@ -31,14 +31,15 @@ async function checksums(root: string, signal?: AbortSignal): Promise<Record<str
   async function visit(directory: string) {
     for (const file of await readdir(directory, { withFileTypes: true })) {
       const path = join(directory, file.name);
+      const archivePath = relative(root, path).split(sep).join('/');
       if (file.isSymbolicLink()) throw new Error('Migration archive must not contain symlinks');
       if (file.isDirectory()) await visit(path);
-      else if (file.name !== 'manifest.json' && !file.name.startsWith('new-state-') && !relative(root,path).split('/').some(part=>part.startsWith('new-content-'))) {
+      else if (file.name !== 'manifest.json' && !file.name.startsWith('new-state-') && !archivePath.split('/').some(part=>part.startsWith('new-content-'))) {
         // Preserve the historical sha256(JSON.stringify(base64)) contract.
         // Base64 has no JSON escapes; the stream decoder retains split triplets.
         const checksum = createHash('sha256').update('"');
         for await (const chunk of createReadStream(path, { encoding: 'base64' })) { signal?.throwIfAborted(); checksum.update(chunk as string); }
-        result[relative(root, path)] = checksum.update('"').digest('hex');
+        result[archivePath] = checksum.update('"').digest('hex');
       }
     }
   }

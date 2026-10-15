@@ -3,7 +3,7 @@ import { Readable, Writable } from 'node:stream';
 import { existsSync } from 'node:fs';
 import { chmod, lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { client, ndJsonStream, type SessionConfigOption } from '@agentclientprotocol/sdk';
 import { parse as parseYaml } from 'yaml';
@@ -13,6 +13,8 @@ import type { Registry } from './topics.js';
 import { errorText } from './util.js';
 import { validateArtifact, ArtifactError } from './topics-contract.mjs';
 import { reportSkill } from './report-skill.js';
+import { agentCommand } from './process-command.js';
+import { validationEnvironment } from './build-site.js';
 
 function modelRoute(model: string): [string, string] {
   const [provider, ...parts] = model.split('/');
@@ -60,8 +62,8 @@ class NotificationLog {
 
 export async function generateBatch(config: Config['agent'], input: SummaryInput, repair?: string, workspace?: string, signal?: AbortSignal): Promise<AgentResult> {
   signal?.throwIfAborted();
-  const command = config.command === 'dsh' && existsSync('node_modules/.bin/dsh') ? resolve('node_modules/.bin/dsh') : config.command;
-  const version = execFileSync(command, ['--version'], { encoding: 'utf8', timeout: 10_000 }).trim();
+  const [versionCommand, versionArgs] = agentCommand(config.command, ['--version']);
+  const version = execFileSync(versionCommand, versionArgs, { encoding: 'utf8', timeout: 10_000 }).trim();
   if (version !== config.version) throw new Error('Expected DSH ' + config.version + '; found ' + version);
   const route = modelRoute(config.model), key = await credential();
   const runtime = resolve(config.runtimeDirectory);
@@ -93,11 +95,12 @@ export async function generateBatch(config: Config['agent'], input: SummaryInput
   ];
   const patch = join(directory, 'patch.json'); // JSON is valid YAML for the DSH loader.
   await writeFile(patch, JSON.stringify(patches), { mode: 0o600 });
-  const env: NodeJS.ProcessEnv = { PATH: dirname(process.execPath) + ':' + process.env.PATH, HOME: process.env.HOME, LANG: 'C.UTF-8',
+  const env: NodeJS.ProcessEnv = { ...validationEnvironment(), PATH: dirname(process.execPath) + delimiter + process.env.PATH, HOME: process.env.HOME, LANG: 'C.UTF-8',
     DSH_HOME: join(directory, 'home'), DSH_TELEMETRY_DISABLED: '1', DEEPSEEK_API_KEY: key, NO_COLOR: '1' };
   for (const name of ['HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY', 'https_proxy', 'http_proxy', 'no_proxy']) if (process.env[name]) env[name] = process.env[name];
   signal?.throwIfAborted();
-  const child = spawn(command, ['acp', '--patch', patch], { cwd: directory, env, stdio: ['pipe', 'pipe', 'pipe'] });
+  const [command, args] = agentCommand(config.command, ['acp', '--patch', patch]);
+  const child = spawn(command, args, { cwd: directory, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   const usage = new NotificationLog(), events = new NotificationLog();
   let stderr = '', sessionId: string | undefined, stage = 'initialize';
   child.stderr.on('data', data => { stderr = (stderr + String(data)).slice(-8000); });

@@ -1,12 +1,14 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, readdir } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
+import { processCommand } from './process-command.js';
 
 export async function run(program: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {
   await new Promise<void>((done, fail) => {
-    const child = spawn(program, args, { cwd, env, stdio: 'inherit' });
+    const [executable, argv] = processCommand(program, args, env);
+    const child = spawn(executable, argv, { cwd, env, stdio: 'inherit', windowsHide: true });
     child.on('error', fail); child.on('exit', code => code === 0 ? done() : fail(new Error(program + ' exited with ' + code)));
   });
 }
@@ -22,7 +24,7 @@ export function assertThemeLock(expected: ThemeLock, actual: ThemeLock): void {
 }
 export function validationEnvironment(inherited: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { GIT_TERMINAL_PROMPT: '0' };
-  for (const name of ['PATH', 'HOME', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'WINDIR']) if (inherited[name]) env[name] = inherited[name];
+  for (const name of ['PATH', 'HOME', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'APPDATA', 'LOCALAPPDATA', 'PATHEXT', 'COMSPEC', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'WINDIR']) if (inherited[name]) env[name] = inherited[name];
   return env;
 }
 export async function buildSite(root = process.cwd()): Promise<string> {
@@ -48,9 +50,9 @@ export async function buildSite(root = process.cwd()): Promise<string> {
     if (!installed) throw new Error('MANUAL_ACTION: Install Node 26 for the Jekyll frontend build');
     node = join(versions, installed, 'bin');
   }
-  const env = { ...validationEnvironment(), PATH: [ruby, node, process.env.PATH].join(':'), BUNDLE_GEMFILE: join(website, 'Gemfile') };
+  const env = { ...validationEnvironment(), PATH: [existsSync(ruby) ? ruby : '', node, process.env.PATH].filter(Boolean).join(delimiter), BUNDLE_GEMFILE: join(website, 'Gemfile') };
   if (!existsSync(join(website, 'node_modules'))) await run('npm', ['ci'], website, env);
-  try { execFileSync('bundle', ['check'], { cwd: website, env, stdio: 'ignore' }); }
+  try { const [program, args] = processCommand('bundle', ['check'], env); execFileSync(program, args, { cwd: website, env, stdio: 'ignore' }); }
   catch { await run('bundle', ['install'], website, env); }
   await run('npm', ['run', 'build'], website, env);
   await run('bundle', ['exec', 'ruby', join(website, 'scripts/package.rb'), '--skip-assets'], website, env);

@@ -184,7 +184,7 @@ test('retention prunes only expired runner-owned terminal workspaces and preserv
   const batch=f.store.db.prepare('SELECT id,workspace FROM feed_batches').get() as {id:string;workspace:string};
   const legacy=join(f.config.agent.runtimeDirectory,'task-legacy');await mkdir(legacy);await writeFile(join(legacy,'audit.json'),'historical evidence');
   const external=join(f.root,'external-evidence');await mkdir(external);await writeFile(join(external,'keep'),'evidence');
-  const linked=join(f.config.agent.runtimeDirectory,'task-00000000-0000-0000-0000-000000000000');await symlink(external,linked);
+  const linked=join(f.config.agent.runtimeDirectory,'task-00000000-0000-0000-0000-000000000000');await symlink(external,linked,process.platform==='win32'?'junction':'dir');
   f.store.db.prepare('INSERT INTO feed_batches VALUES (?,?,?,?,?,?,NULL)').run('linked','{}','[]',linked,'accepted',at);
   f.store.db.prepare("UPDATE feed_batches SET state='deferred' WHERE id=?").run(batch.id);
   const later='2026-11-01T00:00:00.000Z';await summarize(f.config,f.store,{},generator,later);

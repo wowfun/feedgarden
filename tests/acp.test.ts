@@ -12,8 +12,9 @@ import type { Item } from '../src/types.js';
 const peer = `#!/usr/bin/env node
 import { createInterface } from 'node:readline';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { basename } from 'node:path';
 if (process.argv.includes('--version')) { console.log('0.1.7-rc.2'); process.exit(0); }
-const mode = process.argv[1].split('/').at(-1).split('.')[0];
+const mode = basename(process.argv[1]).split('.')[0];
 const options = [{ id: 'model', category: 'model', type: 'select', name: 'Model', currentValue: '["deepseek-official","deepseek-flash"]', options: [{value:'["deepseek-official","deepseek-flash"]', name:'Flash'}] }, {id:'thinking', category:'thought_level', type:'select', name:'Thinking', currentValue:'off', options:[{value:'off',name:'Off'}]}];
 const send = value => process.stdout.write(JSON.stringify({jsonrpc:'2.0',...value})+'\\n');
 let pending;

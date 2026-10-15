@@ -4,6 +4,20 @@ Feedgarden collects developer and AI sources into local SQLite and publishes a b
 
 Use Node 24–26 for the runner (`npm ci`), Node 26 and Ruby 4.0.6 for the pinned Jekyll Obsidian theme. X setup (`npm run setup:twitter`) also requires `uv`. The local DSH dependency is pinned to `0.1.7-rc.2`. Its model is `deepseek/deepseek-flash`, with effort `off`. Configure `DEEPSEEK_API_KEY` in local DSH credentials, or set `FEEDGARDEN_AGENT_API_KEY` / `DEEPSEEK_API_KEY`. Keys stay out of Git and generated content.
 
+On Windows, install the shared toolchains globally. Use Node 26 for both projects, RubyInstaller **Ruby+Devkit 4.0.6**, Bundler 4.0.16, Git and uv. Open a new PowerShell after installation so it receives the updated PATH. RubyInstaller's MSYS2 toolchain supplies native gem builds. Keep `node_modules` and the patched X CLI environment local because their versions and authentication behavior belong to this project.
+
+```powershell
+winget install --id RubyInstallerTeam.RubyWithDevKit.4.0 --exact --version 4.0.6-1
+gem install bundler -v 4.0.16 --no-document
+npm ci
+npm run setup:twitter
+npm run feedgarden -- doctor
+npm run site:build
+npm run site:serve
+```
+
+The preview is at `http://127.0.0.1:4174/feedgarden/` (Chinese: `/feedgarden/zh-CN/`). `doctor` does not call the model or collect live data. Summarization needs the DeepSeek credential above; authenticated X collection additionally needs `TWITTER_AUTH_TOKEN` and `TWITTER_CT0` in the runner environment. A new empty database does not contain the checked-in article history: do not run `render` merely to preview existing content. Windows flushes file contents before atomic replacement, but Node cannot fsync the parent directory there; directory-entry crash durability remains a POSIX-only guarantee. Generated schedulers still target Linux/WSL.
+
 ```sh
 npm run feedgarden -- migrate
 npm run feedgarden -- collect --source openai
@@ -82,6 +96,8 @@ Losing either runner lock cancels active collection/ACP work and prevents accept
 Validation commands:
 
 `verify:scale`, `site:build` and publication require a clean theme checkout at the full SHA in `.github/theme.lock.json`. After changing the upstream theme, commit and push it there, then update this lock to the published SHA before running the pinned build. Uncommitted upstream changes deliberately stop it; a local theme preview does not establish publication readiness.
+
+`npm test` runs test files sequentially so cold CLI/SDK imports and other subprocess fixtures do not compete with parallel test files for their startup budget. Active-request cancellation still has its separate five-second assertion. `npm test` 按文件串行运行，避免 CLI／SDK 冷启动与其他子进程夹具争抢启动时限；活动请求的取消仍独立检查五秒内完成。
 
 ```sh
 npm run typecheck

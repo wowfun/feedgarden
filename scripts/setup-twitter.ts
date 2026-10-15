@@ -4,12 +4,13 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { run } from '../src/build-site.js';
 import { hash } from '../src/util.js';
+import { pythonExecutable } from '../src/process-command.js';
 
 const commit = '7c634e0d396b1e7af9f63315b414925fe4f29ae7';
 const source = resolve('.local/twitter-cli-source'), environment = resolve('.local/twitter-cli');
 if (!existsSync(source)) await run('git', ['clone', '--no-checkout', 'https://github.com/public-clis/twitter-cli.git', source], process.cwd());
 const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: source, encoding: 'utf8' }).trim();
-if (revision !== commit) await run('git', ['checkout', '--detach', commit], source);
+if (revision !== commit || !existsSync(join(source, 'pyproject.toml'))) await run('git', ['checkout', '--detach', commit], source);
 await run('uv', ['sync', '--frozen', '--no-dev', '--project', source], process.cwd(), { ...process.env, UV_PROJECT_ENVIRONMENT: environment });
 const authFile = join(source, 'twitter_cli/auth.py');
 const original = execFileSync('git', ['show', commit + ':twitter_cli/auth.py'], { cwd: source, encoding: 'utf8' });
@@ -30,7 +31,7 @@ await mkdir(environment, { recursive: true });
 await writeFile(join(environment, 'feedgarden-env-only.json'), JSON.stringify({ commit, authFile, authHash: hash(patched) }, null, 2));
 // These checks replace the browser/network functions with tripwires, and never
 // read real credentials or make requests to X.
-execFileSync(join(environment, 'bin/python'), ['-c', `
+execFileSync(pythonExecutable(environment), ['-c', `
 import os
 from unittest.mock import patch
 from twitter_cli.auth import get_cookies, AuthenticationError

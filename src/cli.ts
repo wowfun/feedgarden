@@ -15,6 +15,7 @@ import { migrate, rollback, convertConfig } from './migrate.js';
 import { backup } from './backup.js';
 import { atomicWrite, errorText } from './util.js';
 import { reportSkill } from './report-skill.js';
+import { agentCommand } from './process-command.js';
 
 const { values, positionals } = parseArgs({ allowPositionals: true, options: {
   config: { type: 'string' }, source: { type: 'string' }, since: { type: 'string' },
@@ -67,8 +68,8 @@ else {
       else if (command === 'backup') console.log(JSON.stringify(await backup(store, config.storage.directory)));
       else if (command === 'doctor') {
         await reportSkill(config.sources.filter(source => source.enabled).map(source => source.id));
-        const executable = config.agent.command === 'dsh' ? resolve('node_modules/.bin/dsh') : config.agent.command;
-        console.log(JSON.stringify({ node: process.version, database: store.db.pragma('quick_check'), agent: execFileSync(executable, ['--version'], { encoding: 'utf8' }).trim(), model: config.agent.model, channels: store.states(), items: store.db.prepare('SELECT count(*) n FROM feed_summaries').get(), queue: store.db.prepare('SELECT state,count(*) n FROM feed_jobs GROUP BY state').all() }, null, 2));
+        const [executable, args] = agentCommand(config.agent.command, ['--version']);
+        console.log(JSON.stringify({ node: process.version, database: store.db.pragma('quick_check'), agent: execFileSync(executable, args, { encoding: 'utf8' }).trim(), model: config.agent.model, channels: store.states(), items: store.db.prepare('SELECT count(*) n FROM feed_summaries').get(), queue: store.db.prepare('SELECT state,count(*) n FROM feed_jobs GROUP BY state').all() }, null, 2));
         if (values.live) recordCollection(await collect(config, store, values.source, false, undefined, undefined, signal));
       } else if (command === 'run') {
         if (!values.due) throw new Error('Scheduled runs require --due');

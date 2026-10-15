@@ -9,10 +9,11 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "feedgarden": "tsx src/cli.ts",
     "schema": "tsx scripts/schema.ts",
     "site:build": "tsx scripts/site-build.ts",
+    "site:serve": "tsx scripts/site-serve.ts",
     "test:visual": "tsx scripts/visual-check.ts",
     "setup:twitter": "tsx scripts/setup-twitter.ts",
     "schedule:prepare": "tsx scripts/schedule.ts",
@@ -45,5 +46,13 @@
     "@types/proper-lockfile": "4.1.4",
     "tsx": "4.21.0",
     "typescript": "6.0.2"
+  },
+  "allowScripts": {
+    "better-sqlite3@13.0.3": true,
+    "esbuild@0.27.7": true,
+    "@deepseek-ai/dsh-subprocess-local@0.1.7-rc.2": true,
+    "koffi@3.3.2": true,
+    "node-pty@1.2.0-beta.15": true,
+    "protobufjs@7.6.6": true
   }
 }

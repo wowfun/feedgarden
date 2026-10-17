@@ -19,10 +19,15 @@ export class Store {
   constructor(readonly path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path);
+    try { this.initialize(); }
+    catch (error) { this.db.close(); throw error; }
+  }
+  private initialize(): void {
+    const path = this.path;
     if (path !== ':memory:') chmodSync(path, 0o600);
     const version = this.db.pragma('user_version', { simple: true }) as number;
-    if (version === 1 || version === 2) { this.db.close(); throw new Error('Migration required: run feedgarden migrate before opening the legacy database'); }
-    if (version > 3) { this.db.close(); throw new Error('Database schema is newer than this application'); }
+    if (version === 1 || version === 2) throw new Error('Migration required: run feedgarden migrate before opening the legacy database');
+    if (version > 3) throw new Error('Database schema is newer than this application');
     this.db.pragma('journal_mode = WAL'); this.db.pragma('foreign_keys = ON'); this.db.pragma('busy_timeout = 5000');
     if (version < 1) this.db.transaction(() => {
       this.db.exec(`
@@ -46,7 +51,9 @@ export class Store {
       this.db.exec('CREATE TABLE job_lease(id INTEGER PRIMARY KEY CHECK(id=1),owner TEXT NOT NULL,expires TEXT NOT NULL); PRAGMA user_version=2;');
     })();
     if (version < 3) initializeFeedSchema(this.db, iso(DateTime.now().setZone('Asia/Shanghai').startOf('day').toUTC()), false);
-    this.db.transaction(() => {
+    // Bump this revision when the additive schema below changes. Current stores
+    // need only a read here, including when another connection holds a write lock.
+    if (this.meta('runtime_schema_revision') !== '1' || this.meta('items_date_revision') !== '1') this.db.transaction(() => {
       this.db.exec('CREATE INDEX IF NOT EXISTS agent_calls_at ON agent_calls(at); CREATE INDEX IF NOT EXISTS items_first_seen ON items(source,first_seen,id);');
       this.db.exec('CREATE INDEX IF NOT EXISTS items_selection_published ON items(source,julianday(published_at),id); CREATE INDEX IF NOT EXISTS items_selection_seen ON items(source,julianday(first_seen),id);');
       this.db.exec("CREATE INDEX IF NOT EXISTS feed_jobs_pending_order ON feed_jobs(source,json_extract(data,'$.firstSeen'),id,next_at) WHERE state='pending' AND attempts<5;");
@@ -104,14 +111,14 @@ export class Store {
         this.db.exec("UPDATE items SET published_at=json_extract(data,'$.publishedAt') WHERE typeof(json_extract(data,'$.publishedAt'))='text' AND published_at IS NOT json_extract(data,'$.publishedAt');");
         this.setMeta('items_date_revision', '1');
       }
-    })();
+      this.setMeta('runtime_schema_revision', '1');
+    }).immediate();
   }
   acquireLease(owner: string): void {
-    this.db.transaction(() => {
-      const lease = this.statement('SELECT owner,expires FROM job_lease WHERE id=1').get() as { owner: string; expires: string } | undefined;
-      if (lease && lease.expires > nowIso()) throw new Error('Another Feedgarden job holds the database lease');
-      this.statement('INSERT OR REPLACE INTO job_lease VALUES (1,?,?)').run(owner, new Date(Date.now() + 120_000).toISOString());
-    })();
+    const acquired = this.statement(`INSERT INTO job_lease VALUES (1,?,?)
+      ON CONFLICT(id) DO UPDATE SET owner=excluded.owner,expires=excluded.expires WHERE job_lease.expires<=?`)
+      .run(owner, new Date(Date.now() + 120_000).toISOString(), nowIso());
+    if (acquired.changes !== 1) throw new Error('Another Feedgarden job holds the database lease');
     this.leaseOwner = owner;
   }
   renewLease(owner: string): void { if (this.statement('UPDATE job_lease SET expires=? WHERE id=1 AND owner=? AND expires>?').run(new Date(Date.now() + 120_000).toISOString(), owner, nowIso()).changes !== 1) throw new Error('Lost database job lease'); }
@@ -227,7 +234,9 @@ export class Store {
   }
   states(): ChannelState[] { return this.statement('SELECT * FROM channel_state ORDER BY source,stream,channel').all() as ChannelState[]; }
   meta(key: string): string | undefined { return (this.statement('SELECT value FROM feed_meta WHERE key=?').get(key) as { value: string } | undefined)?.value; }
-  setMeta(key: string, value: string): void { this.statement('INSERT OR REPLACE INTO feed_meta VALUES (?,?)').run(key, value); }
+  setMeta(key: string, value: string): void {
+    if (this.meta(key) !== value) this.statement('INSERT INTO feed_meta VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE feed_meta.value IS NOT excluded.value').run(key, value);
+  }
   itemNumber(source: string, id: string, day: string): number {
     return this.db.transaction(() => {
       const existing = this.statement('SELECT number FROM feed_item_paths WHERE source=? AND id=? AND day=?').get(source, id, day) as { number: number } | undefined;

@@ -20,4 +20,5 @@ const server = createServer(async (request, response) => {
     response.end(await readFile(path));
   } catch { if (!response.headersSent) response.writeHead(404); response.end(); }
 });
-server.listen(4174, '127.0.0.1', () => console.log(`Preview: http://127.0.0.1:4174${base}/`));
+const port = 58002;
+server.listen(port, '127.0.0.1', () => console.log(`Preview: http://127.0.0.1:${port}${base}/`));

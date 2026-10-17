@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ChildProcess } from 'node:child_process';
@@ -12,10 +12,10 @@ import type { Item } from '../src/types.js';
 // using a network or sending synthetic material to a paid model.
 const peer = `#!/usr/bin/env node
 import { createInterface } from 'node:readline';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { spawn } from 'node:child_process';
-if (process.argv.includes('--version')) { console.log('0.1.7-rc.2'); process.exit(0); }
+if (process.argv.includes('--version')) { appendFileSync(process.argv[1]+'.versions','1\\n'); console.log('0.1.7-rc.2'); process.exit(0); }
 const mode = basename(process.argv[1]).split('.')[0];
 const options = [{ id: 'model', category: 'model', type: 'select', name: 'Model', currentValue: '["deepseek-official","deepseek-flash"]', options: [{value:'["deepseek-official","deepseek-flash"]', name:'Flash'}] }, {id:'thinking', category:'thought_level', type:'select', name:'Thinking', currentValue:'off', options:[{value:'off',name:'Off'}]}];
 const send = value => process.stdout.write(JSON.stringify({jsonrpc:'2.0',...value})+'\\n');
@@ -70,6 +70,21 @@ test('ACP notification audit is bounded and exposes omitted counts', async () =>
   assert.ok(result.events.length>0 && result.events.length<=128);
   assert.ok(Buffer.byteLength(JSON.stringify(result.events))<66000);
   assert.equal(result.events.length+result.omittedNotifications!.events,400);
+ }finally{if(previous===undefined)delete process.env.FEEDGARDEN_AGENT_API_KEY;else process.env.FEEDGARDEN_AGENT_API_KEY=previous;await rm(root,{recursive:true,force:true});}
+});
+
+test('ACP probes each executable version once while checking every configured version', async () => {
+ const root=await mkdtemp(join(tmpdir(),'feedgarden-acp-version-')),previous=process.env.FEEDGARDEN_AGENT_API_KEY;process.env.FEEDGARDEN_AGENT_API_KEY='fixture-key';
+ try {
+  const command=join(root,'success.mjs');await writeFile(command,peer,{mode:0o700});
+  const config={...configSchema.shape.agent.parse({model:'deepseek/deepseek-flash'}),command,runtimeDirectory:root};
+  const input={contractVersion:2 as const,topics:{version:1 as const,topics:[]},items:[]};
+  await generateBatch(config,input);await generateBatch(config,input);
+  await assert.rejects(generateBatch({...config,version:'wrong-version'},input),/Expected DSH wrong-version/);
+  assert.equal(await readFile(command+'.versions','utf8'),'1\n');
+  const other=join(root,'other.mjs');await writeFile(other,peer,{mode:0o700});
+  await generateBatch({...config,command:other},input);
+  assert.equal(await readFile(other+'.versions','utf8'),'1\n');
  }finally{if(previous===undefined)delete process.env.FEEDGARDEN_AGENT_API_KEY;else process.env.FEEDGARDEN_AGENT_API_KEY=previous;await rm(root,{recursive:true,force:true});}
 });
 

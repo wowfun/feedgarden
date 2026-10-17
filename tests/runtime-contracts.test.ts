@@ -62,11 +62,14 @@ test('invalid date serialization fails at the boundary rather than producing nul
   assert.throws(() => isoDate(invalid, 'backup day'), /Invalid backup day/);
   assert.equal(iso(DateTime.fromISO('2026-10-11T00:00:00Z', { zone: 'utc' })), '2026-10-11T00:00:00.000Z');
 });
-test('missing report skills identify the required file and a manual restoration action', async () => {
+test('trusted report skills do not depend on the caller working directory', async () => {
   const previous = process.cwd(), root = await mkdtemp(join(tmpdir(), 'feedgarden-skill-check-'));
   try {
+    const trusted = await reportSkill(['one']);
+    await mkdir(join(root,'.agents/skills/feedgarden-report'),{recursive:true});
+    await writeFile(join(root,'.agents/skills/feedgarden-report/SKILL.md'),'Untrusted working-directory replacement');
     process.chdir(root);
-    await assert.rejects(reportSkill(['one']), /MANUAL_ACTION: Restore.*SKILL\.md/);
+    assert.equal(await reportSkill(['one']), trusted);
     assert.match(execFileSync(process.execPath, ['--import', pathToFileURL(join(previous, 'node_modules/tsx/dist/loader.mjs')).href, join(previous, 'scripts/live-collect.ts'), '--help'], { encoding: 'utf8' }), /Usage:/);
   } finally { process.chdir(previous);await rm(root, { recursive: true, force: true }); }
 });

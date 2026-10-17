@@ -60,10 +60,16 @@ class NotificationLog {
   }
 }
 
+const agentVersions = new Map<string, string>();
 export async function generateBatch(config: Config['agent'], input: SummaryInput, repair?: string, workspace?: string, signal?: AbortSignal): Promise<AgentResult> {
   signal?.throwIfAborted();
   const [versionCommand, versionArgs] = agentCommand(config.command, ['--version']);
-  const version = execFileSync(versionCommand, versionArgs, { encoding: 'utf8', timeout: 10_000 }).trim();
+  const versionKey = JSON.stringify([versionCommand, versionArgs]);
+  let version = agentVersions.get(versionKey);
+  if (version === undefined) {
+    version = execFileSync(versionCommand, versionArgs, { encoding: 'utf8', timeout: 10_000, windowsHide: true }).trim();
+    agentVersions.set(versionKey, version);
+  }
   if (version !== config.version) throw new Error('Expected DSH ' + config.version + '; found ' + version);
   const route = modelRoute(config.model), key = await credential();
   const runtime = resolve(config.runtimeDirectory);

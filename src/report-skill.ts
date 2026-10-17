@@ -1,9 +1,29 @@
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+let root = dirname(fileURLToPath(import.meta.url));
+while (!existsSync(join(root, 'package.json'))) {
+  const parent = dirname(root);
+  if (parent === root) throw new Error('MANUAL_ACTION: Cannot locate the Feedgarden package containing its trusted skills');
+  root = parent;
+}
+const directory = join(root, '.agents/skills/feedgarden-report');
+const skills = new Map<string, Promise<string>>();
 async function readSkill(path: string): Promise<string> {
-  try { return await readFile(path, 'utf8'); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Error('MANUAL_ACTION: Restore the required report skill from this repository: ' + path); throw error; }
+  let pending = skills.get(path);
+  if (!pending) {
+    pending = readFile(join(directory, path), 'utf8').catch(error => {
+      skills.delete(path);
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new Error('MANUAL_ACTION: Restore the required report skill from this repository: ' + join(directory, path));
+      throw error;
+    });
+    skills.set(path, pending);
+  }
+  return pending;
 }
 export async function reportSkill(sources: Iterable<string>): Promise<string> {
-  const base = await readSkill('.agents/skills/feedgarden-report/SKILL.md');
-  return new Set(sources).has('hackernews') ? base + '\n\n' + await readSkill('.agents/skills/feedgarden-report/hackernews.md') : base;
+  const base = await readSkill('SKILL.md');
+  return new Set(sources).has('hackernews') ? base + '\n\n' + await readSkill('hackernews.md') : base;
 }

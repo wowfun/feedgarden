@@ -9,6 +9,7 @@ import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { Store } from '../src/store.js';
 import { configSchema } from '../src/config.js';
+import { relate } from '../src/relations.js';
 
 test('unchanged metadata does not write', async () => {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-schema-'));
@@ -100,4 +101,23 @@ process.send({ ready: true });
     assert.equal(results.filter(result => result.acquired).length, 1);
     assert.deepEqual(results.filter(result => result.error).map(result => result.error), ['Another Feedgarden job holds the database lease']);
   } finally { children.forEach(child => child.kill()); await rm(root, { recursive: true, force: true }); }
+});
+
+test('relations that expire during an earlier model call are no longer pending', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-15T12:00:00Z') });
+  const root = await mkdtemp(join(tmpdir(), 'feedgarden-expiry-'));
+  const store = new Store(join(root, 'data.sqlite'));
+  try {
+    const config = configSchema.parse({ version: 2, feed: { directory: join(root, 'content') }, agent: { model: 'deepseek/deepseek-flash', runtimeDirectory: join(root, 'tasks'), maxBatchItems: 1 }, sources: [{ id: 'one', name: 'One', intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'feed', kind: 'feed' }] }] }] });
+    await mkdir(config.feed.directory);
+    for (const name of ['a', 'b', 'c']) await writeFile(join(config.feed.directory, name + '.md'), `---\npublish: true\ncontent_type: post\ntitle: Atlas release ${name}\ndate: 2026-10-12T12:01:00Z\n---\nAtlas released Model One.`);
+    let calls = 0;
+    const result = await relate(config, store, { generator: async (_a, _k, value, _r, directory) => {
+      calls++; t.mock.timers.tick(120_000);
+      const input = value as { pairs: { id: string }[] };
+      return { output: { pairs: input.pairs.map(pair => ({ id: pair.id, verdict: 'same-event', reason: 'Same release', evidence: ['Atlas released Model One.', 'Atlas released Model One.'] })) }, directory: directory!, usage: [], events: [] };
+    } });
+    assert.equal(calls, 1); assert.equal(result.candidates, 3);
+    assert.equal(result.judged, 1); assert.equal(result.pending, 0); assert.equal(result.deferred, false);
+  } finally { store.close(); await rm(root, { recursive: true, force: true }); }
 });

@@ -7,10 +7,11 @@ import type { Config } from './config.js';
 import { Store } from './store.js';
 import { iterateAcceptedItems, itemPath, type AcceptedItem } from './items.js';
 import { loadTopics } from './topics.js';
-import { atomicWrite, safeUrl, hash } from './util.js';
+import { atomicWrite, safeUrl, hash, nowIso } from './util.js';
 import { importArchives, archiveManifestSignature } from './archives.js';
 import { reconcileSelection, selectionPolicy, selectionClause } from './selection.js';
 import { embedKind } from './media-embed.js';
+import { publication, recentPublication, activeRelations, recommendationManifest, relationRevision, type Publication } from './relations.js';
 
 function escapeMarkdown(value: string): string { return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\\`*_[\]{}()#!|$~]/g, char => `&#${char.charCodeAt(0)};`).replace(/\b([a-z][a-z0-9+.-]*):(?=\/\/)/gi, '$1&#58;').replace(/[\r\n]+/g, ' ').trim(); }
 function frontmatter(properties: Record<string, unknown>): string { return `---\n${Object.entries(properties).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join('\n')}\n---\n\n`; }
@@ -111,23 +112,32 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
   const timezones = new Map(config.sources.map(source => [source.id, source.timezone]));
   const destination = resolve(config.feed.directory);
   const manifests = await Promise.all(['en', 'zh-CN'].map(locale => readFile('config/locales/' + locale + '.json', 'utf8')));
-  const signature = hash({ contentVersion: store.meta('content_version'), registry, sources: config.sources.map(({ id, name, timezone, selection }) => ({ id, name, timezone, selection })), manifests, renderRevision: 5 });
+  const signature = hash({ contentVersion: store.meta('content_version'), registry, sources: config.sources.map(({ id, name, timezone, selection }) => ({ id, name, timezone, selection })), manifests, recommendations: relationRevision(store), renderRevision: 8 });
   const signatureKey = 'render_signature:' + destination;
   if (!force && existsSync(destination) && existsSync(join(destination, 'index.md')) && existsSync(join(destination, '_translations/zh-CN/index.md')) && store.meta(signatureKey) === signature) return false;
+  const recommendationAt = nowIso(), relations = activeRelations(store, recommendationAt);
   const topicIds = new Map(registry.topics.map(topic => [topic.id, topic.replacedBy ?? topic.id]));
   await mkdir(dirname(destination), { recursive: true });
   const staging = await mkdtemp(join(dirname(destination), '.content-stage-'));
   const paths = new Map<string, string>();
   const directories = new Set<string>();
+  const posts = new Map<string, Publication>();
+  function trackPublication(path: string, body: string | Buffer): void {
+    if (!path.endsWith('.md') || path.split('/').some(part => part.startsWith('_') || part.startsWith('.'))) return;
+    const post = publication(path, body.toString(), recommendationAt);
+    if (post) posts.set(path, post); else posts.delete(path);
+  }
   try {
     // Configuration changes regenerate only the managed locale manifests;
     // every other opaque archive file remains part of the private snapshot.
     const preserveManifest = store.meta('selection_archive_manifest') === await archiveManifestSignature(config);
-    async function write(path: string, body: string): Promise<void> {
+    async function write(path: string, body: string, postDate?: string): Promise<void> {
       signal?.throwIfAborted();
       const file = join(staging, path), directory = dirname(file);
       if (!directories.has(directory)) { await mkdir(directory, { recursive: true }); directories.add(directory); }
-      await writeFile(file, body.trimEnd() + '\n');
+      const markdown = body.trimEnd() + '\n';
+      await writeFile(file, markdown);
+      if (postDate && recentPublication(postDate, recommendationAt)) trackPublication(path, markdown); else posts.delete(path);
     }
     async function preserve(path: string, body: string | Buffer): Promise<void> {
       signal?.throwIfAborted();
@@ -135,9 +145,10 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
       if (/^[a-z]:/i.test(path) || path.includes('\\') || isAbsolute(path) || isAbsolute(rel) || !rel || rel === '..' || rel.startsWith('..' + (process.platform === 'win32' ? '\\' : '/'))) throw new Error('Invalid archived relative path: ' + path);
       const directory = dirname(file);
       if (!directories.has(directory)) { await mkdir(directory, { recursive: true }); directories.add(directory); }
-      await writeFile(file, body);
+      await writeFile(file, body); trackPublication(path, body);
     }
     for (const row of store.db.prepare('SELECT path,body FROM feed_archive_files ORDER BY path').iterate() as Iterable<{ path: string; body: Buffer }>) {
+      if (row.path === '_recommendations.json') continue;
       if (!preserveManifest && (row.path === '_locale.yml' || row.path === '_translations/zh-CN/_locale.yml')) continue;
       let body: string | Buffer = row.body;
       if (row.path.endsWith('.md')) {
@@ -172,8 +183,9 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
         const topics = [...new Set(record.copy.topics.map(id => {
           const resolved = topicIds.get(id); if (!resolved) throw new Error('Unknown stored topic: ' + id); return resolved;
         }))];
-        for (const locale of ['en', 'zh-CN'] as const) await write((locale === 'zh-CN' ? '_translations/zh-CN/' : '') + path, renderItem(record, locale, topics));
+        for (const locale of ['en', 'zh-CN'] as const) await write((locale === 'zh-CN' ? '_translations/zh-CN/' : '') + path, renderItem(record, locale, topics), record.date);
     }
+    await write('_recommendations.json', JSON.stringify(await recommendationManifest(posts, store, recommendationAt, relations), null, 2));
     signal?.throwIfAborted();
   } catch (error) { await rm(staging, { recursive: true, force: true }); throw error; }
   const previous = destination + '.previous-' + Date.now();

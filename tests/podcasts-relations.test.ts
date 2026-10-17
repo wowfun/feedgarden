@@ -10,6 +10,7 @@ import { configSchema } from '../src/config.js';
 import { Store } from '../src/store.js';
 import { parsePodcastFeed, enrichPodcast, transcriptText, transcriptChunks, transcriptStep } from '../src/podcasts.js';
 import { fixedTask, taskKey, type TaskGenerator } from '../src/fixed-tasks.js';
+import { candidatePairs, publications, relate, recommendationManifest, relationRevision, type Publication } from '../src/relations.js';
 import { validateTask } from '../src/task-contract.mjs';
 import { hash } from '../src/util.js';
 import { writeSite } from '../src/site.js';
@@ -274,6 +275,34 @@ test('transcript planning treats rejected accepted nodes as misses and execution
   } finally { await f.cleanup(); }
 });
 
+test('relate CLI preserves cached verdicts and publishes the recommendation manifest without another model call', async () => {
+  const f = await fixture();
+  try {
+    // A CLI subprocess cannot receive the mock generator. Exhaust its allowance
+    // with the seeded call and use a nonexistent command to prevent live fallback.
+    f.config.agent.maxDailyCalls = 1;
+    f.config.agent.command = join(f.root, 'must-not-run-agent');
+    const now = new Date().toISOString(), evidence = 'Atlas released Model One with open weights.';
+    await mkdir(f.config.feed.directory);
+    for (const name of ['a', 'b']) {
+      const markdown = `---\npublish: true\ncontent_type: post\ntitle: Atlas release ${name}\ndate: ${now}\nsource_url: https://example.test/${name}\n---\n${evidence}\n`;
+      await writeFile(join(f.config.feed.directory, name + '.md'), markdown);
+      f.store.db.prepare('INSERT INTO feed_archive_files VALUES (?,?)').run(name + '.md', markdown);
+    }
+    const seeded = await relate(f.config, f.store, { at: now, generator: async (_a, _k, value, _r, directory) => {
+      const input = value as { pairs: { id: string }[] };
+      return { output: { pairs: input.pairs.map(pair => ({ id: pair.id, verdict: 'same-event', reason: 'Same release', evidence: [evidence, evidence] })) }, directory: directory!, usage: [], events: [] };
+    } });
+    assert.equal(seeded.judged, 1);
+    const configPath = join(f.root, 'config.json'); await writeFile(configPath, JSON.stringify(f.config));
+    const output = await promisify(execFile)(process.execPath, ['--import', 'tsx', resolve('src/cli.ts'), 'relate', '--config', configPath], { timeout: 30_000, windowsHide: true });
+    assert.match(output.stdout, /"judged":0/);
+    const manifest = JSON.parse(await readFile(join(f.config.feed.directory, '_recommendations.json'), 'utf8'));
+    assert.equal(manifest.items['a.md'][0].path, 'b.md'); assert.equal(manifest.items['b.md'][0].path, 'a.md');
+    assert.equal((f.store.db.prepare('SELECT count(*) n FROM agent_calls').get() as { n: number }).n, 1);
+  } finally { await f.cleanup(); }
+});
+
 test('cancelled fixed tasks preserve call accounting and resume immediately without failure backoff', async () => {
   const f = await fixture();
   try {
@@ -312,6 +341,46 @@ test('fixed tasks propagate lease takeover before acceptance or retry mutation',
   }
 });
 
+test('relation recall discards incidental bigrams and retains specific release followups', () => {
+  const post = (path: string, text: string): Publication => ({ path, title: text, text, url: '', date: Date.parse(at), hash: hash(text) });
+  assert.equal(candidatePairs([post('a.md', '甲乙丙丁戊己'), post('b.md', '甲乙庚辛壬癸')]).length, 0);
+  const distinct = (start: number) => Array.from({ length: 500 }, (_, i) => String.fromCharCode(start + i)).join('');
+  assert.equal(candidatePairs([post('a.md', '甲乙丙丁' + distinct(0x3400)), post('b.md', '甲乙丙丁' + distinct(0x5000))]).length, 0);
+  const launch = post('launch.md', 'Atlas Model One launches with a new inference engine');
+  const followup = post('followup.md', 'Atlas Model One inference engine benchmark results');
+  assert.equal(candidatePairs([launch, followup]).length, 1);
+});
+
+test('indexed recall preserves exhaustive overlap scores, top-eight ties, URL exclusions and pair order', () => {
+  const posts: Publication[] = Array.from({ length: 45 }, (_, i) => {
+    const text = ['Atlas Model One release', '团队公布模型评测结果', 'INFERENCE: engine throughput', 'Café Kelvin open weights'][i % 4]! + ' ' + String(i % 7);
+    return { path: `article-${String(i).padStart(2, '0')}.md`, title: text, text: text + ' https://example.test/ignored/', date: Date.parse(at) - (i % 5) * 3600_000, url: 'https://example.test/' + (i < 2 ? 'same' : i), hash: hash(text + i) };
+  });
+  const grams = (post: Publication) => {
+    const chars = [...(post.title + ' ' + post.text.slice(0, 600)).normalize('NFKC').toLowerCase().replace(/https?:\/\/\S+/g, '').replace(/[^\p{L}\p{N}]/gu, '')];
+    return new Set(chars.slice(1).map((c, i) => chars[i]! + c));
+  };
+  const expected = new Map<string, { id: string; paths: string[]; score: number; date: number }>();
+  for (const source of posts) {
+    const a = grams(source);
+    const exhaustive = posts.filter(target => target.path !== source.path && (!source.url || target.url !== source.url)).map(target => {
+      const b = grams(target), common = [...a].filter(gram => b.has(gram)).length;
+      return { target, common, score: common / Math.max(1, Math.min(a.size, b.size)) };
+    }).filter(pair => pair.common >= 3 && pair.score >= 0.01)
+      .sort((a, b) => b.score - a.score || b.target.date - a.target.date || a.target.path.localeCompare(b.target.path)).slice(0, 8);
+    for (const { target, score } of exhaustive) {
+      const sides = [source, target].sort((a, b) => a.path.localeCompare(b.path)), paths = sides.map(p => p.path);
+      const id = hash({ paths, hashes: sides.map(p => p.hash) });
+      expected.set(id, { id, paths, score, date: Math.max(source.date, target.date) });
+    }
+  }
+  const ordered = [...expected.values()].sort((a, b) => b.score - a.score || b.date - a.date || a.id.localeCompare(b.id));
+  for (const input of [posts, posts.toReversed()]) {
+    const actual = candidatePairs(input).map(p => ({ id: p.id, paths: [p.left.path, p.right.path], score: p.score, date: Math.max(p.left.date, p.right.date) }));
+    assert.deepEqual(actual, ordered);
+  }
+});
+
 test('an unsatisfiable derived transcript note budget fails before model work',async()=>{
   const f=await fixture();
   try{
@@ -321,4 +390,73 @@ test('an unsatisfiable derived transcript note budget fails before model work',a
     await assert.rejects(transcriptStep(item,f.store,{...f.config.agent,maxItemChars:50},true),/prefix leaves no room/);
     assert.equal((f.store.db.prepare('SELECT count(*) n FROM agent_calls').get() as {n:number}).n,0);
   }finally{await f.cleanup();}
+});
+
+test('relations use the public archive, require paired evidence and expire on both ends', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date(at) });
+  const f = await fixture();
+  try {
+    await mkdir(f.config.feed.directory, { recursive: true });
+    const article = (title: string, date: string, publish = true) => `---\npublish: ${publish}\ncontent_type: post\ntitle: ${title}\ndate: ${date}\nsource_url: https://example.test/${title}\n---\nAtlas released Model One. This article examines that specific release.`;
+    await writeFile(join(f.config.feed.directory, 'a.md'), article('Atlas-launch', '2026-10-15T10:00:00Z'));
+    await writeFile(join(f.config.feed.directory, 'b.md'), article('Atlas-review', '2026-10-13T13:00:00Z'));
+    await writeFile(join(f.config.feed.directory, 'old.md'), article('Old', '2026-10-12T12:00:00Z'));
+    await writeFile(join(f.config.feed.directory, 'private.md'), article('Private', at, false));
+    const posts = await publications(f.config.feed.directory, at); assert.equal(posts.length, 2); assert.equal(candidatePairs(posts).length, 1);
+    let calls = 0;
+    const generator: TaskGenerator = async (_a, _k, value, _r, directory) => {
+      calls++; const input = value as { pairs: { id: string; texts: [string, string] }[] };
+      return { output: { pairs: input.pairs.map(p => ({ id: p.id, verdict: 'direct-followup', reason: 'Review of the specific release', evidence: ['Atlas released Model One.', 'Atlas released Model One.'] })) }, directory: directory!, usage: [], events: [] };
+    };
+    assert.equal((await relate(f.config, f.store, { at, generator })).judged, 1);
+    const manifest = await recommendationManifest(f.config.feed.directory, f.store, at);
+    assert.equal(manifest.items['a.md']?.[0]?.path, 'b.md');
+    assert.equal(manifest.items['a.md']?.[0]?.expires_at, '2026-10-16T13:00:00.000Z');
+    const revision=relationRevision(f.store);
+    f.store.db.exec("UPDATE feed_relation_pairs SET output=json_set(output,'$.reason','A revised private explanation')");
+    assert.equal(relationRevision(f.store),revision,'private prose does not change published cards');
+    f.store.db.exec("UPDATE feed_relation_pairs SET output=json_set(output,'$.verdict','unrelated')");
+    assert.notEqual(relationRevision(f.store),revision);
+    assert.deepEqual((await recommendationManifest(posts,f.store,at)).items,{});
+    f.store.db.exec("UPDATE feed_relation_pairs SET output=json_set(output,'$.verdict','direct-followup')");
+    assert.deepEqual(await recommendationManifest(posts, f.store, at), manifest);
+    // Existing private archive bytes participate alongside newly rendered posts.
+    for (const path of ['a.md', 'b.md', 'old.md', 'private.md']) f.store.db.prepare('INSERT INTO feed_archive_files VALUES (?,?)').run(path, await readFile(join(f.config.feed.directory, path)));
+    f.store.db.prepare('INSERT INTO feed_archive_files VALUES (?,?)').run('_drafts/hidden.md', article('Hidden', at));
+    await writeSite(f.config, f.store);
+    assert.deepEqual(JSON.parse(await readFile(join(f.config.feed.directory, '_recommendations.json'), 'utf8')), manifest);
+    assert.deepEqual(await recommendationManifest(f.config.feed.directory, f.store, at), manifest);
+    await relate(f.config, f.store, { at, generator }); assert.equal(calls, 1);
+    const currentRevision=relationRevision(f.store);
+    t.mock.timers.tick(72*3600_000);
+    assert.equal(relationRevision(f.store),currentRevision,'time alone must not invalidate the rendered tree');
+    assert.equal(await writeSite(f.config,f.store),false,'expired cards are hidden by the client without a new publication');
+    f.store.db.exec("UPDATE feed_relation_pairs SET output=json_set(output,'$.verdict','unrelated')");
+    assert.equal(await writeSite(f.config,f.store),true,'a changed verdict must invalidate the rendered tree');
+    assert.deepEqual((await recommendationManifest(f.config.feed.directory, f.store, '2026-10-16T13:00:00.000Z')).items, {});
+    await writeFile(join(f.config.feed.directory, 'b.md'), article('Unrelated', '2026-10-13T13:00:00Z'));
+    assert.deepEqual((await recommendationManifest(f.config.feed.directory, f.store, at)).items, {});
+    assert.throws(() => validateTask('relations', { pairs: [{ id: 'one', verdict: 'same-event', reason: 'claim', evidence: ['invented', 'invented'] }] }, { pairs: [{ id: 'one', texts: ['left', 'right'] }] }));
+  } finally { await f.cleanup(); }
+});
+
+test('a limited relation budget reaches strong coverage before newer weak matches', async () => {
+  const f = await fixture();
+  try {
+    f.config.agent.maxBatchItems = 1; f.config.agent.maxDailyCalls = 1;
+    await mkdir(f.config.feed.directory, { recursive: true });
+    const article = (title: string, date: string, body: string) => `---\npublish: true\ncontent_type: post\ntitle: ${title}\ndate: ${date}\n---\n${body}`;
+    const evidence = 'Atlas released Model One with open weights.';
+    await writeFile(join(f.config.feed.directory, 'a.md'), article('Atlas launch', '2026-10-15T09:00:00Z', evidence));
+    await writeFile(join(f.config.feed.directory, 'b.md'), article('Atlas launch review', '2026-10-15T10:00:00Z', evidence));
+    await writeFile(join(f.config.feed.directory, 'new.md'), article('Growing plants', '2026-10-15T11:00:00Z', 'The garden needs water and sunlight every day.'));
+    const generator: TaskGenerator = async (_a, _k, value, _r, directory) => {
+      const input = value as { pairs: { id: string; texts: string[] }[] };
+      assert.ok(input.pairs[0]!.texts.every(text => text.includes(evidence)));
+      return { output: { pairs: input.pairs.map(p => ({ id: p.id, verdict: 'direct-followup', reason: 'Review of this release', evidence: [evidence, evidence] })) }, directory: directory!, usage: [], events: [] };
+    };
+    const result = await relate(f.config, f.store, { at, generator });
+    assert.equal(result.judged, 1); assert.equal(result.deferred, true);
+    assert.equal((await recommendationManifest(f.config.feed.directory, f.store, at)).items['a.md']?.[0]?.path, 'b.md');
+  } finally { await f.cleanup(); }
 });

@@ -71,7 +71,8 @@ test('Product Hunt enrichment caches positive and absent repositories and preser
   } finally { store.close(); }
 });
 
-test('a repository update reaches both frontmatters without another summary call or changing item paths', async () => {
+test('a repository update reaches both frontmatters without another summary call or changing item paths', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-09T13:00:00Z') });
   const directory = await mkdtemp(join(tmpdir(), 'feedgarden-ph-repo-'));
   const store = new Store(':memory:'); let calls = 0;
   try {

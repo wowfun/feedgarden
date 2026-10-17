@@ -80,6 +80,7 @@
     "pdf_preview": "Preview PDF",
     "pdf_close": "Close preview",
     "pdf_loading": "Loading PDF…",
-    "pdf_error": "Preview unavailable. Open the PDF using its link."
+    "pdf_error": "Preview unavailable. Open the PDF using its link.",
+    "related_articles": "Related coverage"
   }
 }

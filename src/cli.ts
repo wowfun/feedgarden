@@ -17,13 +17,14 @@ import { reportSkill } from './report-skill.js';
 import { agentCommand } from './process-command.js';
 import { rankItems, previewRank } from './rank.js';
 import { maintainArchive } from './archives.js';
+import { relate } from './relations.js';
 
 const { values, positionals } = parseArgs({ allowPositionals: true, options: {
   config: { type: 'string' }, source: { type: 'string' }, since: { type: 'string' },
   due: { type: 'boolean' }, rebuild: { type: 'boolean' }, refresh: { type: 'boolean' }, history: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, 'remote-base': { type: 'string' }, 'retry-failed': { type: 'boolean' }, live: { type: 'boolean' }, 'no-publish': { type: 'boolean' }, help: { type: 'boolean', short: 'h' },
 } });
 const command = positionals[0];
-if (values.help || !command) console.log('Feedgarden: migrate | rollback ARCHIVE | collect [--since ISO] | rank [--history] [--source ID] [--dry-run] | archives update|remove PATH | summarize [--source ID] [--refresh] [--rebuild] [--retry-failed] | topics apply FILE | run --due | doctor [--live] | render | backup | publish\nOptions: --config FILE --no-publish');
+if (values.help || !command) console.log('Feedgarden: migrate | rollback ARCHIVE | collect [--since ISO] | rank [--history] [--source ID] [--dry-run] | archives update|remove PATH | summarize [--source ID] [--refresh] [--rebuild] [--retry-failed] | relate [--retry-failed] | topics apply FILE | run --due | doctor [--live] | render | backup | publish\nOptions: --config FILE --no-publish');
 else {
   const configFile = resolveConfigFile(values.config);
   const config = command === 'migrate' || command === 'rollback' ? convertConfig(readConfig(configFile)) : loadConfig(configFile);
@@ -65,6 +66,11 @@ async function runWithRunner(command: string, config: Config, configFile: string
         const selected = new Set(config.sources.filter(source => source.enabled && (!values.source || source.id === values.source)).map(source => source.id));
         for (const error of errors.filter(error => selected.has(error.source) && store!.isSelected(error.source, error.id))) failures.push({ kind: 'summary', key: error.source + '/' + error.id, error: error.error });
       }
+      async function relations() {
+        const result = await relate(config, store!, { signal, retryFailed: values['retry-failed'] });
+        console.log(JSON.stringify({ relations: result }));
+        if (result.pending && !result.deferred) failures.push({ kind: 'relations', key: 'recent', error: `${result.pending} pairs remain pending; inspect feed_tasks for retry details` });
+      }
       if (command === 'collect') recordCollection(await collect(config, store, values.source, values.due, undefined, values.since, signal));
       else if (command === 'rank') {
         const reports = await rankItems(config, store, { source: values.source, history: values.history, signal });
@@ -73,6 +79,11 @@ async function runWithRunner(command: string, config: Config, configFile: string
         await writeSite(config, store, signal);
       }
       else if (command === 'summarize') { await summaries(); await writeSite(config, store, signal); }
+      else if (command === 'relate') {
+        await writeSite(config, store, signal);
+        await relations();
+        await writeSite(config, store, signal);
+      }
       else if (command === 'archives') {
         const action = positionals[1], path = positionals[2];
         if ((action !== 'update' && action !== 'remove') || !path) throw new Error('archives requires update|remove PATH relative to the content directory');
@@ -107,6 +118,8 @@ async function runWithRunner(command: string, config: Config, configFile: string
           for (const report of reports.filter(report => report.status === 'deferred')) failures.push({ kind: 'ranking', key: report.source + '/' + report.day, error: report.notes.join('; ') });
         }
         await summaries();
+        await writeSite(config, store, signal);
+        await relations();
         await writeSite(config, store, signal); await backup(store, config.storage.directory);
         signal.throwIfAborted();
         if (config.publish.auto && !values['no-publish']) { const { publish } = await import('./publish.js'); await publish(config, store, undefined, signal); }

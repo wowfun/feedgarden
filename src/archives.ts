@@ -57,6 +57,7 @@ export async function scanArchives(config: Config, signal?: AbortSignal, onlyPat
       for (const entry of await readdir(directory, { withFileTypes: true })) {
         signal?.throwIfAborted();
         const path = prefix + entry.name;
+        if (path === '_recommendations.json') continue;
         if (onlyPaths && ![...onlyPaths].some(target => target === path || target.startsWith(path + '/'))) continue;
         if (entry.isSymbolicLink()) throw new Error('Archive snapshot does not follow symlinks: ' + path);
         if (entry.isDirectory()) await walk(join(directory, entry.name), path + '/');
@@ -206,7 +207,7 @@ export async function maintainArchive(config: Config, store: Store, action: 'upd
   let path = rel.split(sep).join('/');
   const paired = /^(?:_translations\/zh-CN\/)?((?:reddit|hackernews)\/\d{4}-\d{2}\/\d{2}\/item-\d+\.md)$/.exec(path);
   if (paired) path = paired[1]!;
-  if (['index.md', '_locale.yml', '_translations/zh-CN/index.md', '_translations/zh-CN/_locale.yml'].includes(path)) throw new Error('This file is generated from configuration: ' + path);
+  if (['index.md', '_locale.yml', '_recommendations.json', '_translations/zh-CN/index.md', '_translations/zh-CN/_locale.yml'].includes(path)) throw new Error('This file is generated from configuration: ' + path);
   await importArchives(config, store, signal);
   const current = store.db.prepare('SELECT source,id,day,number FROM feed_archives WHERE path=?').get(path) as { source: string; id: string; day: string; number: number } | undefined;
   const paths = paired ? [path, '_translations/zh-CN/' + path] : [path];

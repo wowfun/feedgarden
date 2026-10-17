@@ -180,7 +180,8 @@ test('DSH structured result preserves bilingual punctuation and paragraphs and r
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
-test('HN guidance preserves other sources skill identity and comment revisions update existing bilingual paths', async () => {
+test('HN guidance preserves other sources skill identity and comment revisions update existing bilingual paths', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-09T02:00:00Z') });
   assert.equal(await reportSkill(['producthunt']), await readFile('.agents/skills/feedgarden-report/SKILL.md', 'utf8'));
   assert.ok((await reportSkill(['hackernews'])).includes('Additional trusted instructions'));
   const directory = await mkdtemp(join(tmpdir(), 'feedgarden-hn-')), store = new Store(':memory:'); let calls = 0;

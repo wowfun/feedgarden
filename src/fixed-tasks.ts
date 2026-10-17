@@ -1,7 +1,7 @@
 import { lstat, mkdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { generateTask, type AuxiliaryTask, type TaskResult } from './agent.js';
+import { generateTask, agentIdentity, resolveAgent, configuredAgent, type AgentResolver, type AuxiliaryTask, type TaskResult } from './agent.js';
 import type { Config } from './config.js';
 import { Store, QuotaDeferred } from './store.js';
 import { ArtifactError } from './topics-contract.mjs';
@@ -14,7 +14,7 @@ interface TaskRow { key: string; input: string; output: string | null; workspace
 const runtimeFailures = new WeakMap<Store, number>();
 const retried = new WeakMap<Store, Set<string>>();
 export async function taskKey(agent: Config['agent'], kind: AuxiliaryTask, input: unknown): Promise<string> {
-  return hash({ kind, input, model: agent.model, effort: agent.effort, revision: 1,
+  return hash({ kind, input, ...agentIdentity(agent), revision: 1,
     skill: await reportTaskSkill(kind) });
 }
 
@@ -26,10 +26,13 @@ async function createTaskWorkspace(agent: Config['agent'], key: string): Promise
 }
 
 /** One durable task visit. Recovery precedes quota spending; deferred work is resumable. */
-export async function fixedTask(store: Store, agent: Config['agent'], kind: AuxiliaryTask, input: unknown, options: { signal?: AbortSignal; retryFailed?: boolean; generator?: TaskGenerator } = {}): Promise<{ output?: unknown; key: string; state: string; performed: boolean }> {
+export async function fixedTask(store: Store, agent: Config['agent'], kind: AuxiliaryTask, input: unknown, options: { signal?: AbortSignal; retryFailed?: boolean; generator?: TaskGenerator; resolveAgent?: AgentResolver } = {}): Promise<{ output?: unknown; key: string; state: string; performed: boolean }> {
   options.signal?.throwIfAborted(); store.assertLease();
   const json = JSON.stringify(input);
   if (json.length > agent.maxInputChars) throw new Error('Fixed task exceeds agent.maxInputChars; split the input');
+  const resolved = 'execution' in agent ? agent : await (options.resolveAgent ?? (options.generator ? configuredAgent : resolveAgent))(agent, options.signal);
+  options.signal?.throwIfAborted(); store.assertLease();
+  agent = resolved;
   const key = await taskKey(agent, kind, input), now = nowIso();
   let row = store.statement('SELECT * FROM feed_tasks WHERE key=?').get(key) as TaskRow | undefined;
   if (!row) {
@@ -86,7 +89,7 @@ export async function fixedTask(store: Store, agent: Config['agent'], kind: Auxi
   for (let attempt = 0; attempt < 2 && row.attempts < 5; attempt++) {
     options.signal?.throwIfAborted(); store.assertLease();
     let call: number;
-    try { call = store.startCall(key, agent.model, agent.maxDailyCalls); }
+    try { call = store.startCall(key, agent.model!, agent.maxDailyCalls); }
     catch (e) { if (e instanceof QuotaDeferred) return { key, state: 'deferred', performed: false }; throw e; }
     row.attempts++;
     store.statement("UPDATE feed_tasks SET attempts=?,state='running' WHERE key=?").run(row.attempts, key);
@@ -97,10 +100,10 @@ export async function fixedTask(store: Store, agent: Config['agent'], kind: Auxi
       options.signal?.throwIfAborted(); store.assertLease(); persisting = true;
       await atomicWrite(join(row.workspace, 'result.json'), JSON.stringify(output));
       await atomicWrite(join(row.workspace, 'audit.json'), JSON.stringify({ key, ...result }));
-      const accepted = accept(output); store.finishCall(call, 'succeeded', result.usage); runtimeFailures.set(store, 0);
+      const accepted = accept(output); store.finishCall(call, 'succeeded', { execution: result.execution ?? ('execution' in agent ? agent.execution : undefined), updates: result.usage }); runtimeFailures.set(store, 0);
       return { ...accepted, performed: true };
     } catch (e) {
-      repair = errorText(e); store.finishCall(call, 'failed', { error: repair });
+      repair = errorText(e); store.finishCall(call, 'failed', { execution: 'execution' in agent ? agent.execution : undefined, error: repair });
       // The call was attempted and stays in the audit/quota ledger. Cancellation
       // or ownership loss must not install a task failure/backoff for its successor.
       options.signal?.throwIfAborted(); store.assertLease();

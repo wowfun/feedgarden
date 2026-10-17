@@ -16,6 +16,7 @@ import { hash } from '../src/util.js';
 import { writeSite } from '../src/site.js';
 import { Http } from '../src/http.js';
 import { pruneWorkspaces } from '../src/workspaces.js';
+import { resolveAgent } from '../src/agent.js';
 
 const at = '2026-10-15T12:00:00.000Z';
 const context = { source: 'podcast', stream: 'show', channel: 'rss', observedAt: at };
@@ -278,10 +279,10 @@ test('transcript planning treats rejected accepted nodes as misses and execution
 test('relate CLI preserves cached verdicts and publishes the recommendation manifest without another model call', async () => {
   const f = await fixture();
   try {
-    // A CLI subprocess cannot receive the mock generator. Exhaust its allowance
-    // with the seeded call and use a nonexistent command to prevent live fallback.
+    // The CLI may probe defaults, but quota and the offline peer prevent model calls.
     f.config.agent.maxDailyCalls = 1;
-    f.config.agent.command = join(f.root, 'must-not-run-agent');
+    f.config.agent.command = resolve('tests/fixtures/acp-peer.mjs');
+    const agent = await resolveAgent(f.config.agent);
     const now = new Date().toISOString(), evidence = 'Atlas released Model One with open weights.';
     await mkdir(f.config.feed.directory);
     for (const name of ['a', 'b']) {
@@ -289,7 +290,7 @@ test('relate CLI preserves cached verdicts and publishes the recommendation mani
       await writeFile(join(f.config.feed.directory, name + '.md'), markdown);
       f.store.db.prepare('INSERT INTO feed_archive_files VALUES (?,?)').run(name + '.md', markdown);
     }
-    const seeded = await relate(f.config, f.store, { at: now, generator: async (_a, _k, value, _r, directory) => {
+    const seeded = await relate({ ...f.config, agent }, f.store, { at: now, generator: async (_a, _k, value, _r, directory) => {
       const input = value as { pairs: { id: string }[] };
       return { output: { pairs: input.pairs.map(pair => ({ id: pair.id, verdict: 'same-event', reason: 'Same release', evidence: [evidence, evidence] })) }, directory: directory!, usage: [], events: [] };
     } });

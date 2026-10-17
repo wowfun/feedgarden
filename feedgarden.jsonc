@@ -13,16 +13,15 @@
     "backfillDays": 7
   },
   "agent": {
-    "command": "dsh",
-    "model": "deepseek/deepseek-flash",
-    "effort": "off",
-    "version": "0.1.7-rc.2",
+    "backend": "opencode",
+    "command": "opencode",
+    "args": ["acp"],
     "timeoutSeconds": 300,
     "maxBatchItems": 10,
     "maxInputChars": 24000,
     "maxItemChars": 4000,
     "maxDailyCalls": 80,
-    "runtimeDirectory": ".local/dsh"
+    "runtimeDirectory": ".local/agents"
   },
   "publish": {
     "repository": "https://github.com/wowfun/feedgarden.git",

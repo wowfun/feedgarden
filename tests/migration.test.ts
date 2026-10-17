@@ -9,7 +9,14 @@ import Database from 'better-sqlite3';
 import { Store } from '../src/store.js';
 import { configSchema } from '../src/config.js';
 import { hash } from '../src/util.js';
+import { convertConfig } from '../src/migrate.js';
 const project=process.cwd();
+test('v1 migration preserves the DSH execution backend while v2 defaults to OpenCode', () => {
+  const sources = [{ id: 'one', name: 'One', intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'feed', kind: 'feed' }] }] }];
+  const converted = convertConfig({ version: 1, agent: { command: 'dsh', model: 'deepseek/deepseek-flash', effort: 'off' }, sources });
+  assert.equal(converted.agent.backend, 'dsh'); assert.equal(converted.agent.command, 'dsh'); assert.equal(converted.agent.effort, 'off');
+  assert.equal(convertConfig({ version: 2, agent: {}, sources }).agent.backend, 'opencode');
+});
 test('default JSON config migration archives WAL data, resumes fixed baseline, and rollback restores schema 2',async()=>{
  const root=await mkdtemp(join(tmpdir(),'feedgarden-migration-'));
  try {

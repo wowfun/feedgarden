@@ -1,6 +1,7 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { array, date, plain, text, type ParseContext } from './channels/parsers.js';
 import type { Item } from './types.js';
+import { agentIdentity } from './agent.js';
 import type { Config } from './config.js';
 import { mediaForUrl } from './source-content.js';
 import { Http } from './http.js';
@@ -137,7 +138,7 @@ export async function transcriptStep(item: Item, store: Store, agent: Config['ag
   const overBudget = () => ({ item, ready: false, performed: false, failed: true, error: `Transcript exceeds agent.maxTranscriptChunks=${agent.maxTranscriptChunks}; full evidence retained. Increase this explicit processing budget and use --retry-failed.` });
   if (snapshot.chars > chunkLimit * agent.maxTranscriptChunks) return overBudget();
   const recipe = hash({ transcript: snapshot.hash, maxChars, inputLimit: agent.maxInputChars, revision: 2,
-    model: agent.model, effort: agent.effort, rebuild: store.meta('podcast_rebuild:' + JSON.stringify([item.source, item.id])) ?? '',
+    ...agentIdentity(agent), rebuild: store.meta('podcast_rebuild:' + JSON.stringify([item.source, item.id])) ?? '',
     skill: await reportTaskSkill('transcript') });
   item = { ...item, metadata: { ...item.metadata, transcriptRecipe: recipe } };
   const retained = plans.get(store) ?? new Map<string, { id: string; text: string }[]>();

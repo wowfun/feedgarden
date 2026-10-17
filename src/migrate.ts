@@ -15,7 +15,7 @@ export function convertConfig(value: any): Config {
   if (value.version === 2) return configSchema.parse(value);
   if (value.version !== 1) throw new Error('Unsupported configuration version');
   const { reports, ...rest } = value;
-  return configSchema.parse({ ...rest, version: 2, feed: { directory: 'content', topics: 'config/topics.json' }, collection: { backfillDays: reports?.backfillDays ?? 7 }, sources: value.sources.map((source: any) => {
+  return configSchema.parse({ ...rest, version: 2, agent: { ...value.agent, backend: 'dsh' }, feed: { directory: 'content', topics: 'config/topics.json' }, collection: { backfillDays: reports?.backfillDays ?? 7 }, sources: value.sources.map((source: any) => {
     const { frequencies, reportAgent, topics, ...next } = source;
     if (reportAgent) {
       const overrides = (frequencies ?? []).map((frequency: string) => ({ model: value.agent.model, ...(value.agent.effort ? { effort: value.agent.effort } : {}), ...source.agent, ...reportAgent[frequency] }));

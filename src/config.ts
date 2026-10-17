@@ -29,21 +29,29 @@ export const sourceSchema = z.object({
     dailyLimit: z.number().int().min(1).max(2000).default(50),
     updateDays: z.number().int().min(1).max(30).default(7),
   }).strict().optional(),
-  agent: z.object({ model: z.string().optional(), effort: z.string().optional() }).strict().optional(),
+  agent: z.object({ model: z.string().trim().min(1).optional(), effort: z.string().trim().min(1).optional() }).strict().optional(),
 }).strict();
+const agentFields = {
+  command: z.string().min(1).optional(), args: z.array(z.string()).default(['acp']),
+  inheritEnvironment: z.array(z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/)).default([]).describe('Additional parent environment variable names explicitly passed to agent processes. Values stay outside configuration.'),
+  effort: z.string().trim().min(1).optional(),
+  version: z.string().min(1).optional(), timeoutSeconds: z.number().positive().max(300).default(300),
+  maxBatchItems: z.number().int().min(1).max(10).default(10), maxInputChars: z.number().int().min(4000).max(24000).default(24000),
+  maxItemChars: z.number().int().min(100).max(4000).default(4000), maxDailyCalls: z.number().int().positive().max(80).default(80),
+  runtimeDirectory: z.string().default('.local/agents'),
+  workspaceRetentionDays: z.number().int().min(0).max(365).default(7),
+  maxTranscriptChunks: z.number().int().min(1).max(1024).default(64),
+};
+export const agentSchema = z.union([
+  z.object({ ...agentFields, backend: z.literal('opencode').default('opencode'), model: z.string().trim().min(1).optional() }).strict(),
+  z.object({ ...agentFields, backend: z.literal('dsh'), model: z.string({ error: 'DSH requires an explicit model' }).trim().min(1) }).strict(),
+]);
 export const configSchema = z.object({
   $schema: z.string().optional(), version: z.literal(2),
   storage: z.object({ database: z.string().default('.local/feedgarden.sqlite'), directory: z.string().default('.local') }).strict().default({ database: '.local/feedgarden.sqlite', directory: '.local' }),
   feed: z.object({ directory: z.string().default('content'), topics: z.string().default('config/topics.json') }).strict().default({ directory: 'content', topics: 'config/topics.json' }),
   collection: z.object({ backfillDays: z.number().int().min(0).max(30).default(7), enrichmentRefreshDays: z.number().int().min(0).max(30).default(7) }).strict().default({ backfillDays: 7, enrichmentRefreshDays: 7 }),
-  agent: z.object({ command: z.string().default('dsh'), model: z.string().min(1), effort: z.string().optional(),
-    version: z.string().default('0.1.7-rc.2'), timeoutSeconds: z.number().positive().max(300).default(300),
-    maxBatchItems: z.number().int().min(1).max(10).default(10), maxInputChars: z.number().int().min(4000).max(24000).default(24000),
-    maxItemChars: z.number().int().min(100).max(4000).default(4000), maxDailyCalls: z.number().int().positive().max(80).default(80),
-    runtimeDirectory: z.string().default('.local/dsh'),
-    workspaceRetentionDays: z.number().int().min(0).max(365).default(7),
-    maxTranscriptChunks: z.number().int().min(1).max(1024).default(64),
-  }).strict(),
+  agent: agentSchema,
   publish: z.object({ repository: z.string().default('https://github.com/wowfun/feedgarden.git'), branch: z.string().default('main'), auto: z.boolean().default(false) }).strict().default({ repository: 'https://github.com/wowfun/feedgarden.git', branch: 'main', auto: false }),
   sources: z.array(sourceSchema).min(1),
 }).strict().superRefine((config, context) => {

@@ -1,10 +1,11 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse } from 'yaml';
+import { agentIdentity, resolveAgent, configuredAgent, type AgentResolver, type ResolvedAgent } from './agent.js';
 import type { Config } from './config.js';
 import { Store } from './store.js';
 import { fixedTask, type TaskGenerator } from './fixed-tasks.js';
-import { hash, safeUrl, nowIso } from './util.js';
+import { hash, safeUrl, nowIso, errorText } from './util.js';
 import { reportTaskSkill } from './report-skill.js';
 
 const WINDOW = 72 * 3600_000;
@@ -106,13 +107,24 @@ export function candidatePairs(posts: Publication[]): Pair[] {
   return [...pairs.values()].sort((a, b) => b.score - a.score || Math.max(b.left.date, b.right.date) - Math.max(a.left.date, a.right.date) || a.id.localeCompare(b.id));
 }
 
-export async function relate(config: Config, store: Store, options: { signal?: AbortSignal; retryFailed?: boolean; generator?: TaskGenerator; at?: string } = {}): Promise<{ candidates: number; judged: number; pending: number; deferred: boolean }> {
+export async function relate(config: Config, store: Store, options: { signal?: AbortSignal; retryFailed?: boolean; generator?: TaskGenerator; resolveAgent?: AgentResolver; at?: string } = {}): Promise<{ candidates: number; judged: number; pending: number; deferred: boolean; configurationError?: string }> {
   const at = options.at ?? nowIso();
-  const policy = hash({ revision: 1, model: config.agent.model, effort: config.agent.effort, skill: await reportTaskSkill('relations') });
-  const candidates = candidatePairs(await publications(config.feed.directory, at)).map(pair => ({ ...pair, id: hash({ input: pair.id, policy }) }));
+  options.signal?.throwIfAborted(); store.assertLease();
+  const candidates = candidatePairs(await publications(config.feed.directory, at));
+  options.signal?.throwIfAborted(); store.assertLease();
+  if (!candidates.length) return { candidates: 0, judged: 0, pending: 0, deferred: false };
+  let agent: ResolvedAgent;
+  try { agent = await (options.resolveAgent ?? (options.generator ? configuredAgent : resolveAgent))(config.agent, options.signal); }
+  catch (error) {
+    options.signal?.throwIfAborted(); store.assertLease();
+    return { candidates: candidates.length, judged: 0, pending: candidates.length, deferred: false, configurationError: errorText(error) };
+  }
+  options.signal?.throwIfAborted(); store.assertLease();
+  const policy = hash({ revision: 1, ...agentIdentity(agent), skill: await reportTaskSkill('relations') });
+  const resolvedCandidates = candidates.map(pair => ({ ...pair, id: hash({ input: pair.id, policy }) }));
   store.setMeta('relation_policy', policy);
   const known = new Set((store.statement('SELECT key FROM feed_relation_pairs WHERE expires_at>?').all(at) as { key: string }[]).map(row => row.key));
-  const pending = candidates.filter(pair => !known.has(pair.id));
+  const pending = resolvedCandidates.filter(pair => !known.has(pair.id));
   const judgedIds = new Set<string>();
   const fixedNow = options.at ? Date.parse(options.at) : undefined;
   const active = (pair: Pair) => Math.min(pair.left.date, pair.right.date) + WINDOW > (fixedNow ?? Date.now());
@@ -131,7 +143,7 @@ export async function relate(config: Config, store: Store, options: { signal?: A
       batch.push(candidate); i++;
     }
     if (!batch.length) continue;
-    const task = await fixedTask(store, config.agent, 'relations', { pairs: batch.map(p => ({ id: p.id, texts: p.texts })) }, options);
+    const task = await fixedTask(store, agent, 'relations', { pairs: batch.map(p => ({ id: p.id, texts: p.texts })) }, options);
     if (task.state === 'deferred') { deferred = true; break; }
     if (!task.output) continue;
     const output = task.output as { pairs: Verdict[] };

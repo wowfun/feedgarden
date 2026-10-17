@@ -16,13 +16,14 @@ await writeFile(join(output, 'feedgarden.service'), '[Unit]\nDescription=Collect
 await writeFile(join(output, 'feedgarden.timer'), '[Unit]\nDescription=Check Feedgarden tasks every 15 minutes\n\n[Timer]\nOnCalendar=*:0/15\nPersistent=true\nRandomizedDelaySec=30\n\n[Install]\nWantedBy=timers.target\n');
 const distro = values.distro ?? process.env.WSL_DISTRO_NAME;
 if (distro) {
+  const startBoundary = new Date().toISOString();
   const xml = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   if (/["\r\n]/.test(distro + root + userInfo().username)) throw new Error('Unsupported WSL argument characters');
   const argumentsText = '-d "' + distro + '" -u "' + userInfo().username + '" --cd "' + root + '" --exec /bin/bash "' + join(output, 'run.sh') + '"';
   await writeFile(join(output, 'Feedgarden.xml'), `<?xml version="1.0" encoding="UTF-8"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo><Description>Run Feedgarden in WSL every 15 minutes. Requires the owning Windows user to be logged in.</Description></RegistrationInfo>
-  <Triggers><CalendarTrigger><Repetition><Interval>PT15M</Interval><Duration>P1D</Duration><StopAtDurationEnd>false</StopAtDurationEnd></Repetition><StartBoundary>2026-09-29T00:00:00</StartBoundary><Enabled>true</Enabled><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger></Triggers>
+  <Triggers><CalendarTrigger><Repetition><Interval>PT15M</Interval><Duration>P1D</Duration><StopAtDurationEnd>false</StopAtDurationEnd></Repetition><StartBoundary>${startBoundary}</StartBoundary><Enabled>true</Enabled><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger></Triggers>
   <Principals><Principal id="Author"><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
   <Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><StartWhenAvailable>true</StartWhenAvailable><RunOnlyIfNetworkAvailable>true</RunOnlyIfNetworkAvailable><ExecutionTimeLimit>PT0S</ExecutionTimeLimit><Enabled>true</Enabled></Settings>
   <Actions Context="Author"><Exec><Command>wsl.exe</Command><Arguments>${xml(argumentsText)}</Arguments></Exec></Actions>

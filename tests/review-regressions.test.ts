@@ -121,3 +121,15 @@ test('relations that expire during an earlier model call are no longer pending',
     assert.equal(result.judged, 1); assert.equal(result.pending, 0); assert.equal(result.deferred, false);
   } finally { store.close(); await rm(root, { recursive: true, force: true }); }
 });
+
+test('Windows schedule starts at generation time and ignores overlapping instances', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'feedgarden-schedule-'));
+  try {
+    const before = Date.now();
+    await promisify(execFile)(process.execPath, ['--import', 'tsx', resolve('scripts/schedule.ts'), '--distro', 'Fixture', '--output', root]);
+    const xml = await readFile(join(root, 'Feedgarden.xml'), 'utf8');
+    const boundary = Date.parse(/<StartBoundary>(.*?)<\/StartBoundary>/.exec(xml)![1]!);
+    assert.ok(boundary >= before && boundary <= Date.now(), 'StartBoundary must describe this generation');
+    assert.match(xml, /<MultipleInstancesPolicy>IgnoreNew<\/MultipleInstancesPolicy>/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

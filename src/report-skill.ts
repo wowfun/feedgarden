@@ -2,8 +2,9 @@ import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { taskSchemas } from './task-contract.mjs';
 
-export type ReportTask = 'transcript' | 'relations';
+export type ReportTask = keyof typeof taskSchemas;
 let root = dirname(fileURLToPath(import.meta.url));
 while (!existsSync(join(root, 'package.json'))) {
   const parent = dirname(root);

@@ -93,6 +93,7 @@ test('official article cache avoids requests and failed refresh preserves accept
     assert.match(String(retained.metadata?.articleError), /403/);
     assert.equal(store.states().length, 0);
     assert.equal((store.db.prepare('SELECT count(*) n FROM raw_responses').get() as { n: number }).n, 2);
+    assert.equal((store.db.prepare("SELECT channel FROM raw_responses WHERE url LIKE '%/robots.txt'").get() as { channel: string }).channel, 'robots');
     assert.equal((await enrichItem({ ...item, text: 'Changed introduction.' }, store, http, true)).text, 'Changed introduction.');
     const before = requests;
     assert.deepEqual(await enrichItem({ ...item, source: 'hackernews', url: 'https://untrusted.test/post' }, store, http), { ...item, source: 'hackernews', url: 'https://untrusted.test/post' });

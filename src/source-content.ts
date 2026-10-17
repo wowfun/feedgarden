@@ -79,7 +79,7 @@ export function parseArticle(html: string, url: string): { text: string; media: 
 function saveEnrichmentResponses(item: Item, store: Store, http: Http, start: number, channel: string): void {
   for (const response of http.raw.splice(start)) {
     http.signal?.throwIfAborted();
-    store.saveRaw(item.source, item.stream, channel, response);
+    store.saveRaw(item.source, item.stream, new URL(response.url).pathname === '/robots.txt' ? 'robots' : channel, response);
   }
 }
 

@@ -2,6 +2,7 @@
   "name": "简体中文",
   "hreflang": "zh-Hans",
   "dir": "ltr",
+  "tag_labels": { "source/podcast": "播客" },
   "messages": {
     "export": "导出",
     "export_title": "导出 Markdown",

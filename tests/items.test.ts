@@ -166,6 +166,27 @@ test('native ID path safety and source-aware cache; metadata updates reuse copy,
  await writeSite(f.config,f.store);const en=await readFile(join(f.config.feed.directory,itemPath('one','2026-10-09',1)),'utf8'),zh=await readFile(join(f.config.feed.directory,'_translations/zh-CN',itemPath('one','2026-10-09',1)),'utf8');assert.match(en,/source_url: "https:\/\/example.test\//);assert.match(en,/topics\/coding/);assert.match(zh,/source\/one/);
  }finally{await f.cleanup();}
 });
+test('source navigation pages survive subsequent publication renders after archive import', async () => {
+ const f=await fixture();
+ try {
+  for (const id of ['podcast','github']) f.config.sources.push({...f.config.sources[0]!,id,name:id});
+  f.store.setMeta('selection_archives','1');
+  await writeSite(f.config,f.store);
+  const paths=['podcast/index.md','_translations/zh-CN/podcast/index.md','github/index.md','_translations/zh-CN/github/index.md'];
+  const before=await Promise.all(paths.map(path=>readFile(join(f.config.feed.directory,path),'utf8')));
+  assert.match(before[0]!,/"id":"podcasts","order":10/);
+  assert.match(before[1]!,/title: "播客"/);
+  const locale=JSON.parse(await readFile(join(f.config.feed.directory,'_translations/zh-CN/_locale.yml'),'utf8'));
+  assert.equal(locale.tag_labels['source/podcast'],'播客');
+  assert.match(before[2]!,/"id":"github","order":12/);
+  assert.match(before[3]!,/title: "GitHub"/);
+  for (const index of [0,2]) assert.match(before[index]!,/"layout":"archive"/);
+  for (const index of [1,3]) assert.doesNotMatch(before[index]!,/"layout":/);
+  f.store.setMeta('content_version','2');
+  await writeSite(f.config,f.store);
+  assert.deepEqual(await Promise.all(paths.map(path=>readFile(join(f.config.feed.directory,path),'utf8'))),before);
+ } finally {await f.cleanup();}
+});
 test('a failed revision retains the previous bilingual snapshot and backs off to five attempts',async()=>{
  const f=await fixture();try{save(f.store,[item('a')]);await summarize(f.config,f.store,{},generator,at);save(f.store,[item('a','one',{text:'Changed facts'})]);let tries=0;
  const broken:Generator=async()=>{tries++;throw new Error('Transport disconnected');};

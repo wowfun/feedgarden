@@ -11,6 +11,7 @@ import { atomicWrite, safeUrl, hash, nowIso } from './util.js';
 import { importArchives, archiveManifestSignature } from './archives.js';
 import { reconcileSelection, selectionPolicy, selectionClause } from './selection.js';
 import { embedKind } from './media-embed.js';
+import { collectionTabs } from './collections.js';
 import { publication, recentPublication, activeRelations, recommendationManifest, relationRevision, type Publication } from './relations.js';
 
 function escapeMarkdown(value: string): string { return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\\`*_[\]{}()#!|$~]/g, char => `&#${char.charCodeAt(0)};`).replace(/\b([a-z][a-z0-9+.-]*):(?=\/\/)/gi, '$1&#58;').replace(/[\r\n]+/g, ' ').trim(); }
@@ -112,7 +113,7 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
   const timezones = new Map(config.sources.map(source => [source.id, source.timezone]));
   const destination = resolve(config.feed.directory);
   const manifests = await Promise.all(['en', 'zh-CN'].map(locale => readFile('config/locales/' + locale + '.json', 'utf8')));
-  const signature = hash({ contentVersion: store.meta('content_version'), registry, sources: config.sources.map(({ id, name, timezone, selection }) => ({ id, name, timezone, selection })), manifests, recommendations: relationRevision(store), renderRevision: 8 });
+  const signature = hash({ contentVersion: store.meta('content_version'), registry, sources: config.sources.map(({ id, name, timezone, selection }) => ({ id, name, timezone, selection })), manifests, recommendations: relationRevision(store), renderRevision: 9 });
   const signatureKey = 'render_signature:' + destination;
   if (!force && existsSync(destination) && existsSync(join(destination, 'index.md')) && existsSync(join(destination, '_translations/zh-CN/index.md')) && store.meta(signatureKey) === signature) return false;
   const recommendationAt = nowIso(), relations = activeRelations(store, recommendationAt);
@@ -160,10 +161,17 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
     for (const locale of ['en', 'zh-CN'] as const) {
       const prefix = locale === 'zh-CN' ? '_translations/zh-CN/' : '';
       const manifest = JSON.parse(manifests[locale === 'en' ? 0 : 1]!);
-      manifest.tag_labels = Object.fromEntries([...config.sources.map(source => ['source/' + source.id, source.name]), ...registry.topics.map(topic => ['topics/' + topic.id, topic.name[locale]])]);
+      manifest.tag_labels = Object.fromEntries([...config.sources.map(source => ['source/' + source.id, manifest.tag_labels?.['source/' + source.id] ?? source.name]), ...registry.topics.map(topic => ['topics/' + topic.id, topic.name[locale]])]);
       manifest.tag_aliases = Object.fromEntries(registry.topics.filter(topic => topic.replacedBy).map(topic => ['topics/' + topic.id, 'topics/' + topic.replacedBy]));
       if (!preserveManifest || !existsSync(join(staging, prefix + '_locale.yml'))) await write(prefix + '_locale.yml', JSON.stringify(manifest, null, 2));
       if (!existsSync(join(staging, prefix + 'index.md'))) await write(prefix + 'index.md', frontmatter({ publish: true, content_type: 'page', title: 'Feedgarden' }));
+      for (const tab of collectionTabs(config.sources)) {
+        const title = tab.title[locale];
+        await write(prefix + tab.source + '/index.md', frontmatter({
+          publish: true, content_type: 'page', title,
+          tab: locale === 'en' ? { id: tab.id, order: tab.order, topics: ['source/' + tab.source], layout: 'archive' } : { label: title }
+        }) + '# ' + title + '\n');
+      }
     }
     const archived = store.db.prepare(`SELECT a.path,a.source,a.id,a.en,a.zh FROM feed_archives a LEFT JOIN feed_summaries f ON f.source=a.source AND f.id=a.id LEFT JOIN feed_excluded e ON e.source=a.source AND e.id=a.id WHERE f.id IS NULL AND e.id IS NULL AND ${selectionClause('a', true)} ORDER BY a.path`);
     for (const row of archived.iterate() as Iterable<{ path: string; source: string; id: string; en: string; zh: string }>) {

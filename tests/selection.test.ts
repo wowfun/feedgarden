@@ -253,6 +253,28 @@ test('archive maintenance updates bilingual bytes and removes output without los
   } finally { await f.cleanup(); }
 });
 
+test('collection pages are protected only while their source remains configured, including disabled sources', async () => {
+  const f = await fixture();
+  try {
+    const source = f.config.sources[0]!;
+    f.config.sources.push(...['github', 'podcast'].map(id => ({ ...source, id, enabled: false, selection: undefined })));
+    const paths = ['github/index.md', '_translations/zh-CN/github/index.md', 'podcast/index.md', '_translations/zh-CN/podcast/index.md'];
+    for (const path of paths) {
+      await mkdir(join(f.config.feed.directory, path, '..'), { recursive: true });
+      await writeFile(join(f.config.feed.directory, path), 'Authored collection');
+      await assert.rejects(maintainArchive(f.config, f.store, 'update', path), /generated from configuration/);
+    }
+    f.config.sources = f.config.sources.filter(source => !['github', 'podcast'].includes(source.id));
+    await importArchives(f.config, f.store);
+    for (const path of paths) {
+      await writeFile(join(f.config.feed.directory, path), 'Updated authored collection');
+      await maintainArchive(f.config, f.store, 'update', path);
+    }
+    await writeSite(f.config, f.store);
+    for (const path of paths) assert.equal(await readFile(join(f.config.feed.directory, path), 'utf8'), 'Updated authored collection');
+  } finally { await f.cleanup(); }
+});
+
 test('archive maintenance promotes a repaired quarantined pair and clears its scoring block', async () => {
   const f = await fixture(1); try {
     const originals = await archive(f, 'hackernews', 1);

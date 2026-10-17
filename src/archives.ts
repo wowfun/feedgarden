@@ -10,6 +10,7 @@ import type { Store } from './store.js';
 import type { Item } from './types.js';
 import { hash, safeUrl, errorText, nowIso } from './util.js';
 import { selectionDay } from './selection.js';
+import { collectionTabs } from './collections.js';
 
 export interface ArchivePost { path: string; source: string; id: string; day: string; number: number; item: Item; firstSeen: string; en: string; zh: string }
 export interface ArchiveIssue { path: string; source: string; day: string; message: string }
@@ -207,7 +208,9 @@ export async function maintainArchive(config: Config, store: Store, action: 'upd
   let path = rel.split(sep).join('/');
   const paired = /^(?:_translations\/zh-CN\/)?((?:reddit|hackernews)\/\d{4}-\d{2}\/\d{2}\/item-\d+\.md)$/.exec(path);
   if (paired) path = paired[1]!;
-  if (['index.md', '_locale.yml', '_recommendations.json', '_translations/zh-CN/index.md', '_translations/zh-CN/_locale.yml'].includes(path)) throw new Error('This file is generated from configuration: ' + path);
+  const collection = collectionTabs(config.sources).some(tab => path === tab.source + '/index.md' || path === '_translations/zh-CN/' + tab.source + '/index.md');
+  if (['index.md', '_locale.yml', '_recommendations.json', '_translations/zh-CN/index.md', '_translations/zh-CN/_locale.yml'].includes(path)
+    || collection) throw new Error('This file is generated from configuration: ' + path);
   await importArchives(config, store, signal);
   const current = store.db.prepare('SELECT source,id,day,number FROM feed_archives WHERE path=?').get(path) as { source: string; id: string; day: string; number: number } | undefined;
   const paths = paired ? [path, '_translations/zh-CN/' + path] : [path];

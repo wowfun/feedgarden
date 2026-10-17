@@ -11,7 +11,7 @@ export class Store {
   readonly db: Database.Database;
   private leaseOwner?: string;
   private readonly statements = new Map<string, Database.Statement>();
-  private statement(sql: string): Database.Statement {
+  statement(sql: string): Database.Statement {
     let statement = this.statements.get(sql);
     if (!statement) { statement = this.db.prepare(sql); this.statements.set(sql, statement); }
     return statement;
@@ -108,13 +108,13 @@ export class Store {
   }
   acquireLease(owner: string): void {
     this.db.transaction(() => {
-      const lease = this.db.prepare('SELECT owner,expires FROM job_lease WHERE id=1').get() as { owner: string; expires: string } | undefined;
+      const lease = this.statement('SELECT owner,expires FROM job_lease WHERE id=1').get() as { owner: string; expires: string } | undefined;
       if (lease && lease.expires > nowIso()) throw new Error('Another Feedgarden job holds the database lease');
-      this.db.prepare('INSERT OR REPLACE INTO job_lease VALUES (1,?,?)').run(owner, new Date(Date.now() + 120_000).toISOString());
+      this.statement('INSERT OR REPLACE INTO job_lease VALUES (1,?,?)').run(owner, new Date(Date.now() + 120_000).toISOString());
     })();
     this.leaseOwner = owner;
   }
-  renewLease(owner: string): void { if (this.db.prepare('UPDATE job_lease SET expires=? WHERE id=1 AND owner=? AND expires>?').run(new Date(Date.now() + 120_000).toISOString(), owner, nowIso()).changes !== 1) throw new Error('Lost database job lease'); }
+  renewLease(owner: string): void { if (this.statement('UPDATE job_lease SET expires=? WHERE id=1 AND owner=? AND expires>?').run(new Date(Date.now() + 120_000).toISOString(), owner, nowIso()).changes !== 1) throw new Error('Lost database job lease'); }
   assertLease(): void { if (this.leaseOwner) this.renewLease(this.leaseOwner); }
   watchLease(owner: string, cancellation: AbortController): NodeJS.Timeout {
     const timer = setInterval(() => {
@@ -124,24 +124,24 @@ export class Store {
     timer.unref();
     return timer;
   }
-  releaseLease(owner: string): void { this.db.prepare('DELETE FROM job_lease WHERE id=1 AND owner=?').run(owner); if (this.leaseOwner === owner) this.leaseOwner = undefined; }
-  close(): void { this.db.close(); }
+  releaseLease(owner: string): void { this.statement('DELETE FROM job_lease WHERE id=1 AND owner=?').run(owner); if (this.leaseOwner === owner) this.leaseOwner = undefined; }
+  close(): void { this.statements.clear(); this.db.close(); }
   channel(source: string, stream: string, channel: string): ChannelState | undefined {
-    return this.db.prepare('SELECT * FROM channel_state WHERE source=? AND stream=? AND channel=?').get(source, stream, channel) as ChannelState | undefined;
+    return this.statement('SELECT * FROM channel_state WHERE source=? AND stream=? AND channel=?').get(source, stream, channel) as ChannelState | undefined;
   }
-  cache(url: string): RawResponse | undefined { const row = this.db.prepare('SELECT response FROM http_cache WHERE url=?').get(url) as { response: string } | undefined; return row && JSON.parse(row.response); }
+  cache(url: string): RawResponse | undefined { const row = this.statement('SELECT response FROM http_cache WHERE url=?').get(url) as { response: string } | undefined; return row && JSON.parse(row.response); }
   cacheHeaders(url: string): Record<string, string> | undefined {
-    const row = this.db.prepare("SELECT json_extract(response,'$.headers') headers FROM http_cache WHERE url=?").get(url) as { headers: string } | undefined;
+    const row = this.statement("SELECT json_extract(response,'$.headers') headers FROM http_cache WHERE url=?").get(url) as { headers: string } | undefined;
     return row && JSON.parse(row.headers);
   }
   extracted<T>(key: string, body: string, parse: () => T): T {
-    const digest = hash(body), row = this.db.prepare('SELECT body_hash,data FROM enrichment_extractions WHERE key=?').get(key) as { body_hash: string; data: string } | undefined;
+    const digest = hash(body), row = this.statement('SELECT body_hash,data FROM enrichment_extractions WHERE key=?').get(key) as { body_hash: string; data: string } | undefined;
     if (row?.body_hash === digest) return JSON.parse(row.data) as T;
     const result = parse();
-    this.db.prepare('INSERT OR REPLACE INTO enrichment_extractions VALUES (?,?,?)').run(key, digest, JSON.stringify(result));
+    this.statement('INSERT OR REPLACE INTO enrichment_extractions VALUES (?,?,?)').run(key, digest, JSON.stringify(result));
     return result;
   }
-  saveCache(response: RawResponse): void { this.db.prepare('INSERT OR REPLACE INTO http_cache VALUES (?,?)').run(response.url, JSON.stringify(response)); }
+  saveCache(response: RawResponse): void { this.statement('INSERT OR REPLACE INTO http_cache VALUES (?,?)').run(response.url, JSON.stringify(response)); }
   saveRaw(source: string, stream: string, channel: string, raw: RawResponse): void {
     const headers = JSON.stringify(raw.headers), digest = hash(raw.body);
     // Keep distinct representations and response metadata, without appending
@@ -153,9 +153,9 @@ export class Store {
       source, stream, channel, raw.url, digest, raw.status, headers);
   }
   saveCollection(source: string, stream: string, channel: string, result: Collection, nextAttempt: string, attemptedAt = result.coverage.to): void {
-    const upsertItem = this.db.prepare('INSERT INTO items VALUES (?,?,?,?,?,?,?) ON CONFLICT(source,id) DO UPDATE SET published_at=excluded.published_at,last_seen=excluded.last_seen,data=excluded.data,content_hash=excluded.content_hash');
-    const insertVersion = this.db.prepare('INSERT OR IGNORE INTO item_versions VALUES (?,?,?,?,?)');
-    const insertObservation = this.db.prepare('INSERT INTO observations(source,item_id,stream,channel,observed_at,data) VALUES (?,?,?,?,?,?)');
+    const upsertItem = this.statement('INSERT INTO items VALUES (?,?,?,?,?,?,?) ON CONFLICT(source,id) DO UPDATE SET published_at=excluded.published_at,last_seen=excluded.last_seen,data=excluded.data,content_hash=excluded.content_hash');
+    const insertVersion = this.statement('INSERT OR IGNORE INTO item_versions VALUES (?,?,?,?,?)');
+    const insertObservation = this.statement('INSERT INTO observations(source,item_id,stream,channel,observed_at,data) VALUES (?,?,?,?,?,?)');
     this.db.transaction(() => {
       for (const raw of result.raw) this.saveRaw(source, stream, channel, raw);
       for (const item of result.items) {
@@ -167,19 +167,22 @@ export class Store {
         insertObservation.run(source, item.id, stream, channel, item.observedAt, data);
         if (ranking) this.saveRanking(source, item.id, ranking);
       }
-      if (result.ranking && (result.coverage.status === 'complete' || result.coverage.status === 'partial')) this.db.prepare('INSERT INTO feed_rank_snapshots VALUES (?,?,?,?) ON CONFLICT(source,stream,window) DO UPDATE SET observed_at=excluded.observed_at WHERE excluded.observed_at>=feed_rank_snapshots.observed_at').run(source, stream, result.ranking.window, result.coverage.to);
+      if (result.ranking && (result.coverage.status === 'complete' || result.coverage.status === 'partial')) this.saveRankSnapshot(source, stream, result.ranking.window, result.coverage.to);
       const previous = this.channel(source, stream, channel);
       const successful = result.coverage.status === 'complete' || result.coverage.status === 'partial';
-      this.db.prepare('INSERT OR REPLACE INTO channel_state VALUES (?,?,?,?,?,?,?,?,?)').run(source, stream, channel,
+      this.statement('INSERT OR REPLACE INTO channel_state VALUES (?,?,?,?,?,?,?,?,?)').run(source, stream, channel,
         successful ? result.cursor ?? previous?.cursor ?? null : previous?.cursor ?? null,
         successful ? result.coverage.to : previous?.last_success ?? null, attemptedAt, nextAttempt, result.coverage.status, JSON.stringify(result.coverage.notes));
-      if (result.coverage.status !== 'complete') this.db.prepare('INSERT INTO gaps(source,stream,channel,at,details) VALUES (?,?,?,?,?)').run(source, stream, channel, attemptedAt, JSON.stringify(result.coverage));
+      if (result.coverage.status !== 'complete') this.statement('INSERT INTO gaps(source,stream,channel,at,details) VALUES (?,?,?,?,?)').run(source, stream, channel, attemptedAt, JSON.stringify(result.coverage));
     })();
   }
   saveRanking(source: string, id: string, ranking: RankingObservation): boolean {
     if (!Number.isFinite(ranking.score)) throw new Error('Invalid selection score');
     const observedAt = new Date(ranking.observedAt).toISOString();
     return this.statement('INSERT INTO feed_rankings VALUES (?,?,?,?) ON CONFLICT(source,id) DO UPDATE SET data=excluded.data,observed_at=excluded.observed_at WHERE julianday(excluded.observed_at)>=julianday(feed_rankings.observed_at)').run(source, id, JSON.stringify({ ...ranking, observedAt }), observedAt).changes === 1;
+  }
+  saveRankSnapshot(source: string, stream: string, window: string, observedAt: string): void {
+    this.statement('INSERT INTO feed_rank_snapshots VALUES (?,?,?,?) ON CONFLICT(source,stream,window) DO UPDATE SET observed_at=excluded.observed_at WHERE excluded.observed_at>=feed_rank_snapshots.observed_at').run(source, stream, window, observedAt);
   }
   private currentRankingItem(source: string, id: string, observedAt: string): Item | undefined {
     const row = this.statement('SELECT i.data,r.observed_at FROM items i LEFT JOIN feed_rankings r ON r.source=i.source AND r.id=i.id WHERE i.source=? AND i.id=?').get(source, id) as { data: string; observed_at: string | null } | undefined;
@@ -219,32 +222,32 @@ export class Store {
   items(source: string, start?: string, end?: string): Item[] {
     const clauses = [start ? 'julianday(published_at)>=julianday(?)' : '', end ? 'julianday(published_at)<julianday(?)' : ''].filter(Boolean);
     const args = [source, ...(start ? [start] : []), ...(end ? [end] : [])];
-    const rows = this.db.prepare(`SELECT data FROM items WHERE source=? ${clauses.length ? 'AND ' + clauses.join(' AND ') : ''} ORDER BY julianday(published_at),id`).all(...args) as { data: string }[];
+    const rows = this.statement(`SELECT data FROM items WHERE source=? ${clauses.length ? 'AND ' + clauses.join(' AND ') : ''} ORDER BY julianday(published_at),id`).all(...args) as { data: string }[];
     return rows.map(row => JSON.parse(row.data) as Item);
   }
-  states(): ChannelState[] { return this.db.prepare('SELECT * FROM channel_state ORDER BY source,stream,channel').all() as ChannelState[]; }
+  states(): ChannelState[] { return this.statement('SELECT * FROM channel_state ORDER BY source,stream,channel').all() as ChannelState[]; }
   meta(key: string): string | undefined { return (this.statement('SELECT value FROM feed_meta WHERE key=?').get(key) as { value: string } | undefined)?.value; }
-  setMeta(key: string, value: string): void { this.db.prepare('INSERT OR REPLACE INTO feed_meta VALUES (?,?)').run(key, value); }
+  setMeta(key: string, value: string): void { this.statement('INSERT OR REPLACE INTO feed_meta VALUES (?,?)').run(key, value); }
   itemNumber(source: string, id: string, day: string): number {
     return this.db.transaction(() => {
-      const existing = this.db.prepare('SELECT number FROM feed_item_paths WHERE source=? AND id=? AND day=?').get(source, id, day) as { number: number } | undefined;
+      const existing = this.statement('SELECT number FROM feed_item_paths WHERE source=? AND id=? AND day=?').get(source, id, day) as { number: number } | undefined;
       if (existing) return existing.number;
-      const { number } = this.db.prepare('SELECT COALESCE(MAX(number),0)+1 AS number FROM feed_item_paths WHERE source=? AND day=?').get(source, day) as { number: number };
-      this.db.prepare('INSERT INTO feed_item_paths VALUES (?,?,?,?)').run(source, id, day, number);
+      const { number } = this.statement('SELECT COALESCE(MAX(number),0)+1 AS number FROM feed_item_paths WHERE source=? AND day=?').get(source, day) as { number: number };
+      this.statement('INSERT INTO feed_item_paths VALUES (?,?,?,?)').run(source, id, day, number);
       return number;
     })();
   }
   startCall(report: string, model: string, maxDaily: number): number {
     return this.db.transaction(() => {
       const day = nowIso().slice(0, 10);
-      const { count } = this.db.prepare('SELECT count(*) AS count FROM agent_calls WHERE at>=?').get(day) as { count: number };
+      const { count } = this.statement('SELECT count(*) AS count FROM agent_calls WHERE at>=?').get(day) as { count: number };
       if (count >= maxDaily) throw new QuotaDeferred(`Agent daily call limit (${maxDaily}) reached; task retained`);
-      return Number(this.db.prepare('INSERT INTO agent_calls(at,report_key,model,status) VALUES (?,?,?,?)').run(nowIso(), report, model, 'running').lastInsertRowid);
+      return Number(this.statement('INSERT INTO agent_calls(at,report_key,model,status) VALUES (?,?,?,?)').run(nowIso(), report, model, 'running').lastInsertRowid);
     })();
   }
-  finishCall(id: number, status: string, usage: unknown): void { this.db.prepare('UPDATE agent_calls SET status=?,usage=? WHERE id=?').run(status, JSON.stringify(usage ?? null), id); }
-  run(kind: string): number { return Number(this.db.prepare('INSERT INTO runs(kind,started_at,status) VALUES (?,?,?)').run(kind, nowIso(), 'running').lastInsertRowid); }
-  finishRun(id: number, status: string, details: unknown): void { this.db.prepare('UPDATE runs SET finished_at=?,status=?,details=? WHERE id=?').run(nowIso(), status, JSON.stringify(details), id); }
+  finishCall(id: number, status: string, usage: unknown): void { this.statement('UPDATE agent_calls SET status=?,usage=? WHERE id=?').run(status, JSON.stringify(usage ?? null), id); }
+  run(kind: string): number { return Number(this.statement('INSERT INTO runs(kind,started_at,status) VALUES (?,?,?)').run(kind, nowIso(), 'running').lastInsertRowid); }
+  finishRun(id: number, status: string, details: unknown): void { this.statement('UPDATE runs SET finished_at=?,status=?,details=? WHERE id=?').run(nowIso(), status, JSON.stringify(details), id); }
   async backup(path: string): Promise<void> { mkdirSync(dirname(path), { recursive: true }); await this.db.backup(path); chmodSync(path, 0o600); }
 }
 export class QuotaDeferred extends Error {}

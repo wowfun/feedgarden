@@ -3,7 +3,6 @@ import { existsSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { DateTime } from 'luxon';
 import type { Config } from './config.js';
 import { Store } from './store.js';
 import { Http, HttpError } from './http.js';
@@ -11,7 +10,7 @@ import { importArchives } from './archives.js';
 import { candidatesFor, historicalWindow, reconcileSelection, selectionRange, type SelectionReport } from './selection.js';
 import { parseFeed, xml, array } from './channels/parsers.js';
 import { hnScore } from './scoring.js';
-import { mapLimit, nowIso, errorText, isoDate } from './util.js';
+import { mapLimit, nowIso, errorText } from './util.js';
 import type { RawResponse, RankingObservation, Metrics } from './types.js';
 
 export async function rankItems(config: Config, store: Store, options: { source?: string; history?: boolean; signal?: AbortSignal; at?: string } = {}, http = new Http(store, undefined, options.signal)): Promise<SelectionReport[]> {
@@ -40,9 +39,8 @@ export async function rankItems(config: Config, store: Store, options: { source?
   }
   function block(key: string, error: unknown): void { blocked.add(key); const notes = errors.get(key) ?? []; notes.push(errorText(error)); errors.set(key, notes); }
   for (const source of sources) {
-    const earliest = isoDate(DateTime.fromISO(at).setZone(source.timezone).startOf('day').minus({ days: source.selection!.updateDays - 1 }));
-    const today = isoDate(DateTime.fromISO(at).setZone(source.timezone));
-    const candidates = candidatesFor(store, source, options.history ? undefined : selectionRange(source, at)).filter(candidate => options.history || candidate.day >= earliest && candidate.day <= today);
+    const range = selectionRange(source, at);
+    const candidates = candidatesFor(store, source, options.history ? undefined : range).filter(candidate => options.history || candidate.day >= range.firstDay && candidate.day <= range.lastDay);
     if (source.selection!.method === 'hn-engagement') {
       // Network requests remain outside SQLite transactions. Commit each bounded
       // batch's evidence, score and native metrics under one lease check.
@@ -103,7 +101,7 @@ export async function rankItems(config: Config, store: Store, options: { source?
           const document = xml(raw.body), size = array(document.feed?.entry ?? document.rss?.channel?.item ?? document.RDF?.item).length;
           store.assertLease(); options.signal?.throwIfAborted();
           store.db.transaction(() => {
-            store.db.prepare('INSERT INTO feed_rank_snapshots VALUES (?,?,?,?) ON CONFLICT(source,stream,window) DO UPDATE SET observed_at=excluded.observed_at WHERE excluded.observed_at>=feed_rank_snapshots.observed_at').run(source.id, request.stream, request.window, raw.fetchedAt);
+            store.saveRankSnapshot(source.id, request.stream, request.window, raw.fetchedAt);
             for (const row of items) if (row.ranking && matching.has(row.id)) store.updateRankingItem(source.id, row.id, row.ranking, { rank: row.ranking.rank });
           })();
           if (size === 0) for (const day of request.days) { const key = source.id + '/' + day; const messages = errors.get(key) ?? []; messages.push(`The ${request.stream}/${request.window} RSS ranking is empty; unmatched candidates have unknown rank.`); errors.set(key, messages); }

@@ -43,7 +43,7 @@ function childIds(value: unknown): string[] {
 }
 export async function enrichHackerNews(item: Item, store: Store, http: Http, refresh: boolean, extractMedia: (html: string, url: string) => Media[]): Promise<Item> {
   if (!/^\d+$/.test(item.id)) return item;
-  const feedHash = hash(item.text), previousRow = store.db.prepare('SELECT accepted FROM feed_summaries WHERE source=? AND id=?').get(item.source, item.id) as { accepted: string } | undefined;
+  const feedHash = hash(item.text), previousRow = store.statement('SELECT accepted FROM feed_summaries WHERE source=? AND id=?').get(item.source, item.id) as { accepted: string } | undefined;
   const previous = previousRow && (JSON.parse(previousRow.accepted) as { item: Item }).item;
   const retained = previous?.url === item.url && previous.metadata?.hnFeedTextHash === feedHash ? previous : undefined;
   const metadata: NonNullable<Item['metadata']> = { ...item.metadata, hnFeedTextHash: feedHash };

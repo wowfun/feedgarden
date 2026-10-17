@@ -98,7 +98,7 @@ async function enrichProductHunt(item: Item, store: Store, http: Http, refresh: 
   const metadata: NonNullable<Item['metadata']> = { ...item.metadata, ...(attemptedAt ? { repositoryLastAttemptAt: attemptedAt } : {}) };
   if (!result?.matched && !failure) failure = 'Product Hunt repository data unavailable';
   if (failure) {
-    const row = store.db.prepare('SELECT accepted FROM feed_summaries WHERE source=? AND id=?').get(item.source, item.id) as { accepted: string } | undefined;
+    const row = store.statement('SELECT accepted FROM feed_summaries WHERE source=? AND id=?').get(item.source, item.id) as { accepted: string } | undefined;
     const previous = row && (JSON.parse(row.accepted) as { item: Item }).item;
     // A failed refresh retains only evidence belonging to the same product route.
     const retained = previous?.url === item.url ? repositoryUrl(previous.repoUrl) : undefined;
@@ -131,7 +131,7 @@ export async function enrichItem(item: Item, store: Store, http: Http, refresh =
   const article = raw && store.extracted('official/v2/' + item.url, raw.body, () => parseArticle(raw!.body, item.url) ?? null);
   if (article && article.text.length > item.text.length) return { ...item, text: article.text, media: [...new Map([...article.media, ...(item.media ?? [])].map(candidate => [candidate.url, candidate])).values()].slice(0, 6), metadata: { ...item.metadata, enrichment: 'article', feedTextHash: feedHash, articleFetchedAt: raw!.fetchedAt, ...(failure ? { articleError: failure } : {}) } };
   // A transient fetch failure must not downgrade previously accepted full text.
-  const previous = store.db.prepare('SELECT accepted FROM feed_summaries WHERE source=? AND id=?').get(item.source, item.id) as { accepted: string } | undefined;
+  const previous = store.statement('SELECT accepted FROM feed_summaries WHERE source=? AND id=?').get(item.source, item.id) as { accepted: string } | undefined;
   const accepted = previous && (JSON.parse(previous.accepted) as { item: Item }).item;
   if (accepted?.metadata?.feedTextHash === feedHash) return { ...item, text: accepted.text, media: accepted.media, metadata: { ...item.metadata, ...accepted.metadata, ...(failure ? { articleError: failure } : {}) } };
   return { ...item, metadata: { ...item.metadata, enrichment: 'feed', ...(failure ? { articleError: failure } : {}) } };

@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { reportSkill } from '../src/report-skill.js';
+import { reportSkill, reportTaskSkill } from '../src/report-skill.js';
+import { configSchema } from '../src/config.js';
 import { run, validationEnvironment } from '../src/build-site.js';
 import { iso, isoDate } from '../src/util.js';
 import { DateTime } from 'luxon';
@@ -66,12 +67,23 @@ test('trusted report skills do not depend on the caller working directory', asyn
   const previous = process.cwd(), root = await mkdtemp(join(tmpdir(), 'feedgarden-skill-check-'));
   try {
     const trusted = await reportSkill(['one']);
+    const transcript=await reportTaskSkill('transcript'),relations=await reportTaskSkill('relations');
     await mkdir(join(root,'.agents/skills/feedgarden-report'),{recursive:true});
     await writeFile(join(root,'.agents/skills/feedgarden-report/SKILL.md'),'Untrusted working-directory replacement');
     process.chdir(root);
     assert.equal(await reportSkill(['one']), trusted);
+    assert.equal(await reportTaskSkill('transcript'),transcript);assert.equal(await reportTaskSkill('relations'),relations);
+    await assert.rejects(reportTaskSkill('../../other' as any),/Unknown fixed report task/);
     assert.match(execFileSync(process.execPath, ['--import', pathToFileURL(join(previous, 'node_modules/tsx/dist/loader.mjs')).href, join(previous, 'scripts/live-collect.ts'), '--help'], { encoding: 'utf8' }), /Usage:/);
   } finally { process.chdir(previous);await rm(root, { recursive: true, force: true }); }
+});
+test('podcast channels require complete metadata and the built-in source identity', () => {
+ const source={id:'podcast',name:'Podcasts',intervalHours:6,streams:[{id:'show',channels:[{id:'rss',kind:'podcast-rss',url:'https://example.test/feed',podcastName:'Show'}]}]};
+ const valid={version:2,agent:{model:'deepseek/deepseek-flash'},sources:[source]};
+ assert.ok(configSchema.safeParse(valid).success);
+ assert.throws(()=>configSchema.parse({...valid,sources:[{...source,id:'other'}]}),/built-in podcast source ID/);
+ for(const field of ['url','podcastName']){const invalid=structuredClone(valid);delete (invalid.sources[0]!.streams[0]!.channels[0]! as any)[field];assert.equal(configSchema.safeParse(invalid).success,false);}
+ assert.equal(configSchema.safeParse({...valid,sources:[{...source,streams:[{id:'main',channels:[{id:'feed',kind:'feed',podcastName:'Show'}]}]}]}).success,false);
 });
 test('live collection rejects mistyped source IDs before creating an evidence directory', async () => {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-collect-args-'));

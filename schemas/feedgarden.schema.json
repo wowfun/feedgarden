@@ -124,6 +124,12 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 365
+        },
+        "maxTranscriptChunks": {
+          "default": 64,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
         }
       },
       "required": [
@@ -194,63 +200,123 @@
                   "minItems": 1,
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                          },
+                          "enabled": {
+                            "default": true,
+                            "type": "boolean"
+                          },
+                          "transport": {
+                            "default": "fetch",
+                            "type": "string",
+                            "enum": [
+                              "fetch",
+                              "curl"
+                            ]
+                          },
+                          "limit": {
+                            "default": 500,
+                            "description": "Maximum items for hn-api and arxiv-api. Other channel kinds use their feed window or adapter-specific bounds.",
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 2000
+                          },
+                          "authTokenEnv": {
+                            "default": "TWITTER_AUTH_TOKEN",
+                            "type": "string"
+                          },
+                          "csrfTokenEnv": {
+                            "default": "TWITTER_CT0",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "const": "podcast-rss"
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "podcastName": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "url",
+                          "podcastName"
+                        ],
+                        "additionalProperties": false
                       },
-                      "kind": {
-                        "type": "string",
-                        "enum": [
-                          "hn-api",
-                          "feed",
-                          "sitemap",
-                          "anthropic-html",
-                          "github-trending",
-                          "github-search",
-                          "x-cli",
-                          "follow-builders",
-                          "arxiv-api",
-                          "ph-html"
-                        ]
-                      },
-                      "enabled": {
-                        "default": true,
-                        "type": "boolean"
-                      },
-                      "url": {
-                        "type": "string",
-                        "format": "uri"
-                      },
-                      "transport": {
-                        "default": "fetch",
-                        "type": "string",
-                        "enum": [
-                          "fetch",
-                          "curl"
-                        ]
-                      },
-                      "limit": {
-                        "default": 500,
-                        "type": "integer",
-                        "exclusiveMinimum": 0,
-                        "maximum": 2000
-                      },
-                      "authTokenEnv": {
-                        "default": "TWITTER_AUTH_TOKEN",
-                        "type": "string"
-                      },
-                      "csrfTokenEnv": {
-                        "default": "TWITTER_CT0",
-                        "type": "string"
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                          },
+                          "enabled": {
+                            "default": true,
+                            "type": "boolean"
+                          },
+                          "transport": {
+                            "default": "fetch",
+                            "type": "string",
+                            "enum": [
+                              "fetch",
+                              "curl"
+                            ]
+                          },
+                          "limit": {
+                            "default": 500,
+                            "description": "Maximum items for hn-api and arxiv-api. Other channel kinds use their feed window or adapter-specific bounds.",
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 2000
+                          },
+                          "authTokenEnv": {
+                            "default": "TWITTER_AUTH_TOKEN",
+                            "type": "string"
+                          },
+                          "csrfTokenEnv": {
+                            "default": "TWITTER_CT0",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "hn-api",
+                              "feed",
+                              "sitemap",
+                              "anthropic-html",
+                              "github-trending",
+                              "github-search",
+                              "x-cli",
+                              "follow-builders",
+                              "arxiv-api",
+                              "ph-html"
+                            ]
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind"
+                        ],
+                        "additionalProperties": false
                       }
-                    },
-                    "required": [
-                      "id",
-                      "kind"
-                    ],
-                    "additionalProperties": false
+                    ]
                   }
                 }
               },

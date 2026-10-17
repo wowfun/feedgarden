@@ -69,6 +69,13 @@ export function renderItem(record: AcceptedItem, locale: 'en' | 'zh-CN', topics 
     return mediaLink(label, candidate.url, candidate.type === 'image', alt);
   });
   let body = item.source === 'hackernews' ? excerpt ? '## ' + (locale === 'en' ? 'Original excerpt' : '原文摘录') + '\n\n> ' + escapeMarkdown(excerpt) : summary ? '## ' + (locale === 'en' ? 'Article' : '正文提炼') + '\n\n' + summary : '' : summary;
+  if (item.source === 'podcast') {
+    const basis = item.metadata?.summaryBasis === 'transcript' ? 'transcript' : 'shownotes';
+    const notes = locale === 'en'
+      ? { transcript: 'Based on the complete available transcript.', shownotes: 'Based on episode show notes.' }
+      : { transcript: '根据取得的完整转录整理。', shownotes: '根据单集节目简介整理。' };
+    body += (body ? '\n\n' : '') + notes[basis];
+  }
   if (copy.discussion && item.discussion) {
     const links = copy.discussion.commentIds.map(id => item.discussion!.comments.find(comment => comment.id === id)).filter(comment => !!comment).map(comment => '[' + escapeMarkdown((comment.author || '#' + comment.id)) + '](https://news.ycombinator.com/item?id=' + encodeURIComponent(comment.id) + ')');
     const sample = locale === 'en' ? 'Based on ' + item.discussion.comments.length + ' selected comments and replies.' : '根据 ' + item.discussion.comments.length + ' 条选取的评论与回复整理。';
@@ -104,7 +111,7 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
   const timezones = new Map(config.sources.map(source => [source.id, source.timezone]));
   const destination = resolve(config.feed.directory);
   const manifests = await Promise.all(['en', 'zh-CN'].map(locale => readFile('config/locales/' + locale + '.json', 'utf8')));
-  const signature = hash({ contentVersion: store.meta('content_version'), registry, sources: config.sources.map(({ id, name, timezone, selection }) => ({ id, name, timezone, selection })), manifests, renderRevision: 4 });
+  const signature = hash({ contentVersion: store.meta('content_version'), registry, sources: config.sources.map(({ id, name, timezone, selection }) => ({ id, name, timezone, selection })), manifests, renderRevision: 5 });
   const signatureKey = 'render_signature:' + destination;
   if (!force && existsSync(destination) && existsSync(join(destination, 'index.md')) && existsSync(join(destination, '_translations/zh-CN/index.md')) && store.meta(signatureKey) === signature) return false;
   const topicIds = new Map(registry.topics.map(topic => [topic.id, topic.replacedBy ?? topic.id]));

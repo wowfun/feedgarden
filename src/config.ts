@@ -4,16 +4,18 @@ import { parse, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { z } from 'zod';
 
 const slug = z.string().regex(/^[a-z0-9][a-z0-9_-]*$/);
-export const channelSchema = z.object({
+const channelFields = {
   id: slug,
-  kind: z.enum(['hn-api', 'feed', 'sitemap', 'anthropic-html', 'github-trending', 'github-search', 'x-cli', 'follow-builders', 'arxiv-api', 'ph-html']),
   enabled: z.boolean().default(true),
-  url: z.url().optional(),
   transport: z.enum(['fetch', 'curl']).default('fetch'),
-  limit: z.number().int().positive().max(2000).default(500),
+  limit: z.number().int().positive().max(2000).default(500).describe('Maximum items for hn-api and arxiv-api. Other channel kinds use their feed window or adapter-specific bounds.'),
   authTokenEnv: z.string().default('TWITTER_AUTH_TOKEN'),
   csrfTokenEnv: z.string().default('TWITTER_CT0'),
-}).strict();
+};
+export const channelSchema = z.discriminatedUnion('kind', [
+  z.object({ ...channelFields, kind: z.literal('podcast-rss'), url: z.url(), podcastName: z.string().min(1) }).strict(),
+  z.object({ ...channelFields, kind: z.enum(['hn-api', 'feed', 'sitemap', 'anthropic-html', 'github-trending', 'github-search', 'x-cli', 'follow-builders', 'arxiv-api', 'ph-html']), url: z.url().optional() }).strict(),
+]);
 export const sourceSchema = z.object({
   id: slug, name: z.string().min(1), enabled: z.boolean().default(true),
   timezone: z.string().default('Asia/Shanghai').refine(value => {
@@ -40,6 +42,7 @@ export const configSchema = z.object({
     maxItemChars: z.number().int().min(100).max(4000).default(4000), maxDailyCalls: z.number().int().positive().max(80).default(80),
     runtimeDirectory: z.string().default('.local/dsh'),
     workspaceRetentionDays: z.number().int().min(0).max(365).default(7),
+    maxTranscriptChunks: z.number().int().min(1).max(1024).default(64),
   }).strict(),
   publish: z.object({ repository: z.string().default('https://github.com/wowfun/feedgarden.git'), branch: z.string().default('main'), auto: z.boolean().default(false) }).strict().default({ repository: 'https://github.com/wowfun/feedgarden.git', branch: 'main', auto: false }),
   sources: z.array(sourceSchema).min(1),
@@ -51,6 +54,7 @@ export const configSchema = z.object({
     seen.add(source.id);
     const streams = new Set<string>();
     for (const stream of source.streams) {
+      if (source.id !== 'podcast' && stream.channels.some(channel => channel.kind === 'podcast-rss')) context.addIssue({ code: 'custom', message: 'podcast-rss requires the built-in podcast source ID' });
       if (streams.has(stream.id)) context.addIssue({ code: 'custom', message: `Duplicate stream: ${source.id}/${stream.id}` });
       streams.add(stream.id);
       if (new Set(stream.channels.map(channel => channel.id)).size !== stream.channels.length) context.addIssue({ code: 'custom', message: `Duplicate channel: ${source.id}/${stream.id}` });

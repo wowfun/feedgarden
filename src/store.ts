@@ -53,7 +53,7 @@ export class Store {
     if (version < 3) initializeFeedSchema(this.db, iso(DateTime.now().setZone('Asia/Shanghai').startOf('day').toUTC()), false);
     // Bump this revision when the additive schema below changes. Current stores
     // need only a read here, including when another connection holds a write lock.
-    if (this.meta('runtime_schema_revision') !== '1' || this.meta('items_date_revision') !== '1') this.db.transaction(() => {
+    if (this.meta('runtime_schema_revision') !== '3' || this.meta('items_date_revision') !== '1') this.db.transaction(() => {
       this.db.exec('CREATE INDEX IF NOT EXISTS agent_calls_at ON agent_calls(at); CREATE INDEX IF NOT EXISTS items_first_seen ON items(source,first_seen,id);');
       this.db.exec('CREATE INDEX IF NOT EXISTS items_selection_published ON items(source,julianday(published_at),id); CREATE INDEX IF NOT EXISTS items_selection_seen ON items(source,julianday(first_seen),id);');
       this.db.exec("CREATE INDEX IF NOT EXISTS feed_jobs_pending_order ON feed_jobs(source,json_extract(data,'$.firstSeen'),id,next_at) WHERE state='pending' AND attempts<5;");
@@ -68,6 +68,24 @@ export class Store {
         CREATE TABLE IF NOT EXISTS feed_archives(path TEXT PRIMARY KEY,source TEXT NOT NULL,id TEXT,day TEXT NOT NULL,number INTEGER NOT NULL,item TEXT,en TEXT NOT NULL,zh TEXT NOT NULL);
         CREATE UNIQUE INDEX IF NOT EXISTS feed_archives_identity ON feed_archives(source,id) WHERE id IS NOT NULL;
         CREATE TABLE IF NOT EXISTS feed_archive_files(path TEXT PRIMARY KEY,body BLOB NOT NULL);
+        CREATE TABLE IF NOT EXISTS feed_tasks(key TEXT PRIMARY KEY,kind TEXT NOT NULL,input TEXT NOT NULL,output TEXT,workspace TEXT NOT NULL,state TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,next_at TEXT NOT NULL DEFAULT '',error TEXT,created_at TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS podcast_transcripts(source TEXT NOT NULL,id TEXT NOT NULL,body TEXT NOT NULL,hash TEXT NOT NULL,url TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(source,id));
+        CREATE TABLE IF NOT EXISTS feed_relation_pairs(key TEXT PRIMARY KEY,left_path TEXT NOT NULL,right_path TEXT NOT NULL,left_hash TEXT NOT NULL,right_hash TEXT NOT NULL,output TEXT NOT NULL,expires_at TEXT NOT NULL);
+        CREATE INDEX IF NOT EXISTS feed_relations_active ON feed_relation_pairs(expires_at,key);
+        INSERT OR IGNORE INTO feed_meta VALUES ('relation_version','0');
+        CREATE TRIGGER IF NOT EXISTS feed_relation_insert AFTER INSERT ON feed_relation_pairs BEGIN
+          UPDATE feed_meta SET value=CAST(value AS INTEGER)+1 WHERE key='relation_version';
+        END;
+        CREATE TRIGGER IF NOT EXISTS feed_relation_update AFTER UPDATE ON feed_relation_pairs
+        WHEN OLD.key IS NOT NEW.key OR OLD.left_path IS NOT NEW.left_path OR OLD.right_path IS NOT NEW.right_path
+          OR OLD.left_hash IS NOT NEW.left_hash OR OLD.right_hash IS NOT NEW.right_hash OR OLD.expires_at IS NOT NEW.expires_at
+          OR json_extract(OLD.output,'$.verdict') IS NOT json_extract(NEW.output,'$.verdict')
+          OR json_extract(OLD.output,'$.policy') IS NOT json_extract(NEW.output,'$.policy') BEGIN
+          UPDATE feed_meta SET value=CAST(value AS INTEGER)+1 WHERE key='relation_version';
+        END;
+        CREATE TRIGGER IF NOT EXISTS feed_relation_delete AFTER DELETE ON feed_relation_pairs BEGIN
+          UPDATE feed_meta SET value=CAST(value AS INTEGER)+1 WHERE key='relation_version';
+        END;
       `);
       // Collection changes enqueue planning; planning consumes or reschedules
       // each row after enrichment. Accepted content/exclusion changes bump the
@@ -111,7 +129,7 @@ export class Store {
         this.db.exec("UPDATE items SET published_at=json_extract(data,'$.publishedAt') WHERE typeof(json_extract(data,'$.publishedAt'))='text' AND published_at IS NOT json_extract(data,'$.publishedAt');");
         this.setMeta('items_date_revision', '1');
       }
-      this.setMeta('runtime_schema_revision', '1');
+      this.setMeta('runtime_schema_revision', '3');
     }).immediate();
   }
   acquireLease(owner: string): void {

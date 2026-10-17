@@ -17,6 +17,8 @@ import { hash } from '../src/util.js';
 import { artifactRepairFeedback } from '../src/agent.js';
 import { pruneWorkspaces } from '../src/workspaces.js';
 import type { Item } from '../src/types.js';
+import { transcriptStep } from '../src/podcasts.js';
+import type { TaskGenerator } from '../src/fixed-tasks.js';
 const at='2026-10-09T10:00:00.000Z';
 const topic={id:'coding',name:{en:'Coding','zh-CN':'编程'},description:'Developer tools',aliases:[],deprecated:false};
 const registry:Registry={version:1,topics:[topic]};
@@ -41,6 +43,11 @@ test('invalid summary cutoffs fail before touching the queue or archive snapshot
  }finally{await f.cleanup();}
 });
 
+test('title-only podcast summaries put the evidence note immediately after frontmatter',()=>{
+ const rendered=renderItem({item:item('episode','podcast'),copy:{source:'podcast',id:'episode',topics:[],en:{title:'Episode',summary:''},'zh-CN':{title:'单集',summary:''}},firstSeen:at,date:at,dateBasis:'published',updated:at},'en');
+ assert.match(rendered,/\n---\n\nBased on episode show notes\.\n$/);
+});
+
 test('ISO week, ordinal and basic summary cutoffs normalize before selection-backed archive work', async () => {
  for(const since of ['2026-W40-1','2026-245','20261015']){
   const f=await fixture();try{
@@ -63,6 +70,50 @@ test('a summary generator losing its lease reports ownership loss without queue 
   },at),/Lost database job lease/);
   const job=f.store.db.prepare('SELECT attempts,next_at,error FROM feed_jobs').get() as {attempts:number;next_at:string;error:string|null};
   assert.equal(job.attempts,1);assert.equal(job.next_at,'');assert.equal(job.error,null);
+ }finally{await f.cleanup();}
+});
+
+test('a since-scoped podcast rebuild preserves other episodes reduction caches',async()=>{
+ const f=await fixture();try{
+  f.config.sources=[{...f.config.sources[0]!,id:'podcast',name:'Podcasts'}];
+  const body='Complete episode evidence including its ending.';
+  const episodes=['old','recent'].map(id=>item(id,'podcast',{publishedAt:id==='old'?'2026-10-08T00:00:00Z':at,metadata:{transcriptHash:hash(body),summaryBasis:'transcript'}}));
+  const reduce:TaskGenerator=async(_a,_k,value,_r,directory)=>{
+   const input=value as {taskId:string;parts:{id:string}[]};
+   return {output:{taskId:input.taskId,inputIds:input.parts.map(p=>p.id),facts:'Complete episode evidence.'},directory:directory!,events:[],usage:[]};
+  };
+  for(const episode of episodes){
+   f.store.db.prepare('INSERT INTO podcast_transcripts VALUES (?,?,?,?,?,?)').run('podcast',episode.id,body,hash(body),'https://example.test/transcript',at);
+   for(let i=0;i<3;i++) if((await transcriptStep(episode,f.store,f.config.agent,true,undefined,false,reduce)).ready) break;
+  }
+  save(f.store,episodes);await summarize(f.config,f.store,{},generator,at,async i=>i);
+  const before=episodes.map(episode=>f.store.db.prepare('SELECT data FROM feed_jobs WHERE id=?').get(episode.id) as {data:string});
+  f.config.agent.maxDailyCalls=3;
+  const result=await summarize(f.config,f.store,{rebuild:true,since:'2026-10-09T00:00:00Z'},generator,at,async i=>i);
+  assert.equal(result.deferred,true);
+  assert.deepEqual(f.store.db.prepare('SELECT data FROM feed_jobs WHERE id=?').get('old'),before[0]);
+  const recent=JSON.parse((f.store.db.prepare('SELECT data FROM feed_jobs WHERE id=?').get('recent') as {data:string}).data).item as Item;
+  assert.notEqual(recent.metadata?.transcriptRecipe,JSON.parse(before[1]!.data).item.metadata.transcriptRecipe);
+  assert.equal((await transcriptStep(episodes[0]!,f.store,f.config.agent,false)).ready,true);
+  assert.equal((await transcriptStep(episodes[1]!,f.store,f.config.agent,false)).ready,false);
+ }finally{await f.cleanup();}
+});
+
+test('a quota-deferred transcript does not prevent another source from accepting a cached summary', async () => {
+ const f=await fixture();try{
+  save(f.store,[item('cached')]);await summarize(f.config,f.store,{source:'one'},generator,at);
+  f.store.db.exec("DELETE FROM feed_summaries; DELETE FROM feed_jobs;");
+  f.config.agent.maxDailyCalls=1;
+  f.config.sources=[{...f.config.sources[0]!,id:'podcast',name:'Podcasts'},f.config.sources[0]!];
+  f.store.setMeta('round_robin','one');
+  save(f.store,[item('aaa-uncached')]);
+  const body='A complete spoken transcript with concrete evidence.';
+  f.store.db.prepare('INSERT INTO podcast_transcripts VALUES (?,?,?,?,?,?)').run('podcast','episode',body,hash(body),'https://example.test/transcript',at);
+  save(f.store,[item('episode','podcast',{metadata:{transcriptHash:hash(body),summaryBasis:'transcript'}})]);
+  const result=await summarize(f.config,f.store,{},async()=>{throw new Error('No paid call is available');},at,async value=>value);
+  assert.equal(result.deferred,true);assert.equal(result.generated,1);
+  assert.equal(acceptedItems(f.store)[0]?.item.id,'cached');
+  assert.equal((f.store.db.prepare('SELECT count(*) n FROM agent_calls').get() as {n:number}).n,1);
  }finally{await f.cleanup();}
 });
 test('all eligible items enter persistent per-source FIFO and round-robin batches with a complete input budget',async()=>{
@@ -271,7 +322,7 @@ test('pending batch selection uses an ordered index and preserves first-seen ord
   save(f.store,rows);const order:string[]=[];
   await summarize(f.config,f.store,{},async(...args)=>{order.push(...args[1].items.map(item=>item.id));return generator(...args);},at);
   assert.deepEqual(order,rows.toSorted((a,b)=>a.observedAt.localeCompare(b.observedAt)||a.id.localeCompare(b.id)).map(item=>item.id));
-  const plan=prepare('EXPLAIN QUERY PLAN '+queuedSQL).all('one',at,'1970-01-01T00:00:00.000Z',10) as {detail:string}[];
+  const plan=prepare('EXPLAIN QUERY PLAN '+queuedSQL).all('one',at,'1970-01-01T00:00:00.000Z','[]',10) as {detail:string}[];
   assert.ok(plan.some(row=>row.detail.includes('feed_jobs_pending_order')),JSON.stringify(plan));
   assert.ok(!plan.some(row=>row.detail.includes('TEMP B-TREE')),JSON.stringify(plan));
  } finally {await f.cleanup();}

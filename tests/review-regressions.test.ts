@@ -33,6 +33,23 @@ test('a current store opens beside an active writer after initialization', async
   } finally { writer.close(); await rm(root, { recursive: true, force: true }); }
 });
 
+test('additive schema upgrades run atomically and failed constructors close their handles', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'feedgarden-upgrade-')), path = join(root, 'data.sqlite');
+  const old = new Store(path);
+  old.db.exec("DELETE FROM feed_meta WHERE key='runtime_schema_revision'; DROP TABLE feed_relation_pairs;");
+  old.close();
+  try {
+    const upgraded = new Store(path);
+    assert.equal(upgraded.meta('runtime_schema_revision'), '3');
+    assert.deepEqual(upgraded.db.prepare('SELECT * FROM feed_relation_pairs').all(), []);
+    upgraded.db.exec("DELETE FROM feed_meta WHERE key='runtime_schema_revision';"); upgraded.close();
+    t.mock.method(Store.prototype, 'setMeta', () => { throw new Error('Injected schema failure'); });
+    assert.throws(() => new Store(path), /Injected schema failure/);
+    // Windows refuses this removal if the failed constructor leaked its handle.
+    await rm(root, { recursive: true, force: true });
+  } finally { t.mock.restoreAll(); await rm(root, { recursive: true, force: true }); }
+});
+
 test('simultaneous expired-lease contenders yield one owner and an explicit lease rejection', { timeout: 20_000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-contenders-')), path = join(root, 'data.sqlite');
   const seed = new Store(path); seed.db.prepare("INSERT INTO job_lease VALUES (1,'expired','1970-01-01T00:00:00.000Z')").run(); seed.close();

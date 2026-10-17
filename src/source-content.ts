@@ -6,6 +6,7 @@ import { Store } from './store.js';
 import { productHuntPage, parseProductHuntRepository, repositoryUrl } from './producthunt.js';
 import { enrichHackerNews } from './hackernews.js';
 import { embedKind } from './media-embed.js';
+import { enrichPodcast } from './podcasts.js';
 
 const officialArticleHosts = new Map([
   ['openai', ['openai.com']],
@@ -18,6 +19,7 @@ function isOfficialArticle(item: Item): boolean {
 // Only recent enriched items receive periodic refreshes; changed items and
 // explicit --refresh remain eligible regardless of age.
 export function enrichmentInterval(item: Item): number {
+  if (item.source === 'podcast') return 6 * 3600_000;
   if (item.source === 'hackernews' && /^\d+$/.test(item.id)) return 3600_000;
   if (item.source === 'producthunt' && productHuntPage(item.url)) return 6 * 3600_000;
   return isOfficialArticle(item) ? 6 * 3600_000 : 0;
@@ -112,6 +114,7 @@ async function enrichProductHunt(item: Item, store: Store, http: Http, refresh: 
 // Enrichment follows official article origins, Product Hunt product pages, and
 // HN's submitted public article URL and fixed comment API. Prose links aren't crawled.
 export async function enrichItem(item: Item, store: Store, http: Http, refresh = false): Promise<Item> {
+  if (item.source === 'podcast') return enrichPodcast(item, store, http, refresh);
   if (item.source === 'hackernews') {
     const start = http.raw.length;
     try { return await enrichHackerNews(item, store, http, refresh, extractMedia); }

@@ -16,6 +16,7 @@ import { reportSkill } from './report-skill.js';
 import { pruneWorkspaces } from './workspaces.js';
 import { importArchives } from './archives.js';
 import { reconcileSelection, selectionClause } from './selection.js';
+import { transcriptStep } from './podcasts.js';
 
 export type ItemCopy = z.infer<typeof outputSchema>['items'][number];
 export interface AcceptedItem { item: Item; copy: ItemCopy; firstSeen: string; date: string; dateBasis: 'published' | 'observed'; updated: string }
@@ -27,6 +28,9 @@ export function summaryItem(item: Item, maxChars: number): SummaryInput['items']
   const normalize = (value: string) => value.normalize('NFKC').replace(/\s+/g, ' ').trim();
   const comments = item.discussion?.comments.slice(0, 10).map(comment => ({ ...comment, text: normalize(comment.text).slice(0, 600), author: normalize(comment.author) }));
   return { source: item.source, id: item.id, title: normalize(item.title), text: normalize(item.text).slice(0, maxChars), ...(item.author ? { author: normalize(item.author) } : {}), ...(item.media?.length ? { media: item.media.slice(0, 6) } : {}), ...(item.articleQuote ? { articleQuote: item.articleQuote } : {}), ...(comments?.length ? { discussion: { comments } } : {}) };
+}
+function summaryKey(item: Item, agent: Config['agent'], skillHash: string): string {
+  return hash({ ...summaryItem(item, agent.maxItemChars), ...(item.metadata?.transcriptRecipe ? { transcriptRecipe: item.metadata.transcriptRecipe } : {}), model: agent.model, effort: agent.effort, skillHash, contractVersion: 2, summaryRevision: 3 });
 }
 export function itemPath(source: string, day: string, number: number): string {
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(source) || !/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isSafeInteger(number) || number < 1) throw new Error('Invalid item path components');
@@ -152,8 +156,12 @@ export async function summarize(config: Config, store: Store, options: { source?
         }
         safeUrl(item.url);
         item = await prepare(item, store, http, !!(options.rebuild || options.refresh));
+        if (item.source === 'podcast') {
+          if (options.rebuild) store.setMeta('podcast_rebuild:' + JSON.stringify([item.source, item.id]), randomUUID());
+          item = (await transcriptStep(item, store, agent, false, options.signal)).item;
+        }
         options.signal?.throwIfAborted();
-        const key = hash({ ...summaryItem(item, agent.maxItemChars), model: agent.model, effort: agent.effort, skillHash, contractVersion: 2, summaryRevision: 3 });
+        const key = summaryKey(item, agent, skillHash);
         const previous = planning.job.get(source.id, row.id) as Job | undefined;
         if (!previous || previous.cache_key !== key || options.rebuild) planning.insert.run(source.id, row.id, key, JSON.stringify({ item, firstSeen: row.first_seen }));
         else {
@@ -177,25 +185,43 @@ export async function summarize(config: Config, store: Store, options: { source?
     }
   }
   let cursor = store.meta('round_robin') ?? '';
+  const blockedJobs = new Set<string>();
   // The due-time index requires sorting the entire pending queue per batch.
   // Walk the partial FIFO index instead; next_at still filters delayed retries.
-  const pendingJobs = store.statement(`SELECT j.* FROM feed_jobs j INDEXED BY feed_jobs_pending_order WHERE source=? AND state='pending' AND next_at<=? AND attempts<5 AND julianday(CASE WHEN json_extract(data,'$.item.basis')='observed' THEN json_extract(data,'$.firstSeen') ELSE json_extract(data,'$.item.publishedAt') END)>=julianday(?) AND ${selectionClause('j')} ORDER BY json_extract(data,'$.firstSeen'),id LIMIT ?`);
+  const pendingJobs = store.statement(`SELECT j.* FROM feed_jobs j INDEXED BY feed_jobs_pending_order WHERE source=? AND state='pending' AND next_at<=? AND attempts<5 AND julianday(CASE WHEN json_extract(data,'$.item.basis')='observed' THEN json_extract(data,'$.firstSeen') ELSE json_extract(data,'$.item.publishedAt') END)>=julianday(?) AND ${selectionClause('j')} AND j.source||'/'||j.id NOT IN (SELECT value FROM json_each(?)) ORDER BY json_extract(data,'$.firstSeen'),id LIMIT ?`);
   while (sources.length) {
     options.signal?.throwIfAborted();
     const start = (sources.findIndex(source => source.id === cursor) + 1) % sources.length;
     let chosen: Source | undefined, jobs: Job[] = [];
+    const blocked = JSON.stringify([...blockedJobs]);
     for (let offset = 0; offset < sources.length; offset++) {
       const source = sources[(start + offset) % sources.length]!;
       // HN produces both article and discussion copy in two languages. Its output
       // can exceed the model's token limit even when a larger batch fits the input.
       const batchLimit = source.id === 'hackernews' ? Math.min(2, config.agent.maxBatchItems) : config.agent.maxBatchItems;
-      const candidates = pendingJobs.all(source.id, at, cutoff, batchLimit) as Job[];
+      const candidates = pendingJobs.all(source.id, at, cutoff, blocked, batchLimit) as Job[];
       if (candidates.length) { chosen = source; jobs = candidates; break; }
     }
     if (!chosen) break;
     cursor = chosen.id; store.setMeta('round_robin', cursor);
     const agent = { ...config.agent, ...chosen.agent };
     const skillHash = skillHashes.get(chosen.id)!;
+    if (chosen.id === 'podcast') {
+      // Advance one episode node per visit, then rotate sources. Ready episodes
+      // also stay single-item batches so their transcript dependencies stay fixed.
+      jobs = jobs.slice(0, 1);
+      const job = jobs[0]!, data = JSON.parse(job.data) as { item: Item; firstSeen: string };
+      const step = await transcriptStep(data.item, store, agent, true, options.signal, options.retryFailed);
+      if (!step.ready) {
+        if (step.error) store.statement('UPDATE feed_jobs SET error=?,state=? WHERE source=? AND id=?').run('Transcript: ' + step.error, step.failed ? 'failed' : 'pending', job.source, job.id);
+        if (step.deferred) deferred = true;
+        if (!step.performed) blockedJobs.add(job.source + '/' + job.id);
+        continue;
+      }
+      data.item = step.item; job.data = JSON.stringify(data);
+      job.cache_key = summaryKey(step.item, agent, skillHash);
+      store.statement('UPDATE feed_jobs SET cache_key=?,data=? WHERE source=? AND id=?').run(job.cache_key, job.data, job.source, job.id);
+    }
     checkRegistryBudget();
     const fixed: FixedJob[] = [], input: SummaryInput = { contractVersion: 2, topics: registry, items: [] };
     let oversizedChars = 0;
@@ -210,14 +236,19 @@ export async function summarize(config: Config, store: Store, options: { source?
       store.statement("UPDATE feed_jobs SET state='failed',error=? WHERE source=? AND id=?").run(`Item and topic registry use ${oversizedChars} characters, exceeding agent.maxInputChars=${agent.maxInputChars}. Increase maxInputChars or lower maxItemChars, then use --retry-failed. No ACP attempt was spent.`, jobs[0]!.source, jobs[0]!.id);
       continue;
     }
+    const cached = options.rebuild ? [] : fixed.map(job => (store.statement('SELECT copy FROM feed_cache WHERE key=?').get(job.key) as { copy: string } | undefined)?.copy);
+    const hasCached = cached.length === fixed.length && cached.every(Boolean);
+    // A full cache can fail validation below. Quota deferral must also block
+    // those rejected cached jobs rather than revisit the same batch this run.
+    const blockUncached = () => fixed.forEach((job, index) => { if (!cached[index] || hasCached) blockedJobs.add(job.source + '/' + job.id); });
+    if (deferred && !hasCached) { blockUncached(); continue; }
     const id = randomUUID(), workspace = resolve(agent.runtimeDirectory, 'task-' + id);
     const batch: Batch = { id, input: JSON.stringify(input), jobs: JSON.stringify(fixed), workspace, state: 'prepared' };
     await mkdir(workspace, { recursive: true, mode: 0o700 });
     await atomicWrite(join(workspace, '.feedgarden-workspace.json'), JSON.stringify({ version: 1, batch: id }));
     store.statement('INSERT INTO feed_batches VALUES (?,?,?,?,?,?,NULL)').run(id, batch.input, batch.jobs, workspace, 'prepared', at);
     if (!options.rebuild) {
-      const cached = fixed.map(job => (store.statement('SELECT copy FROM feed_cache WHERE key=?').get(job.key) as { copy: string } | undefined)?.copy);
-      if (cached.every(Boolean)) {
+      if (hasCached) {
         try {
           await accept(batch, { contractVersion: 2, items: cached.map(copy => JSON.parse(copy!)), newTopics: [] });
           continue;
@@ -233,12 +264,13 @@ export async function summarize(config: Config, store: Store, options: { source?
     }
     // Persisted failures cross the queue boundary unchanged; the agent owns repair wording.
     let repair = jobs.find(job => job.error)?.error ?? undefined;
+    let batchDeferred = false;
     for (let attempt = 0; attempt < 2; attempt++) {
       if (fixed.some(job => !store.isSelected(job.source, job.id))) { store.statement("UPDATE feed_batches SET state='interrupted',error='Selection changed before generation' WHERE id=?").run(id); break; }
       if (fixed.some(job => (planning.attempts.get(job.source, job.id) as { attempts: number }).attempts >= 5)) break;
       let call: number;
       try { call = store.startCall(id, agent.model, agent.maxDailyCalls); }
-      catch (error) { if (error instanceof QuotaDeferred) { deferred = true; break; } throw error; }
+      catch (error) { if (error instanceof QuotaDeferred) { deferred = true; batchDeferred = true; break; } throw error; }
       store.db.transaction(() => {
         for (const job of fixed) store.statement('UPDATE feed_jobs SET attempts=attempts+1 WHERE source=? AND id=?').run(job.source, job.id);
         store.statement("UPDATE feed_batches SET state='running' WHERE id=?").run(id);
@@ -263,7 +295,11 @@ export async function summarize(config: Config, store: Store, options: { source?
         if (!artifactFailure || attempt === 1) break;
       }
     }
-    if (deferred) { store.statement("UPDATE feed_batches SET state='deferred' WHERE id=?").run(id); break; }
+    if (batchDeferred) {
+      store.statement("UPDATE feed_batches SET state='deferred' WHERE id=?").run(id);
+      blockUncached();
+      continue;
+    }
     if (repair) {
       store.db.transaction(() => {
         for (const job of fixed) {

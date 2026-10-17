@@ -96,7 +96,7 @@ async function runWithRunner(command: string, config: Config, configFile: string
       else if (command === 'doctor') {
         await reportSkill(config.sources.filter(source => source.enabled).map(source => source.id));
         const [executable, args] = agentCommand(config.agent.command, ['--version']);
-        console.log(JSON.stringify({ node: process.version, database: store.db.pragma('quick_check'), agent: execFileSync(executable, args, { encoding: 'utf8' }).trim(), model: config.agent.model, channels: store.states(), items: store.db.prepare('SELECT count(*) n FROM feed_summaries').get(), queue: store.db.prepare('SELECT state,count(*) n FROM feed_jobs GROUP BY state').all() }, null, 2));
+        console.log(JSON.stringify({ node: process.version, database: store.db.pragma('quick_check'), agent: execFileSync(executable, args, { encoding: 'utf8' }).trim(), model: config.agent.model, channels: store.states(), tasks: store.db.prepare("SELECT kind,state,count(*) n FROM feed_tasks GROUP BY kind,state").all(), items: store.db.prepare('SELECT count(*) n FROM feed_summaries').get(), queue: store.db.prepare('SELECT state,count(*) n FROM feed_jobs GROUP BY state').all() }, null, 2));
         if (values.live) recordCollection(await collect(config, store, values.source, false, undefined, undefined, signal));
       } else if (command === 'run') {
         if (!values.due) throw new Error('Scheduled runs require --due');

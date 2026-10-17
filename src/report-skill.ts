@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+export type ReportTask = 'transcript' | 'relations';
 let root = dirname(fileURLToPath(import.meta.url));
 while (!existsSync(join(root, 'package.json'))) {
   const parent = dirname(root);
@@ -26,4 +27,8 @@ async function readSkill(path: string): Promise<string> {
 export async function reportSkill(sources: Iterable<string>): Promise<string> {
   const base = await readSkill('SKILL.md');
   return new Set(sources).has('hackernews') ? base + '\n\n' + await readSkill('hackernews.md') : base;
+}
+export async function reportTaskSkill(task: ReportTask): Promise<string> {
+  if (task !== 'transcript' && task !== 'relations') throw new Error('Unknown fixed report task');
+  return readSkill(task + '.md');
 }

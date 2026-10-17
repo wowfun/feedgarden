@@ -9,6 +9,7 @@ import type { Collection, Item, RankingWindow } from '../types.js';
 import { Http } from '../http.js';
 import { Store } from '../store.js';
 import { pythonExecutable } from '../process-command.js';
+import { parsePodcastFeed } from '../podcasts.js';
 import { validationEnvironment } from '../build-site.js';
 import { hash, mapLimit, safeUrl, errorText, iso, isoDate } from '../util.js';
 import { array, date, parseFeed, parseXTimeline, parseFollowBuilders, parseProductHunt, parseTrending, plain, text, xml, type ParseContext } from './parsers.js';
@@ -36,6 +37,13 @@ async function feed(c: ChannelContext): Promise<Collection> {
     result.ranking = { method: 'reddit-rss-percentile', window: redditWindow, size: array(document.feed?.entry ?? document.rss?.channel?.item ?? document.RDF?.item).length };
   }
   return result;
+}
+async function podcast(c: ChannelContext): Promise<Collection> {
+  if (c.channel.kind !== 'podcast-rss') throw new Error('Expected podcast-rss channel');
+  const raw = await c.http.get(c.channel.url), notes: string[] = [];
+  const items = parsePodcastFeed(raw.body, base(c), c.channel.podcastName, notes);
+  notes.push('Podcast RSS window; older history before the returned episodes is unknown.');
+  return collected(c, items, notes);
 }
 async function hn(c: ChannelContext): Promise<Collection> {
   const url = 'https://hacker-news.firebaseio.com/v0';
@@ -202,4 +210,4 @@ async function officialPages(c: ChannelContext): Promise<Collection> {
   }
   return collected(c, items, [...(failures ? [`${failures} official pages were inaccessible or lacked an article title.`] : []), ...(items.some(item => item.basis === 'observed') ? ['Pages without a verifiable publication date use their first observation.'] : []), ...(unseen.length > 50 ? ['Discovery budget is 50 previously unseen detail pages per run.'] : [])]);
 }
-export const adapters: Record<Channel['kind'], Adapter> = { 'hn-api': hn, feed, sitemap: officialPages, 'anthropic-html': officialPages, 'github-trending': trending, 'github-search': githubSearch, 'x-cli': xCli, 'follow-builders': followBuilders, 'arxiv-api': arxiv, 'ph-html': productHunt };
+export const adapters: Record<Channel['kind'], Adapter> = { 'hn-api': hn, feed, 'podcast-rss': podcast, sitemap: officialPages, 'anthropic-html': officialPages, 'github-trending': trending, 'github-search': githubSearch, 'x-cli': xCli, 'follow-builders': followBuilders, 'arxiv-api': arxiv, 'ph-html': productHunt };

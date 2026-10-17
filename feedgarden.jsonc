@@ -695,6 +695,88 @@
         }
       ],
       "includeKeywords": []
+    },
+    {
+      "id": "podcast",
+      "name": "Podcasts",
+      "enabled": true,
+      "timezone": "Asia/Shanghai",
+      "intervalHours": 6,
+      "streams": [
+        {
+          "id": "latent-space",
+          "channels": [
+            {
+              "id": "rss",
+              "kind": "podcast-rss",
+              "podcastName": "Latent Space",
+              "url": "https://pod2txt.vercel.app/api/feed?url=https://api.substack.com/feed/podcast/1084089.rss",
+              "enabled": true
+            }
+          ]
+        },
+        {
+          "id": "training-data",
+          "channels": [
+            {
+              "id": "rss",
+              "kind": "podcast-rss",
+              "podcastName": "Training Data",
+              "url": "https://feeds.megaphone.fm/trainingdata",
+              "enabled": true
+            }
+          ]
+        },
+        {
+          "id": "no-priors",
+          "channels": [
+            {
+              "id": "rss",
+              "kind": "podcast-rss",
+              "podcastName": "No Priors",
+              "url": "https://feeds.megaphone.fm/nopriors",
+              "enabled": true
+            }
+          ]
+        },
+        {
+          "id": "unsupervised-learning",
+          "channels": [
+            {
+              "id": "rss",
+              "kind": "podcast-rss",
+              "podcastName": "Unsupervised Learning",
+              "url": "https://feeds.simplecast.com/dOSE_bdP",
+              "enabled": true
+            }
+          ]
+        },
+        {
+          "id": "mad",
+          "channels": [
+            {
+              "id": "rss",
+              "kind": "podcast-rss",
+              "podcastName": "The MAD Podcast with Matt Turck",
+              "url": "https://anchor.fm/s/f2ee4948/podcast/rss",
+              "enabled": true
+            }
+          ]
+        },
+        {
+          "id": "ai-and-i",
+          "channels": [
+            {
+              "id": "rss",
+              "kind": "podcast-rss",
+              "podcastName": "AI & I by Every",
+              "url": "https://anchor.fm/s/ed1f5584/podcast/rss",
+              "enabled": true
+            }
+          ]
+        }
+      ],
+      "includeKeywords": []
     }
   ]
 }

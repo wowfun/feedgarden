@@ -59,7 +59,7 @@ DSH requires an explicit DeepSeek model and reads `FEEDGARDEN_AGENT_API_KEY`, th
 
 Shared budgets remain configurable: `timeoutSeconds` (default 300), `maxBatchItems` (10), `maxInputChars` (24000), `maxItemChars` (4000), `maxDailyCalls` (80), `workspaceRetentionDays` (7), and `maxTranscriptChunks` (64). New workspaces default to `.local/agents`. Model-call accounting excludes configuration probes. Execution audit records the backend, version, resolved model/effort and original usage updates. Cache and planning identities include the backend, actual agent version, resolved selection and a fingerprint of relevant OpenCode provider/model configuration; inherited configuration changes and backend upgrades cannot reuse stale entries. Existing historical content remains governed by the normal refresh/rebuild policy.
 
-`doctor` uses this same resolver and submits no generation prompt. `npm run verify:agent -- --config FILE` uses the selected configuration for a paid live run in isolated storage.
+`doctor` uses this same resolver and submits no generation prompt. `npm run verify:agent -- --config FILE` uses the selected configuration for a paid live run in isolated storage. `npm run verify:opencode` instead uses a temporary profile and local simulated provider, exercising the installed OpenCode without paid model calls. Pass `-- --command PATH` to test a specific OpenCode executable.
 
 The OpenCode provider fingerprint is conservative: edits or additions to any provider document can invalidate all model-dependent caches, even when the selected model ID is unchanged. This favors recomputation over reusing results after an endpoint or provider setting changes.
 

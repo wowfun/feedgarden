@@ -22,6 +22,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck && npm test && npm run build
+      - name: Install the OpenCode acceptance baseline
+        run: npm install --prefix "$RUNNER_TEMP/feedgarden-opencode" --no-save --ignore-scripts @opencode/cli-linux-x64@2.0.31
+      - name: Verify ACP against a local simulated model
+        run: npm run verify:opencode -- --command "$RUNNER_TEMP/feedgarden-opencode/node_modules/@opencode/cli-linux-x64/bin/opencode"
       - name: Read the pinned theme revision
         id: theme
         run: node -e 'console.log("commit=" + JSON.parse(require("fs").readFileSync(".github/theme.lock.json")).commit)' >> "$GITHUB_OUTPUT"

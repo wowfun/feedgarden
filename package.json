@@ -18,6 +18,7 @@
     "setup:twitter": "tsx scripts/setup-twitter.ts",
     "schedule:prepare": "tsx scripts/schedule.ts",
     "verify:agent": "tsx scripts/live-agent.ts",
+    "verify:opencode": "tsx scripts/verify-opencode.ts",
     "verify:collect": "tsx scripts/live-collect.ts",
     "verify:scale": "tsx scripts/scale-check.ts"
   },

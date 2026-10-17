@@ -122,7 +122,27 @@
     "topics/memory-management": "Memory Management",
     "topics/land-use": "Land Use",
     "topics/linux": "Linux",
-    "topics/ai-code-policy": "AI Code Contribution Policies"
+    "topics/ai-code-policy": "AI Code Contribution Policies",
+    "topics/ai-and-work": "AI and Work",
+    "topics/digital-ownership": "Digital Ownership",
+    "topics/agent-memory": "Agent Memory",
+    "topics/image-compression": "Image Compression",
+    "topics/accessibility": "Accessibility",
+    "topics/computer-graphics": "Computer Graphics",
+    "topics/biodiversity": "Biodiversity",
+    "topics/hallucination-detection": "Hallucination Detection",
+    "topics/ontologies": "Ontologies",
+    "topics/immigration": "Immigration",
+    "topics/agent-self-improvement": "Agent Self-Improvement",
+    "topics/web-archiving": "Web Archiving",
+    "topics/politics": "Politics",
+    "topics/amateur-radio": "Amateur Radio",
+    "topics/ai-financing": "AI Financing",
+    "topics/personal-finance": "Personal Finance",
+    "topics/public-safety": "Public Safety",
+    "topics/game-engines": "Game Engines",
+    "topics/invasive-species": "Invasive Species",
+    "topics/cloud-computing": "Cloud Computing"
   },
   "tag_aliases": {}
 }

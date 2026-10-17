@@ -80,7 +80,8 @@
     "pdf_preview": "Preview PDF",
     "pdf_close": "Close preview",
     "pdf_loading": "Loading PDF…",
-    "pdf_error": "Preview unavailable. Open the PDF using its link."
+    "pdf_error": "Preview unavailable. Open the PDF using its link.",
+    "related_articles": "Related coverage"
   },
   "tag_labels": {
     "source/hackernews": "Hacker News",
@@ -91,6 +92,7 @@
     "source/reddit": "Reddit",
     "source/arxiv": "arXiv",
     "source/producthunt": "Product Hunt",
+    "source/podcast": "Podcasts",
     "topics/agents": "Agents",
     "topics/coding": "Coding",
     "topics/models": "Models",
@@ -114,7 +116,13 @@
     "topics/agriculture": "Agriculture",
     "topics/system-dynamics": "System Dynamics",
     "topics/geopolitics": "Geopolitics",
-    "topics/ai-safety": "AI Safety"
+    "topics/ai-safety": "AI Safety",
+    "topics/education": "Education",
+    "topics/ethics-compute-access": "Research Compute Access & Ethics",
+    "topics/memory-management": "Memory Management",
+    "topics/land-use": "Land Use",
+    "topics/linux": "Linux",
+    "topics/ai-code-policy": "AI Code Contribution Policies"
   },
   "tag_aliases": {}
 }

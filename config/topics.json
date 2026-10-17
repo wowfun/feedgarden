@@ -283,6 +283,86 @@
         "AI 安全"
       ],
       "deprecated": false
+    },
+    {
+      "id": "education",
+      "name": {
+        "en": "Education",
+        "zh-CN": "教育"
+      },
+      "description": "Schools, teaching and learning, including the use of AI tools in classrooms and for students, teachers and educators.",
+      "aliases": [
+        "edtech",
+        "teaching",
+        "learning"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "ethics-compute-access",
+      "name": {
+        "en": "Research Compute Access & Ethics",
+        "zh-CN": "科研算力获取与伦理"
+      },
+      "description": "Access to GPU and compute resources for academic research, queueing and allocation constraints, and the ethical questions raised when researchers use employer or third-party infrastructure.",
+      "aliases": [
+        "compute access",
+        "GPU allocation"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "memory-management",
+      "name": {
+        "en": "Memory Management",
+        "zh-CN": "内存管理"
+      },
+      "description": "Memory allocators, stack and buffer layout, fragmentation, and memory reuse strategies in systems and application software.",
+      "aliases": [
+        "memory allocation",
+        "allocators"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "land-use",
+      "name": {
+        "en": "Land Use",
+        "zh-CN": "土地利用"
+      },
+      "description": "Land parcels, property boundaries, public and state-owned land, easements and the practical implications of owning land adjacent to public holdings.",
+      "aliases": [
+        "public land",
+        "property boundaries"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "linux",
+      "name": {
+        "en": "Linux",
+        "zh-CN": "Linux"
+      },
+      "description": "Linux distributions and their releases, desktop environments, display servers, packaging formats and system software choices.",
+      "aliases": [
+        "linux distributions",
+        "linux desktop"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "ai-code-policy",
+      "name": {
+        "en": "AI Code Contribution Policies",
+        "zh-CN": "AI 代码贡献政策"
+      },
+      "description": "Project rules and debates about whether AI-generated or AI-assisted code may be contributed to open source and other software projects, and how such contributions are disclosed and reviewed.",
+      "aliases": [
+        "AI-generated code",
+        "AI-assisted commits",
+        "vibe coding policy"
+      ],
+      "deprecated": false
     }
   ]
 }

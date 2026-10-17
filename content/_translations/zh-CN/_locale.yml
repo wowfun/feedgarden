@@ -133,7 +133,7 @@
     "portfolio": "作品集",
     "projects": "项目",
     "recent_posts": "最新文章",
-    "related_articles": "相关文章",
+    "related_articles": "相关进展",
     "view_all": "查看全部",
     "more": "更多",
     "interactive_graph": "交互式关系图",
@@ -227,6 +227,7 @@
     "source/reddit": "Reddit",
     "source/arxiv": "arXiv",
     "source/producthunt": "Product Hunt",
+    "source/podcast": "Podcasts",
     "topics/agents": "智能体",
     "topics/coding": "编程",
     "topics/models": "模型",
@@ -250,7 +251,13 @@
     "topics/agriculture": "农业",
     "topics/system-dynamics": "系统动力学",
     "topics/geopolitics": "地缘政治",
-    "topics/ai-safety": "AI 安全"
+    "topics/ai-safety": "AI 安全",
+    "topics/education": "教育",
+    "topics/ethics-compute-access": "科研算力获取与伦理",
+    "topics/memory-management": "内存管理",
+    "topics/land-use": "土地利用",
+    "topics/linux": "Linux",
+    "topics/ai-code-policy": "AI 代码贡献政策"
   },
   "tag_aliases": {}
 }

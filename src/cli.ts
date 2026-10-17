@@ -59,7 +59,7 @@ async function runWithRunner(command: string, config: Config, configFile: string
       heartbeat = store.watchLease(owner, cancellation);
       run = store.run(command); await recoverContent(config);
       async function summaries() {
-        const result = await summarize(config, store!, { source: values.source, rebuild: values.rebuild, refresh: values.refresh, retryFailed: values['retry-failed'], signal });
+        const result = await summarize(config, store!, { source: values.source, since: values.since, rebuild: values.rebuild, refresh: values.refresh, retryFailed: values['retry-failed'], signal });
         console.log(JSON.stringify(result));
         const errors = store!.db.prepare("SELECT source,id,error FROM feed_jobs WHERE error IS NOT NULL AND state!='ready'").all() as { source: string; id: string; error: string }[];
         const selected = new Set(config.sources.filter(source => source.enabled && (!values.source || source.id === values.source)).map(source => source.id));
@@ -100,7 +100,7 @@ async function runWithRunner(command: string, config: Config, configFile: string
         if (values.live) recordCollection(await collect(config, store, values.source, false, undefined, undefined, signal));
       } else if (command === 'run') {
         if (!values.due) throw new Error('Scheduled runs require --due');
-        recordCollection(await collect(config, store, values.source, true, undefined, undefined, signal));
+        recordCollection(await collect(config, store, values.source, true, undefined, values.since, signal));
         if (config.sources.some(source => source.enabled && source.selection && (!values.source || source.id === values.source))) {
           const reports = await rankItems(config, store, { source: values.source, signal });
           console.log(JSON.stringify(reports, null, 2));

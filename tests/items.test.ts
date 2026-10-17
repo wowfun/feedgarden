@@ -7,7 +7,7 @@ import Database from 'better-sqlite3';
 import { configSchema } from '../src/config.js';
 import { Store, initializeFeedSchema } from '../src/store.js';
 import { summarize, acceptedItems, iterateAcceptedItems, itemPath, eligible, type Generator } from '../src/items.js';
-import { writeSite, recoverContent } from '../src/site.js';
+import { writeSite, recoverContent, renderItem } from '../src/site.js';
 import { loadTopics, applyTopics, mergeTopics, type Registry } from '../src/topics.js';
 import { validateArtifact, validateRegistry } from '../src/topics-contract.mjs';
 import { date, parseFollowBuilders } from '../src/channels/parsers.js';
@@ -29,12 +29,60 @@ async function fixture() {
  const store=new Store(config.storage.database);store.setMeta('cutoff','1970-01-01T00:00:00.000Z');
  return {root,config,store,cleanup:async()=>{store.close();await rm(root,{recursive:true,force:true});}};
 }
+test('invalid summary cutoffs fail before touching the queue or archive snapshot', async () => {
+ const f=await fixture();try{
+  f.config.sources[0]!.selection={method:'hn-engagement',dailyLimit:50,updateDays:7};
+  await mkdir(f.config.feed.directory);await writeFile(join(f.config.feed.directory,'notes.md'),'Retained archive');
+  const before=f.store.db.prepare('SELECT total_changes() n').get();
+  for(const since of ['not-a-date','']) await assert.rejects(summarize(f.config,f.store,{since},generator,at),/Invalid --since/);
+  assert.deepEqual(f.store.db.prepare('SELECT total_changes() n').get(),before);
+  assert.equal(f.store.meta('selection_archives'),undefined);
+  assert.equal((f.store.db.prepare('SELECT count(*) n FROM feed_archive_files').get() as {n:number}).n,0);
+ }finally{await f.cleanup();}
+});
+
+test('ISO week, ordinal and basic summary cutoffs normalize before selection-backed archive work', async () => {
+ for(const since of ['2026-W40-1','2026-245','20261015']){
+  const f=await fixture();try{
+   f.config.sources[0]!.selection={method:'hn-engagement',dailyLimit:50,updateDays:7};
+   await mkdir(f.config.feed.directory);await writeFile(join(f.config.feed.directory,'notes.md'),'Retained archive');
+   const seen:string[]=[];
+   save(f.store,[item('before','two',{publishedAt:'2026-01-01T00:00:00Z'}),item('after','two',{publishedAt:'2026-10-16T00:00:00Z'})]);
+   await summarize(f.config,f.store,{since},async(...args)=>{seen.push(...args[1].items.map(i=>i.id));return generator(...args);},'2026-10-16T12:00:00.000Z');
+   assert.deepEqual(seen,['after']);assert.equal(f.store.meta('selection_archives'),'1');
+   assert.equal((f.store.db.prepare('SELECT count(*) n FROM feed_archive_files').get() as {n:number}).n,1);
+  }finally{await f.cleanup();}
+ }
+});
+
+test('a summary generator losing its lease reports ownership loss without queue backoff',async()=>{
+ const f=await fixture();try{
+  save(f.store,[item('one')]);f.store.acquireLease('runner');
+  await assert.rejects(summarize(f.config,f.store,{},async()=>{
+   f.store.db.prepare("UPDATE job_lease SET owner='replacement'").run();throw new Error('Transport interrupted during takeover');
+  },at),/Lost database job lease/);
+  const job=f.store.db.prepare('SELECT attempts,next_at,error FROM feed_jobs').get() as {attempts:number;next_at:string;error:string|null};
+  assert.equal(job.attempts,1);assert.equal(job.next_at,'');assert.equal(job.error,null);
+ }finally{await f.cleanup();}
+});
 test('all eligible items enter persistent per-source FIFO and round-robin batches with a complete input budget',async()=>{
  const f=await fixture();const order:string[]=[];
  try {save(f.store,Array.from({length:24},(_,i)=>item(String(i).padStart(2,'0'),i<12?'one':'two')));
  const result=await summarize(f.config,f.store,{},async(...args)=>{order.push(args[1].items[0]!.source);assert.ok(JSON.stringify(args[1]).length<=24000);return generator(...args);},at);
  assert.equal(result.generated,24);assert.deepEqual(order,['one','two','one','two']);assert.equal(acceptedItems(f.store).length,24);
  }finally{await f.cleanup();}
+});
+
+test('an explicit since instant limits summary work without deleting older queued jobs', async () => {
+ const f=await fixture();
+ try {
+  save(f.store,[item('old','one',{publishedAt:'2026-10-08T15:59:59Z'}),item('today','one',{publishedAt:'2026-10-08T16:00:00Z'})]);
+  f.store.db.prepare("INSERT INTO feed_jobs VALUES (?,?,?,?, 'pending',0,'',NULL)").run('one','old','old-key',JSON.stringify({item:item('old','one',{publishedAt:'2026-10-08T15:59:59Z'}),firstSeen:at}));
+  const seen:string[]=[];
+  await summarize(f.config,f.store,{since:'2026-10-09T00:00:00+08:00'},async(...args)=>{seen.push(...args[1].items.map(i=>i.id));return generator(...args);},at);
+  assert.deepEqual(seen,['today']);
+  assert.equal((f.store.db.prepare('SELECT state FROM feed_jobs WHERE id=?').get('old') as {state:string}).state,'pending');
+ } finally {await f.cleanup();}
 });
 test('an oversized item fails without a model call or blocking following items, and can be retried with a larger budget', async () => {
  const f=await fixture();
@@ -223,7 +271,7 @@ test('pending batch selection uses an ordered index and preserves first-seen ord
   save(f.store,rows);const order:string[]=[];
   await summarize(f.config,f.store,{},async(...args)=>{order.push(...args[1].items.map(item=>item.id));return generator(...args);},at);
   assert.deepEqual(order,rows.toSorted((a,b)=>a.observedAt.localeCompare(b.observedAt)||a.id.localeCompare(b.id)).map(item=>item.id));
-  const plan=prepare('EXPLAIN QUERY PLAN '+queuedSQL).all('one',at,10) as {detail:string}[];
+  const plan=prepare('EXPLAIN QUERY PLAN '+queuedSQL).all('one',at,'1970-01-01T00:00:00.000Z',10) as {detail:string}[];
   assert.ok(plan.some(row=>row.detail.includes('feed_jobs_pending_order')),JSON.stringify(plan));
   assert.ok(!plan.some(row=>row.detail.includes('TEMP B-TREE')),JSON.stringify(plan));
  } finally {await f.cleanup();}

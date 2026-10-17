@@ -1,6 +1,7 @@
 import { readFile, mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { DateTime } from 'luxon';
 import type { z } from 'zod';
 import type { Config, Source } from './config.js';
 import { generateBatch, type AgentResult, type SummaryInput } from './agent.js';
@@ -8,7 +9,7 @@ import { validateArtifact, ArtifactError, outputSchema } from './topics-contract
 import { applyTopics, loadTopics, type Registry } from './topics.js';
 import { Store, QuotaDeferred } from './store.js';
 import type { Item } from './types.js';
-import { atomicWrite, errorText, hash, nowIso, safeUrl } from './util.js';
+import { atomicWrite, errorText, hash, nowIso, safeUrl, iso } from './util.js';
 import { enrichItem, enrichmentInterval } from './source-content.js';
 import { Http } from './http.js';
 import { reportSkill } from './report-skill.js';
@@ -47,14 +48,15 @@ export function* iterateAcceptedItems(store: Store): IterableIterator<AcceptedIt
   }
 }
 export function acceptedItems(store: Store): AcceptedItem[] { return [...iterateAcceptedItems(store)]; }
-export async function summarize(config: Config, store: Store, options: { source?: string; rebuild?: boolean; refresh?: boolean; retryFailed?: boolean; signal?: AbortSignal } = {}, generator: Generator = generateBatch, at = nowIso(), prepare: typeof enrichItem = enrichItem): Promise<{ generated: number; pending: number; failed: number; deferred: boolean }> {
+export async function summarize(config: Config, store: Store, options: { source?: string; since?: string; rebuild?: boolean; refresh?: boolean; retryFailed?: boolean; signal?: AbortSignal } = {}, generator: Generator = generateBatch, at = nowIso(), prepare: typeof enrichItem = enrichItem): Promise<{ generated: number; pending: number; failed: number; deferred: boolean }> {
   options.signal?.throwIfAborted();
+  const since = options.since === undefined ? undefined : iso(DateTime.fromISO(options.since).toUTC(), '--since');
+  const cutoff = since ? new Date(Math.max(Date.parse(store.meta('cutoff')!), Date.parse(since))).toISOString() : store.meta('cutoff')!;
   const sources = config.sources.filter(source => source.enabled && (!options.source || source.id === options.source));
   if (options.source && !sources.length) throw new Error('Unknown or disabled source: ' + options.source);
   await importArchives(config, store, options.signal);
   reconcileSelection(config, store, { source: options.source, at, signal: options.signal });
   const skillHashes = new Map(await Promise.all(sources.map(async source => [source.id, hash(await reportSkill([source.id]))] as const)));
-  const cutoff = store.meta('cutoff')!;
   const http = new Http(store, undefined, options.signal);
   let registry = await loadTopics(config.feed.topics), generated = 0, deferred = false, runtimeFailures = 0;
   function checkRegistryBudget(): void {
@@ -177,7 +179,7 @@ export async function summarize(config: Config, store: Store, options: { source?
   let cursor = store.meta('round_robin') ?? '';
   // The due-time index requires sorting the entire pending queue per batch.
   // Walk the partial FIFO index instead; next_at still filters delayed retries.
-  const pendingJobs = store.statement(`SELECT j.* FROM feed_jobs j INDEXED BY feed_jobs_pending_order WHERE source=? AND state='pending' AND next_at<=? AND attempts<5 AND ${selectionClause('j')} ORDER BY json_extract(data,'$.firstSeen'),id LIMIT ?`);
+  const pendingJobs = store.statement(`SELECT j.* FROM feed_jobs j INDEXED BY feed_jobs_pending_order WHERE source=? AND state='pending' AND next_at<=? AND attempts<5 AND julianday(CASE WHEN json_extract(data,'$.item.basis')='observed' THEN json_extract(data,'$.firstSeen') ELSE json_extract(data,'$.item.publishedAt') END)>=julianday(?) AND ${selectionClause('j')} ORDER BY json_extract(data,'$.firstSeen'),id LIMIT ?`);
   while (sources.length) {
     options.signal?.throwIfAborted();
     const start = (sources.findIndex(source => source.id === cursor) + 1) % sources.length;
@@ -187,7 +189,7 @@ export async function summarize(config: Config, store: Store, options: { source?
       // HN produces both article and discussion copy in two languages. Its output
       // can exceed the model's token limit even when a larger batch fits the input.
       const batchLimit = source.id === 'hackernews' ? Math.min(2, config.agent.maxBatchItems) : config.agent.maxBatchItems;
-      const candidates = pendingJobs.all(source.id, at, batchLimit) as Job[];
+      const candidates = pendingJobs.all(source.id, at, cutoff, batchLimit) as Job[];
       if (candidates.length) { chosen = source; jobs = candidates; break; }
     }
     if (!chosen) break;
@@ -254,6 +256,7 @@ export async function summarize(config: Config, store: Store, options: { source?
       } catch (error) {
         repair = errorText(error); store.finishCall(call, 'failed', { error: repair });
         options.signal?.throwIfAborted();
+        store.assertLease();
         if (persisting || repair.includes('MANUAL_ACTION:')) throw error;
         const artifactFailure = error instanceof ArtifactError;
         runtimeFailures = artifactFailure ? 0 : runtimeFailures + 1;

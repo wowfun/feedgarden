@@ -22,7 +22,8 @@ store.setMeta('cutoff', '1970-01-01T00:00:00.000Z');
 try {
  for (let i=0;i<101;i++) {
   const source=config.sources[i%2]!;
-  const date=DateTime.fromISO('2026-08-01T00:00:00Z').plus({days:i}).toUTC().toISO()!;
+  // Keep an older-year entry on the last page to exercise localized year headings.
+  const date=DateTime.fromISO(i===0?'2025-08-01T00:00:00Z':'2026-08-01T00:00:00Z').plus({days:i}).toUTC().toISO()!;
   const item:Item={id:'fixture-'+i,source:source.id,stream:'main',channel:'rss',title:'Fixture '+i+' — Research and developer tools',text:'Synthetic fixture for archive validation. It does not represent a real announcement.',url:'https://example.invalid/'+i+'/a-long-source-path-to-check-url-wrapping-and-complete-clickable-text?reference='+('x'.repeat(80)),publishedAt:date,observedAt:date,basis:i===100?'observed':'published',metrics:{}};
   if(i===100)item.media=[{id:'fixture-diagram',type:'image',url:'https://example.invalid/fixture-diagram.svg',title:'Synthetic source diagram'},{id:'fixture-video',type:'video',url:'https://example.invalid/fixture-video.mp4',title:'Synthetic source demo'}];
   store.saveCollection(source.id,'main','rss',{items:[item],raw:[],coverage:{status:'complete',to:date,notes:[]}},'');

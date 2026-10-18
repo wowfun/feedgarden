@@ -217,6 +217,12 @@
     "pdf_preview": "预览 PDF",
     "pdf_close": "关闭预览",
     "pdf_loading": "正在载入 PDF…",
-    "pdf_error": "无法预览，请通过链接打开 PDF。"
+    "pdf_error": "无法预览，请通过链接打开 PDF。",
+    "ledger_date": "{month}{day}日",
+    "ledger_date_year": "{year}年{month}{day}日",
+    "ledger_months": "1月|2月|3月|4月|5月|6月|7月|8月|9月|10月|11月|12月",
+    "ledger_weekdays": "星期日|星期一|星期二|星期三|星期四|星期五|星期六",
+    "ledger_entry": "{count} 条",
+    "ledger_entries": "{count} 条"
   }
 }

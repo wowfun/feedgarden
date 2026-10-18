@@ -81,7 +81,13 @@
     "pdf_close": "Close preview",
     "pdf_loading": "Loading PDF…",
     "pdf_error": "Preview unavailable. Open the PDF using its link.",
-    "related_articles": "Related coverage"
+    "related_articles": "Related coverage",
+    "ledger_date": "{month} {day}",
+    "ledger_date_year": "{month} {day}, {year}",
+    "ledger_months": "January|February|March|April|May|June|July|August|September|October|November|December",
+    "ledger_weekdays": "Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday",
+    "ledger_entry": "{count} entry",
+    "ledger_entries": "{count} entries"
   },
   "tag_labels": {
     "source/hackernews": "Hacker News",
@@ -122,7 +128,27 @@
     "topics/memory-management": "Memory Management",
     "topics/land-use": "Land Use",
     "topics/linux": "Linux",
-    "topics/ai-code-policy": "AI Code Contribution Policies"
+    "topics/ai-code-policy": "AI Code Contribution Policies",
+    "topics/ai-and-work": "AI and Work",
+    "topics/digital-ownership": "Digital Ownership",
+    "topics/agent-memory": "Agent Memory",
+    "topics/image-compression": "Image Compression",
+    "topics/accessibility": "Accessibility",
+    "topics/computer-graphics": "Computer Graphics",
+    "topics/biodiversity": "Biodiversity",
+    "topics/hallucination-detection": "Hallucination Detection",
+    "topics/ontologies": "Ontologies",
+    "topics/immigration": "Immigration",
+    "topics/agent-self-improvement": "Agent Self-Improvement",
+    "topics/web-archiving": "Web Archiving",
+    "topics/politics": "Politics",
+    "topics/amateur-radio": "Amateur Radio",
+    "topics/ai-financing": "AI Financing",
+    "topics/personal-finance": "Personal Finance",
+    "topics/public-safety": "Public Safety",
+    "topics/game-engines": "Game Engines",
+    "topics/invasive-species": "Invasive Species",
+    "topics/cloud-computing": "Cloud Computing"
   },
   "tag_aliases": {}
 }

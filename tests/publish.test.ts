@@ -15,7 +15,7 @@ test('local bare-Git publication isolates managed paths, merges additions, refus
  let store:Store|undefined;
  try{
   await mkdir(join(root,'.github'));await mkdir(join(root,'config/locales'),{recursive:true});await cp('config/locales',join(root,'config/locales'),{recursive:true});await cp('config/topics.json',join(root,'config/topics.json'));await writeFile(join(root,'.github/jekyll-obsidian.yml'),'website:\n  source: content\n');await writeFile(join(root,'.gitignore'),'.local/\n');await writeFile(join(root,'README.md'),'Original code');
-  await cp('.github/theme.lock.json',join(root,'.github/theme.lock.json'));
+  for (const file of ['Gemfile', 'Gemfile.lock']) await cp(file,join(root,file));
   git(root,'init','-q','-b','main');git(root,'config','user.name','Fixture');git(root,'config','user.email','fixture@example.invalid');
   const config=configSchema.parse({version:2,storage:{directory:'.local',database:'.local/data.sqlite'},feed:{directory:'content',topics:'config/topics.json'},publish:{repository:remote,branch:'main'},agent:{model:'deepseek/deepseek-flash'},sources:[{id:'one',name:'One',intervalHours:1,streams:[{id:'main',channels:[{id:'rss',kind:'feed'}]}]}]});
   process.chdir(root);store=new Store(config.storage.database);await writeSite(config,store);git(root,'add','.');git(root,'commit','-qm','Base');git(temporary,'init','--bare','-q',remote);git(root,'remote','add','origin',remote);git(root,'push','-q','origin','main');git(temporary,'clone','-q','--branch','main',remote,other);git(other,'config','user.name','Other');git(other,'config','user.email','other@example.invalid');
@@ -25,12 +25,16 @@ test('local bare-Git publication isolates managed paths, merges additions, refus
   await writeFile('README.md','Uncommitted local code');let validated=0;
   await publish(config,store,async(worktree)=>{validated++;assert.equal(await readFile(join(worktree,'README.md'),'utf8'),'Original code');assert.ok(JSON.parse(await readFile(join(worktree,'config/topics.json'),'utf8')).topics.some((t:any)=>t.id==='remote-topic'));});assert.equal(validated,1);assert.equal(await readFile('README.md','utf8'),'Uncommitted local code');
   const published=git(root,'rev-parse','FETCH_HEAD');git(other,'pull','-q','--ff-only');assert.ok(JSON.parse(await readFile(join(other,'config/topics.json'),'utf8')).topics.some((t:any)=>t.id==='local-topic'));
-  const trustedLock=await readFile('.github/theme.lock.json','utf8'),topicsBefore=await readFile('config/topics.json','utf8');
-  await writeFile(join(other,'.github/theme.lock.json'),JSON.stringify({repository:'https://example.invalid/untrusted.git',commit:'a'.repeat(40)}));
-  git(other,'add','.github/theme.lock.json');git(other,'commit','-qm','Divergent theme lock');git(other,'push','-q');
-  await assert.rejects(publish(config,store,async()=>{throw new Error('Remote theme must not execute');}),/Theme lock.*differs|theme lock.*differs/);
-  assert.equal(await readFile('config/topics.json','utf8'),topicsBefore);assert.equal(await readFile('.github/theme.lock.json','utf8'),trustedLock);
-  await writeFile(join(other,'.github/theme.lock.json'),trustedLock);git(other,'add','.github/theme.lock.json');git(other,'commit','-qm','Restore trusted lock');git(other,'push','-q');
+  const topicsBefore=await readFile('config/topics.json','utf8'),contentBefore=await readFile('content/index.md','utf8'),changesBefore=(store.db.prepare('SELECT total_changes() n').get() as {n:number}).n;
+  for (const file of ['Gemfile', 'Gemfile.lock']) {
+  const trustedLock=await readFile(file,'utf8');
+  await writeFile(join(other,file),trustedLock+'\n# Unreviewed dependency change\n');
+  git(other,'add',file);git(other,'commit','-qm','Divergent site bundle');git(other,'push','-q');
+  await assert.rejects(publish(config,store,async()=>{throw new Error('Remote theme must not execute');}),/Site bundle differs/);
+  assert.equal(await readFile('config/topics.json','utf8'),topicsBefore);assert.equal(await readFile(file,'utf8'),trustedLock);
+  assert.equal(await readFile('content/index.md','utf8'),contentBefore);assert.equal((store.db.prepare('SELECT total_changes() n').get() as {n:number}).n,changesBefore);
+  await writeFile(join(other,file),trustedLock);git(other,'add',file);git(other,'commit','-qm','Restore trusted bundle');git(other,'push','-q');
+  }
   const current=await loadTopics('config/topics.json');current.topics[0]!.description='Local conflicting description';await writeFile('config/topics.json',JSON.stringify(current));
   const conflict=JSON.parse(await readFile(join(other,'config/topics.json'),'utf8'));conflict.topics[0].description='Remote conflicting description';await writeFile(join(other,'config/topics.json'),JSON.stringify(conflict));git(other,'add','config/topics.json');git(other,'commit','-qm','Conflicting topic');git(other,'push','-q');
   const remoteBefore=git(other,'rev-parse','HEAD');await assert.rejects(publish(config,store,async()=>{throw new Error('Must reject before validation');}),/Topic merge conflicts/);assert.equal(git(remote,'rev-parse','refs/heads/main'),remoteBefore);assert.equal((await loadTopics('config/topics.json')).topics[0]!.description,'Local conflicting description');

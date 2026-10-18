@@ -1,22 +1,26 @@
 import assert from 'node:assert/strict';
 import { writeFile, cp, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { configSchema } from '../src/config.js';
+import { configSchema, loadConfig } from '../src/config.js';
 import { Store } from '../src/store.js';
 import { collect } from '../src/collect.js';
 import { summarize, acceptedItems } from '../src/items.js';
 import { writeSite } from '../src/site.js';
 import { loadTopics } from '../src/topics.js';
+import { parseArgs } from 'node:util';
+import { resolveAgent } from '../src/agent.js';
 import { validationDirectory } from './validation-paths.js';
 
+const { values } = parseArgs({ options: { config: { type: 'string' } } });
+const selected = loadConfig(values.config);
 const root = join(validationDirectory, 'live-' + Date.now());
 await mkdir(root, { recursive: true, mode: 0o700 });
-await cp('config/topics.json', join(root, 'topics.json'));
+await cp(selected.feed.topics, join(root, 'topics.json'));
 const config = configSchema.parse({
   version: 2,
   storage: { directory: root, database: join(root, 'data.sqlite') },
   feed: { directory: join(root, 'content'), topics: join(root, 'topics.json') },
-  agent: { model: 'deepseek/deepseek-flash', effort: 'off', runtimeDirectory: join(root, 'dsh') },
+  agent: { ...selected.agent, ...selected.sources.find(source => source.id === 'openai')?.agent, runtimeDirectory: join(root, 'agents') },
   sources: [{ id: 'openai', name: 'OpenAI', intervalHours: 6, streams: [{
     id: 'news', channels: [{ id: 'rss', kind: 'feed', url: 'https://openai.com/news/rss.xml' }],
   }] }],
@@ -43,17 +47,18 @@ try {
       publishedAt: now, observedAt: now, basis: 'published', metrics: {} }],
   }, '');
 
-  const result = await summarize(config, store);
+  const resolved = await resolveAgent(config.agent);
+  const result = await summarize(config, store, { resolveAgent: async () => resolved });
   assert.equal(result.generated, 4); assert.equal(result.failed, 0); assert.equal(result.pending, 0);
   const records = acceptedItems(store);
   assert.equal(records.length, 4);
   assert.equal(records.find(row => row.item.id === 'live-title-only')?.copy.en.summary, '');
   await writeSite(config, store);
   const calls = store.db.prepare('SELECT model,status,usage FROM agent_calls').all();
-  const evidence = { checkedAt, node: process.version, model: config.agent.model, dshVersion: config.agent.version,
+  const evidence = { checkedAt, node: process.version, agent: resolved.execution,
     status: 'passed', root, collection, accepted: records, calls, topics: await loadTopics(config.feed.topics) };
   await writeFile(evidencePath, JSON.stringify(evidence, null, 2), { mode: 0o600 });
-  console.log(JSON.stringify({ checkedAt, status: 'passed', root, accepted: records.length, calls: calls.length, model: config.agent.model }));
+  console.log(JSON.stringify({ checkedAt, status: 'passed', root, accepted: records.length, calls: calls.length, agent: resolved.execution }));
 } catch (error) {
   await writeFile(evidencePath, JSON.stringify({ checkedAt, status: 'failed', root, error: String(error) }, null, 2), { mode: 0o600 });
   throw error;

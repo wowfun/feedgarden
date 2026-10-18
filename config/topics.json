@@ -363,6 +363,270 @@
         "vibe coding policy"
       ],
       "deprecated": false
+    },
+    {
+      "id": "ai-and-work",
+      "name": {
+        "en": "AI and Work",
+        "zh-CN": "AI 与就业"
+      },
+      "description": "How AI changes jobs, hiring, productivity, workplace organization and labor demand, including expectations about automation and employment.",
+      "aliases": [
+        "future of work",
+        "labor market",
+        "AI and employment"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "digital-ownership",
+      "name": {
+        "en": "Digital Ownership",
+        "zh-CN": "数字所有权"
+      },
+      "description": "Ownership, preservation and continued access rights for digital goods such as video games and software, including offline modes, server shutdowns and community-run servers.",
+      "aliases": [
+        "video game preservation",
+        "software preservation",
+        "right to own"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "agent-memory",
+      "name": {
+        "en": "Agent Memory",
+        "zh-CN": "智能体记忆"
+      },
+      "description": "Storage, retrieval, selection and reuse of past experiences and knowledge by LLM agents, including memory assembly and context construction.",
+      "aliases": [
+        "LLM agent memory",
+        "experience memory"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "image-compression",
+      "name": {
+        "en": "Image Compression",
+        "zh-CN": "图像压缩"
+      },
+      "description": "Image codecs and compression formats such as JPEG, WebP, AVIF and JPEG XL, including file size, visual quality, encoding speed and browser support.",
+      "aliases": [
+        "image codecs",
+        "image formats"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "accessibility",
+      "name": {
+        "en": "Accessibility",
+        "zh-CN": "无障碍"
+      },
+      "description": "Assistive technology and accessible interfaces that let people with disabilities use software, hardware and digital services independently.",
+      "aliases": [
+        "assistive technology",
+        "a11y"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "computer-graphics",
+      "name": {
+        "en": "Computer Graphics",
+        "zh-CN": "计算机图形学"
+      },
+      "description": "Real-time rendering, shaders, graphics APIs such as WebGPU, and the techniques used to produce interactive 3D scenes.",
+      "aliases": [
+        "real-time rendering",
+        "shaders"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "biodiversity",
+      "name": {
+        "en": "Biodiversity",
+        "zh-CN": "生物多样性"
+      },
+      "description": "Wildlife populations, species abundance and ecosystem health, including population indices, conservation status and debate over how declines are measured and interpreted.",
+      "aliases": [
+        "wildlife populations",
+        "species decline"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "hallucination-detection",
+      "name": {
+        "en": "Hallucination Detection",
+        "zh-CN": "幻觉检测"
+      },
+      "description": "Detection of unsupported or fabricated model outputs, including attention-based probes, grounding checkers and LLM judges used to verify factual consistency with supplied context.",
+      "aliases": [
+        "grounding checks",
+        "faithfulness detection",
+        "factual consistency"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "ontologies",
+      "name": {
+        "en": "Ontologies",
+        "zh-CN": "本体"
+      },
+      "description": "Construction, refinement and maintenance of ontologies and class hierarchies, including axiom repair, subsumption errors and embedding-assisted knowledge engineering.",
+      "aliases": [
+        "ontology engineering",
+        "knowledge graphs"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "immigration",
+      "name": {
+        "en": "Immigration",
+        "zh-CN": "移民"
+      },
+      "description": "Public opinion on immigration and migration policy, including people's desire to move between countries and host countries' openness to newcomers.",
+      "aliases": [
+        "migration",
+        "emigration"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "agent-self-improvement",
+      "name": {
+        "en": "Agent Self-Improvement",
+        "zh-CN": "智能体自我改进"
+      },
+      "description": "Agents that revise their own prompts, harnesses, skills, workflows or policies over time, including recursive self-improvement, and the safety and evaluation limits of automated self-modification.",
+      "aliases": [
+        "recursive self-improvement",
+        "self-evolving agents"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "web-archiving",
+      "name": {
+        "en": "Web Archiving",
+        "zh-CN": "网页归档"
+      },
+      "description": "Preservation of websites and born-digital web content through crawls, archives and searchable collections, including efforts to keep defunct services such as GeoCities accessible.",
+      "aliases": [],
+      "deprecated": false
+    },
+    {
+      "id": "politics",
+      "name": {
+        "en": "Politics",
+        "zh-CN": "政治"
+      },
+      "description": "Government affairs, political appointments, public officials, elections and political debate.",
+      "aliases": [
+        "government",
+        "political news"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "amateur-radio",
+      "name": {
+        "en": "Amateur Radio",
+        "zh-CN": "业余无线电"
+      },
+      "description": "Amateur radio operation, RF equipment and spectrum regulation, including ham-band transceivers, software-defined radio, licensing rules and marketplace restrictions on radio gear.",
+      "aliases": [
+        "ham radio",
+        "SDR",
+        "software-defined radio",
+        "RF equipment"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "ai-financing",
+      "name": {
+        "en": "AI Financing",
+        "zh-CN": "AI 融资"
+      },
+      "description": "Debt issuance, credit ratings, capital raising and the financial structure of AI companies and their infrastructure buildout.",
+      "aliases": [
+        "AI debt",
+        "AI capex"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "personal-finance",
+      "name": {
+        "en": "Personal Finance",
+        "zh-CN": "个人理财"
+      },
+      "description": "Personal finance apps and methods for tracking accounts, spending and budgets, and for forecasting household cash flow.",
+      "aliases": [
+        "budgeting",
+        "money management",
+        "cash-flow tracking"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "public-safety",
+      "name": {
+        "en": "Public Safety",
+        "zh-CN": "公共安全"
+      },
+      "description": "Emergency call routing and dispatch, civilian crisis-response programs, and the division of labor between police, fire, medical and other first responders.",
+      "aliases": [
+        "emergency services",
+        "911 dispatch",
+        "crisis response"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "game-engines",
+      "name": {
+        "en": "Game Engines",
+        "zh-CN": "游戏引擎"
+      },
+      "description": "Game engine architecture, frameworks and source-code releases used to build and run video games.",
+      "aliases": [
+        "game engine",
+        "game development"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "invasive-species",
+      "name": {
+        "en": "Invasive Species",
+        "zh-CN": "入侵物种"
+      },
+      "description": "Non-native plants, animals and other organisms that spread beyond their original range and harm ecosystems, agriculture or public health, and efforts to control them.",
+      "aliases": [
+        "biological invasions",
+        "non-native species"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "cloud-computing",
+      "name": {
+        "en": "Cloud Computing",
+        "zh-CN": "云计算"
+      },
+      "description": "Cloud computing services and platforms, including reliance on remote providers, vendor lock-in and the trade-offs between hosted software and local control.",
+      "aliases": [
+        "cloud services",
+        "SaaS"
+      ],
+      "deprecated": false
     }
   ]
 }

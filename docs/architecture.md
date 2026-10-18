@@ -49,7 +49,9 @@ The separate `site:build` command builds HTML from the existing content tree. `s
 | Selection | [rank.ts](../src/rank.ts), [selection.ts](../src/selection.ts), [scoring.ts](../src/scoring.ts) | Refresh source-specific ranking evidence and materialize daily selections, including frozen historical dates. |
 | Source enrichment | [source-content.ts](../src/source-content.ts), [hackernews.ts](../src/hackernews.ts), [producthunt.ts](../src/producthunt.ts) | Prepare article, discussion, media and repository evidence before summary generation. |
 | Summary workflow | [items.ts](../src/items.ts) | Plan work, enforce eligibility, recover batches, reuse cached copies, accept bilingual results, and reserve stable item paths. |
-| Agent execution | [agent.ts](../src/agent.ts), [dsh-plugin.mjs](../src/dsh-plugin.mjs) | Run the pinned DSH process over ACP with fixed input and output tools. |
+| Agent execution | [agent.ts](../src/agent.ts), [agent-backends.ts](../src/agent-backends.ts) | Resolve configuration and run OpenCode (default) or DSH over ACP, with explicit child environment inheritance. |
+| Fixed agent tools | [artifact-tools.mjs](../src/artifact-tools.mjs), [mcp-server.mjs](../src/mcp-server.mjs), [opencode-ready.mjs](../src/opencode-ready.mjs) | Share fixed input/output validation and atomic writes, expose local stdio MCP, and wait for direct tool registration. DSH uses its restricted plugin. |
+| Agent processes | [agent-process.ts](../src/agent-process.ts), [process-command.ts](../src/process-command.ts) | Resolve executable entrypoints without shell concatenation and terminate owned ACP/MCP process trees with bounded cleanup. |
 | Contracts and topics | [topics-contract.mjs](../src/topics-contract.mjs), [task-contract.mjs](../src/task-contract.mjs), [topics.ts](../src/topics.ts) | Validate outputs and maintain the canonical bilingual vocabulary. |
 | Auxiliary tasks | [fixed-tasks.ts](../src/fixed-tasks.ts), [podcasts.ts](../src/podcasts.ts), [relations.ts](../src/relations.ts) | Persist transcript reductions and relation judgments, recover artifacts, and share the call budget. |
 | Archives and Markdown | [archives.ts](../src/archives.ts), [site.ts](../src/site.ts), [collections.ts](../src/collections.ts) | Import and maintain private archive bytes, preserve opaque files, render locale content, share built-in collection definitions, and recover directory replacements. |
@@ -75,7 +77,7 @@ Database triggers enqueue planning when relevant item facts change and update th
 
 ## Task execution and acceptance
 
-Summary planning applies the cutoff, source-specific filters, selection and refresh policy before model work. The queue is FIFO within each source and round-robin across sources. Summary cache identity includes normalized fixed input, source identity, model, effort, skill content and contract revisions. Podcast transcript recipes also participate in the key.
+Summary planning applies the cutoff, source-specific filters, selection and refresh policy before model work. The queue is FIFO within each source and round-robin across sources. Summary cache identity includes normalized fixed input, source identity, backend, agent version, resolved model/effort, provider configuration fingerprint, skill content and contract revisions. Podcast transcript recipes also participate in the key.
 
 The agent receives a trusted task skill and fixed source material. The restricted plugin exposes only `feedgarden_input` and `feedgarden_result`; source material is treated as untrusted data. The client validates the returned artifact again before acceptance. Summary acceptance checks identities, bilingual copy, topic references and media selections. A failed revision retains the preceding accepted snapshot.
 
@@ -101,7 +103,7 @@ The content directory contains English item Markdown, matching files under `_tra
 
 The render skip signature reads the persisted recommendation revision without scanning relation rows. A changed render then reads one compact projection of active judgments for its recommendation manifest. Expired rows remain private audit evidence and are excluded through the expiry index. Time passing alone does not rebuild the tree or create a publication commit: the theme filters expired entries during HTML builds and in the browser, while the next changed or explicit render refreshes the manifest. Private explanation or quotation edits alone do not invalidate published cards; changes to their verdict, targets, hashes, policy or expiry do.
 
-[.github/jekyll-obsidian.yml](../.github/jekyll-obsidian.yml) configures the public site. [.github/theme.lock.json](../.github/theme.lock.json) pins the upstream theme repository and full commit. The build requires the selected theme checkout to match that commit and have no tracked changes, then produces `.jekyll-obsidian-cache/site`.
+[.github/jekyll-obsidian.yml](../.github/jekyll-obsidian.yml) configures the public site. [Gemfile](../Gemfile) and [Gemfile.lock](../Gemfile.lock) pin the released theme gem and its dependencies. The build uses the trusted local bundle in frozen mode and its precompiled assets, then produces `.jekyll-obsidian-cache/site`.
 
 The theme owns HTML templates, search and archive assets, pagination, language switching, continuous reading, media display, export and browser-local favorites. Changes to reusable theme behavior belong in the upstream Jekyll Obsidian checkout first; integrate its published commit through the lock file afterward. Feedgarden owns source acquisition, selection, model contracts and generated content. The files in `docs/` are repository documentation, separate from the configured public content tree.
 
@@ -111,7 +113,7 @@ Publication fetches the configured branch into an isolated worktree, merges topi
 
 - Source feeds, article pages, comments, transcripts and model output are untrusted. Parsers and task contracts validate them before acceptance.
 - HN article fetching validates public destinations and pins the resolved address for direct connections, proxy tunnels, robots requests and redirects. It does not execute source scripts or crawl onward from prose links.
-- DSH runs with a fixed workspace, restricted tools, a read-only sandbox policy and denied permission requests. Credentials are supplied to the execution environment and excluded from generated content.
+- Both ACP backends use fixed workspaces, shared validated artifact tools and denied additional permission requests. OpenCode uses a dedicated agent that denies all other tools, with direct local MCP tools and Code Mode disabled; DSH retains its restricted plugin and read-only sandbox policy. Credentials stay in the backend environment or local credential store and are excluded from generated task configuration and public content.
 - Theme builds receive an environment allowlist. This boundary removes inherited credentials and runtime injection settings, but is not an operating-system sandbox.
 - SQLite, task workspaces, raw evidence and credentials stay private. The static build can use the published Markdown without opening the private database.
 

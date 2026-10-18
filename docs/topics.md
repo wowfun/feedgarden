@@ -2,7 +2,9 @@
 
 ## Canonical vocabulary
 
-`config/topics.json` is the canonical bilingual vocabulary. The fixed-input DSH skill reads it, reuses active IDs and aliases, and may append reusable topics. Both the restricted plugin and client validate identities, bilingual copy, topic references and new-topic uniqueness. The registry is written with file/directory fsync before the summary transaction; an interrupted commit may leave an unused topic, but cannot leave a published dangling reference. Saved artifacts are recovered before another ACP call. Topic additions do not invalidate accepted summaries; `--rebuild` explicitly refreshes classification.
+`config/topics.json` is the canonical bilingual vocabulary. The fixed-input agent skill reads it, reuses active IDs and aliases, and may append reusable topics. Both the restricted tool adapter and client validate identities, bilingual copy, topic references and new-topic uniqueness. The registry is written with file/directory fsync before the summary transaction; an interrupted commit may leave an unused topic, but cannot leave a published dangling reference. Saved artifacts are recovered before another ACP call. Topic additions do not invalidate accepted summaries; `--rebuild` explicitly refreshes classification.
+
+The complete registry, including deprecated topics and aliases, counts toward every summary batch's input budget. Keep descriptions concise and use the measured budget warning to guide edits through `topics apply`. Deprecated IDs and aliases remain available for historical content and shared links; removing them or an empty aliases array is not a substitute for reducing substantial description overhead.
 
 ## Manual updates
 

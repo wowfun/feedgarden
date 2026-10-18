@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { DateTime } from 'luxon';
 import type { z } from 'zod';
 import type { Config, Source } from './config.js';
-import { generateBatch, type AgentResult, type SummaryInput } from './agent.js';
+import { generateBatch, agentIdentity, configuredAgent, createAgentResolver, resolveAgent, type AgentResolver, type ResolvedAgent, type AgentResult, type SummaryInput } from './agent.js';
 import { validateArtifact, ArtifactError, outputSchema } from './topics-contract.mjs';
 import { applyTopics, loadTopics, type Registry } from './topics.js';
 import { Store, QuotaDeferred } from './store.js';
@@ -30,13 +30,15 @@ export function summaryItem(item: Item, maxChars: number): SummaryInput['items']
   return { source: item.source, id: item.id, title: normalize(item.title), text: normalize(item.text).slice(0, maxChars), ...(item.author ? { author: normalize(item.author) } : {}), ...(item.media?.length ? { media: item.media.slice(0, 6) } : {}), ...(item.articleQuote ? { articleQuote: item.articleQuote } : {}), ...(comments?.length ? { discussion: { comments } } : {}) };
 }
 function summaryKey(item: Item, agent: Config['agent'], skillHash: string): string {
-  return hash({ ...summaryItem(item, agent.maxItemChars), ...(item.metadata?.transcriptRecipe ? { transcriptRecipe: item.metadata.transcriptRecipe } : {}), model: agent.model, effort: agent.effort, skillHash, contractVersion: 2, summaryRevision: 3 });
+  return hash({ ...summaryItem(item, agent.maxItemChars), ...(item.metadata?.transcriptRecipe ? { transcriptRecipe: item.metadata.transcriptRecipe } : {}), ...agentIdentity(agent), skillHash, contractVersion: 2, summaryRevision: 3 });
 }
 export function itemPath(source: string, day: string, number: number): string {
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(source) || !/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isSafeInteger(number) || number < 1) throw new Error('Invalid item path components');
   return `${source}/${day.slice(0, 7)}/${day.slice(8)}/item-${number}.md`;
 }
 export function eligible(item: Item, firstSeen: string, cutoff: string, source: Source): boolean {
+  // Source/date gate shared by the conservative probe scan and final planning
+  // check. SQL date scans below must remain a superset of this predicate.
   if (item.source === 'x' && item.kind === 'repost') return false;
   if (item.source === 'arxiv' && source.includeKeywords.length && !source.includeKeywords.some(word => (item.title + ' ' + item.text).toLowerCase().includes(word.toLowerCase()))) return false;
   return (item.basis === 'observed' ? firstSeen : item.publishedAt) >= cutoff;
@@ -52,8 +54,11 @@ export function* iterateAcceptedItems(store: Store): IterableIterator<AcceptedIt
   }
 }
 export function acceptedItems(store: Store): AcceptedItem[] { return [...iterateAcceptedItems(store)]; }
-export async function summarize(config: Config, store: Store, options: { source?: string; since?: string; rebuild?: boolean; refresh?: boolean; retryFailed?: boolean; signal?: AbortSignal } = {}, generator: Generator = generateBatch, at = nowIso(), prepare: typeof enrichItem = enrichItem): Promise<{ generated: number; pending: number; failed: number; deferred: boolean }> {
+export async function summarize(config: Config, store: Store, options: { source?: string; since?: string; rebuild?: boolean; refresh?: boolean; retryFailed?: boolean; signal?: AbortSignal; resolveAgent?: AgentResolver } = {}, generator: Generator = generateBatch, at = nowIso(), prepare: typeof enrichItem = enrichItem): Promise<{ generated: number; pending: number; failed: number; deferred: boolean; sourceErrors: { source: string; error: string }[] }> {
   options.signal?.throwIfAborted();
+  const resolver = createAgentResolver(options.resolveAgent ?? (generator === generateBatch ? resolveAgent : configuredAgent));
+  const agents = new Map<string, ResolvedAgent>();
+  const sourceErrors: { source: string; error: string }[] = [];
   const since = options.since === undefined ? undefined : iso(DateTime.fromISO(options.since).toUTC(), '--since');
   const cutoff = since ? new Date(Math.max(Date.parse(store.meta('cutoff')!), Date.parse(since))).toISOString() : store.meta('cutoff')!;
   const sources = config.sources.filter(source => source.enabled && (!options.source || source.id === options.source));
@@ -126,11 +131,39 @@ export async function summarize(config: Config, store: Store, options: { source?
   }
   store.statement("UPDATE feed_jobs SET state='failed',error=COALESCE(error,'Attempt limit reached after interruption') WHERE state='pending' AND attempts>=5").run();
   await pruneWorkspaces(config.agent, store, at);
+  // Probe only if potentially useful work exists. Keep selection/exclusion and
+  // archived-without-summary rules aligned with the final per-row check below;
+  // the policy INSERT intentionally also models refresh/unfinished-job state.
+  const potential = store.statement(`SELECT i.data,i.first_seen FROM items i
+    LEFT JOIN feed_excluded e ON e.source=i.source AND e.id=i.id
+    WHERE i.source=? AND e.id IS NULL AND ${selectionClause('i')}
+    AND (i.first_seen>=? OR i.published_at>=?)
+    AND (? OR NOT EXISTS(SELECT 1 FROM feed_archives a WHERE a.source=i.source AND a.id=i.id
+      AND NOT EXISTS(SELECT 1 FROM feed_summaries f WHERE f.source=a.source AND f.id=a.id)))`);
+  function hasEligibleItems(source: Source): boolean {
+    for (const row of potential.iterate(source.id, cutoff, cutoff, options.rebuild || options.refresh ? 1 : 0) as Iterable<{ data: string; first_seen: string }>) {
+      if (eligible(JSON.parse(row.data) as Item, row.first_seen, cutoff, source)) return true;
+    }
+    return false;
+  }
   for (const source of sources) {
+    // An inherited identity still has to be refreshed when eligible accepted
+    // copies exist, since a changed model/effort/version can invalidate them.
+    if (!hasEligibleItems(source)) continue;
     const skillHash = skillHashes.get(source.id)!;
-    const agent = { ...config.agent, ...source.agent };
-    const policy = hash({ cutoff, keywords: source.includeKeywords, model: agent.model, effort: agent.effort, maxItemChars: agent.maxItemChars, skillHash, summaryRevision: 3, planningRevision: 2, enrichmentRefreshDays: config.collection.enrichmentRefreshDays });
+    let agent: ResolvedAgent;
+    try { agent = await resolver({ ...config.agent, ...source.agent }, options.signal); }
+    catch (error) {
+      options.signal?.throwIfAborted(); store.assertLease();
+      sourceErrors.push({ source: source.id, error: errorText(error) });
+      continue;
+    }
+    options.signal?.throwIfAborted(); store.assertLease();
+    agents.set(source.id, agent);
+    const policy = hash({ cutoff, keywords: source.includeKeywords, ...agentIdentity(agent), maxItemChars: agent.maxItemChars, skillHash, summaryRevision: 3, planningRevision: 2, enrichmentRefreshDays: config.collection.enrichmentRefreshDays });
     if (options.rebuild || options.refresh || store.meta('planning_policy:' + source.id) !== policy) {
+      // This is incremental scheduling, not the full eligibility predicate:
+      // the probe above is conservative; queued rows are rechecked below.
       // Policy changes revisit recent items and unfinished copies. Historical accepted
       // items require changed source facts or an explicit refresh/rebuild.
       const refreshSince = new Date(Date.parse(at) - config.collection.enrichmentRefreshDays * 86400_000).toISOString();
@@ -151,6 +184,8 @@ export async function summarize(config: Config, store: Store, options: { source?
           planning.remove.run(source.id, row.id); continue;
         }
         let item = JSON.parse(row.data) as Item;
+        // Final gate for both new policy scans and trigger-enqueued facts. See
+        // potential/hasEligibleItems above and the eligibility matrix regression.
         if (!store.isSelected(source.id, row.id) || planning.archived.get(source.id, row.id) && !options.refresh && !options.rebuild || planning.excluded.get(source.id, row.id) || !eligible(item, row.first_seen, cutoff, source)) {
           planning.remove.run(source.id, row.id); continue;
         }
@@ -196,6 +231,7 @@ export async function summarize(config: Config, store: Store, options: { source?
     const blocked = JSON.stringify([...blockedJobs]);
     for (let offset = 0; offset < sources.length; offset++) {
       const source = sources[(start + offset) % sources.length]!;
+      if (!agents.has(source.id)) continue;
       // HN produces both article and discussion copy in two languages. Its output
       // can exceed the model's token limit even when a larger batch fits the input.
       const batchLimit = source.id === 'hackernews' ? Math.min(2, config.agent.maxBatchItems) : config.agent.maxBatchItems;
@@ -204,7 +240,7 @@ export async function summarize(config: Config, store: Store, options: { source?
     }
     if (!chosen) break;
     cursor = chosen.id; store.setMeta('round_robin', cursor);
-    const agent = { ...config.agent, ...chosen.agent };
+    const agent = agents.get(chosen.id)!;
     const skillHash = skillHashes.get(chosen.id)!;
     if (chosen.id === 'podcast') {
       // Advance one episode node per visit, then rotate sources. Ready episodes
@@ -284,9 +320,9 @@ export async function summarize(config: Config, store: Store, options: { source?
         await atomicWrite(join(workspace, 'result.json'), JSON.stringify(result.output));
         await atomicWrite(join(workspace, 'audit.json'), JSON.stringify({ inputHash: hash(input), model: agent.model, skillHash, ...result }, null, 2));
         await accept(batch, result.output, validated);
-        store.finishCall(call, 'succeeded', result.usage); runtimeFailures = 0; repair = undefined; break;
+        store.finishCall(call, 'succeeded', { execution: result.execution ?? agent.execution, updates: result.usage }); runtimeFailures = 0; repair = undefined; break;
       } catch (error) {
-        repair = errorText(error); store.finishCall(call, 'failed', { error: repair });
+        repair = errorText(error); store.finishCall(call, 'failed', { execution: agent.execution, error: repair });
         options.signal?.throwIfAborted();
         store.assertLease();
         if (persisting || repair.includes('MANUAL_ACTION:')) throw error;
@@ -314,5 +350,5 @@ export async function summarize(config: Config, store: Store, options: { source?
     if (runtimeFailures >= 3) throw new Error('Three consecutive ACP runtime/transport failures; stopping this run');
   }
   const states = (sources.length ? store.statement("SELECT state,count(*) count FROM feed_jobs j WHERE state!='ready' AND " + selectionClause('j') + " AND source IN (" + sources.map(() => '?').join(',') + ") GROUP BY state").all(...sources.map(source => source.id)) : []) as { state: string; count: number }[];
-  return { generated, pending: states.find(row => row.state === 'pending')?.count ?? 0, failed: states.find(row => row.state === 'failed')?.count ?? 0, deferred };
+  return { generated, pending: states.find(row => row.state === 'pending')?.count ?? 0, failed: states.find(row => row.state === 'failed')?.count ?? 0, deferred, sourceErrors };
 }

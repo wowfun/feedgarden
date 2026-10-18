@@ -14,7 +14,7 @@ import { migrate, rollback, convertConfig } from './migrate.js';
 import { backup } from './backup.js';
 import { atomicWrite, errorText } from './util.js';
 import { reportSkill } from './report-skill.js';
-import { agentCommand } from './process-command.js';
+import { createAgentResolver } from './agent.js';
 import { rankItems, previewRank } from './rank.js';
 import { maintainArchive } from './archives.js';
 import { relate } from './relations.js';
@@ -43,6 +43,7 @@ async function runWithRunner(command: string, config: Config, configFile: string
   const target = resolve(config.storage.directory, 'runner');
   await writeFile(target, '', { flag: 'a', mode: 0o600 });
   const cancellation = new AbortController(), signal = cancellation.signal;
+  const agentResolver = createAgentResolver();
   let lockCompromised = false;
   const release = await lockfile.lock(target, { stale: 120_000, update: 10_000, retries: 0, onCompromised: error => { lockCompromised = true; cancellation.abort(error); } });
   const owner = randomUUID();
@@ -60,16 +61,18 @@ async function runWithRunner(command: string, config: Config, configFile: string
       heartbeat = store.watchLease(owner, cancellation);
       run = store.run(command); await recoverContent(config);
       async function summaries() {
-        const result = await summarize(config, store!, { source: values.source, since: values.since, rebuild: values.rebuild, refresh: values.refresh, retryFailed: values['retry-failed'], signal });
+        const result = await summarize(config, store!, { source: values.source, since: values.since, rebuild: values.rebuild, refresh: values.refresh, retryFailed: values['retry-failed'], signal, resolveAgent: agentResolver });
         console.log(JSON.stringify(result));
+        for (const error of result.sourceErrors) failures.push({ kind: 'summary-config', key: error.source, error: error.error });
         const errors = store!.db.prepare("SELECT source,id,error FROM feed_jobs WHERE error IS NOT NULL AND state!='ready'").all() as { source: string; id: string; error: string }[];
         const selected = new Set(config.sources.filter(source => source.enabled && (!values.source || source.id === values.source)).map(source => source.id));
         for (const error of errors.filter(error => selected.has(error.source) && store!.isSelected(error.source, error.id))) failures.push({ kind: 'summary', key: error.source + '/' + error.id, error: error.error });
       }
       async function relations() {
-        const result = await relate(config, store!, { signal, retryFailed: values['retry-failed'] });
+        const result = await relate(config, store!, { signal, retryFailed: values['retry-failed'], resolveAgent: agentResolver });
         console.log(JSON.stringify({ relations: result }));
-        if (result.pending && !result.deferred) failures.push({ kind: 'relations', key: 'recent', error: `${result.pending} pairs remain pending; inspect feed_tasks for retry details` });
+        if (result.configurationError) failures.push({ kind: 'relations', key: 'config', error: result.configurationError });
+        else if (result.pending && !result.deferred) failures.push({ kind: 'relations', key: 'recent', error: `${result.pending} pairs remain pending; inspect feed_tasks for retry details` });
       }
       if (command === 'collect') recordCollection(await collect(config, store, values.source, values.due, undefined, values.since, signal));
       else if (command === 'rank') {
@@ -106,8 +109,8 @@ async function runWithRunner(command: string, config: Config, configFile: string
       else if (command === 'backup') console.log(JSON.stringify(await backup(store, config.storage.directory)));
       else if (command === 'doctor') {
         await reportSkill(config.sources.filter(source => source.enabled).map(source => source.id));
-        const [executable, args] = agentCommand(config.agent.command, ['--version']);
-        console.log(JSON.stringify({ node: process.version, database: store.db.pragma('quick_check'), agent: execFileSync(executable, args, { encoding: 'utf8' }).trim(), model: config.agent.model, channels: store.states(), tasks: store.db.prepare("SELECT kind,state,count(*) n FROM feed_tasks GROUP BY kind,state").all(), items: store.db.prepare('SELECT count(*) n FROM feed_summaries').get(), queue: store.db.prepare('SELECT state,count(*) n FROM feed_jobs GROUP BY state').all() }, null, 2));
+        const resolved = await agentResolver(config.agent, signal);
+        console.log(JSON.stringify({ node: process.version, database: store.db.pragma('quick_check'), agent: resolved.execution, channels: store.states(), tasks: store.db.prepare("SELECT kind,state,count(*) n FROM feed_tasks GROUP BY kind,state").all(), items: store.db.prepare('SELECT count(*) n FROM feed_summaries').get(), queue: store.db.prepare('SELECT state,count(*) n FROM feed_jobs GROUP BY state').all() }, null, 2));
         if (values.live) recordCollection(await collect(config, store, values.source, false, undefined, undefined, signal));
       } else if (command === 'run') {
         if (!values.due) throw new Error('Scheduled runs require --due');
@@ -130,7 +133,7 @@ async function runWithRunner(command: string, config: Config, configFile: string
       if (failures.length) { console.error(`Run incomplete: ${failures.length} task(s) failed; successful work retained.`); process.exitCode = 1; }
     }
   } catch (error) {
-    if (run) store?.finishRun(run, 'failed', { error: errorText(error) });
+    if (run) store?.finishRun(run, 'failed', { error: errorText(error), failures });
     throw error;
   } finally {
     if (heartbeat) clearInterval(heartbeat);

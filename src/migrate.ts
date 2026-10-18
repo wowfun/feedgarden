@@ -10,12 +10,18 @@ import { configSchema, resolveConfigFile, type Config } from './config.js';
 import { initializeFeedSchema, Store } from './store.js';
 import { atomicWrite, hash, nowIso, iso } from './util.js';
 import { writeSite } from './site.js';
+import { readSiteBundle, siteBundleIdentity } from './site-bundle.js';
+
+const dependencyFiles = ['package-lock.json', 'Gemfile', 'Gemfile.lock', '.github/jekyll-obsidian.yml'];
+function requireCurrentArchive(manifest: { format?: number; codeCommit?: string }): void {
+  if (manifest.format !== 2) throw new Error('Unsupported migration archive format; use its recorded code commit ' + (manifest.codeCommit ?? '(missing)') + ' in an independent worktree');
+}
 
 export function convertConfig(value: any): Config {
   if (value.version === 2) return configSchema.parse(value);
   if (value.version !== 1) throw new Error('Unsupported configuration version');
   const { reports, ...rest } = value;
-  return configSchema.parse({ ...rest, version: 2, feed: { directory: 'content', topics: 'config/topics.json' }, collection: { backfillDays: reports?.backfillDays ?? 7 }, sources: value.sources.map((source: any) => {
+  return configSchema.parse({ ...rest, version: 2, agent: { ...value.agent, backend: 'dsh' }, feed: { directory: 'content', topics: 'config/topics.json' }, collection: { backfillDays: reports?.backfillDays ?? 7 }, sources: value.sources.map((source: any) => {
     const { frequencies, reportAgent, topics, ...next } = source;
     if (reportAgent) {
       const overrides = (frequencies ?? []).map((frequency: string) => ({ model: value.agent.model, ...(value.agent.effort ? { effort: value.agent.effort } : {}), ...source.agent, ...reportAgent[frequency] }));
@@ -54,6 +60,7 @@ export async function migrate(configFile?: string, at = nowIso(), signal?: Abort
   const journalPath = resolve(config.storage.directory, 'migration.json');
   let journal: { archive: string; cutoff: string; configHash: string; state: string } | undefined;
   if (existsSync(journalPath)) journal = JSON.parse(await readFile(journalPath, 'utf8'));
+  if (journal) requireCurrentArchive(JSON.parse(await readFile(join(journal.archive, 'manifest.json'), 'utf8')));
   if (journal?.state === 'complete') return journal.archive;
   const db = new Database(config.storage.database);
   try {
@@ -74,13 +81,13 @@ export async function migrate(configFile?: string, at = nowIso(), signal?: Abort
         counts = Object.fromEntries(['items', 'observations', 'reports', 'raw_responses'].map(table => [table, (archived.prepare('SELECT count(*) count FROM ' + table).get() as { count: number }).count]));
       } finally { archived.close(); }
       await copyFile(configFile, join(archive, 'config.original'));
-      for (const file of ['package-lock.json', '.github/theme.lock.json', '.github/jekyll-obsidian.yml']) if (existsSync(file)) await cp(file, join(archive, file), { recursive: true });
-      for (const file of ['package-lock.json', '.github/theme.lock.json', '.github/jekyll-obsidian.yml']) {
+      for (const file of dependencyFiles) if (existsSync(file)) await cp(file, join(archive, file), { recursive: true });
+      for (const file of dependencyFiles) {
         const original = execFileSync('git', ['show', 'HEAD:' + file], {encoding:'utf8'});
         await atomicWrite(join(archive, 'code-base', file), original);
       }
       if (existsSync(legacy.reports?.directory ?? 'reports')) await cp(legacy.reports?.directory ?? 'reports', join(archive, 'reports'), { recursive: true });
-      const manifest = { createdAt: at, configFile: resolve(configFile), reportsDirectory: resolve(legacy.reports?.directory ?? 'reports'), database: resolve(config.storage.database), codeCommit: revision(), themeCommit: JSON.parse(await readFile(join(archive, 'code-base/.github/theme.lock.json'), 'utf8')).commit, workingThemeCommit: JSON.parse(await readFile('.github/theme.lock.json', 'utf8')).commit, counts, checksums: await checksums(archive, signal), quickCheck: 'ok' };
+      const manifest = { format: 2, createdAt: at, configFile: resolve(configFile), reportsDirectory: resolve(legacy.reports?.directory ?? 'reports'), database: resolve(config.storage.database), codeCommit: revision(), themeBundle: siteBundleIdentity(await readSiteBundle(join(archive, 'code-base'))), workingThemeBundle: siteBundleIdentity(await readSiteBundle(process.cwd())), counts, checksums: await checksums(archive, signal), quickCheck: 'ok' };
       await atomicWrite(join(archive, 'manifest.json'), JSON.stringify(manifest, null, 2));
       journal = { archive, cutoff: iso(DateTime.fromISO(at).setZone('Asia/Shanghai').startOf('day').toUTC(), 'migration cutoff'), configHash: hash(raw), state: 'archived' };
       await atomicWrite(journalPath, JSON.stringify(journal));
@@ -109,6 +116,7 @@ export async function rollback(archive: string, signal?: AbortSignal): Promise<v
   signal?.throwIfAborted();
   archive = resolve(archive);
   const manifest = JSON.parse(await readFile(join(archive, 'manifest.json'), 'utf8'));
+  requireCurrentArchive(manifest);
   const actual = await checksums(archive, signal);
   for (const [file, expected] of Object.entries(manifest.checksums)) if (actual[file] !== expected) throw new Error('Archive checksum mismatch: ' + file);
   const original = parse(await readFile(join(archive, 'config.original'), 'utf8'));
@@ -129,7 +137,7 @@ export async function rollback(archive: string, signal?: AbortSignal): Promise<v
   await atomicWrite(manifest.configFile, await readFile(join(archive, 'config.original'), 'utf8'));
   await rm(manifest.reportsDirectory, { recursive: true, force: true });
   if (existsSync(join(archive, 'reports'))) await cp(join(archive, 'reports'), manifest.reportsDirectory, { recursive: true });
-  for (const file of ['package-lock.json', '.github/theme.lock.json', '.github/jekyll-obsidian.yml']) if (existsSync(join(archive, 'code-base', file))) await cp(join(archive, 'code-base', file), resolve(file));
+  for (const file of dependencyFiles) if (existsSync(join(archive, 'code-base', file))) await cp(join(archive, 'code-base', file), resolve(file));
   else if (existsSync(join(archive, file))) await cp(join(archive, file), resolve(file));
   await rm(resolve(original.storage?.directory ?? '.local', 'migration.json'), { force: true });
   console.log('Restored legacy data. Run code commit ' + manifest.codeCommit + ' in an independent worktree; remote publication rollback requires a normal revert commit.');

@@ -4,6 +4,8 @@
 
 Feedgarden 将开发者和 AI 信息源采集到本地 SQLite，并发布按时间排列的双语信息流。每个条目都有独立的 Markdown 页面、来源标签、1 至 3 个主题标签，以及可点击的原文链接。英文站点位于 `/feedgarden/`，简体中文站点位于 `/feedgarden/zh-CN/`。
 
+文章列表支持按日独立折叠，标题显示本地化日期、星期及当前页条数。默认只展开最新一天，筛选和翻页保留手动开合状态，刷新后重置。详见[站点功能](docs/site.md)。
+
 ## 快速开始
 
 运行器使用 Node 24 至 26（`npm ci`），锁定版本的 Jekyll Obsidian 主题使用 Node 26 和 Ruby 4.0.6。X 环境配置（`npm run setup:twitter`）还需要 `uv`。请另行安装 OpenCode 2，并在本机配置 provider 和凭据。Feedgarden 默认运行 `opencode acp`；未设置 `agent.model` / `agent.effort` 时继承 OpenCode 的模型与推理 variant，以 OpenCode 2.0.31 为验收基线。DSH 保留为可选后端，详见 [agent 配置](docs/configuration.md#agent-execution)。密钥不进入 Git 或生成的内容。Windows 上可直接解析 npm/pnpm 启动器中的明确入口，无需 shell。缓存身份包含 agent 版本；单个来源配置失败会单独报告，其他正常来源继续处理。

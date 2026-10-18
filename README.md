@@ -4,6 +4,8 @@ English | [简体中文](README.zh-CN.md)
 
 Feedgarden collects developer and AI sources into local SQLite and publishes a bilingual chronological feed. Each item has its own Markdown page, source tag, 1-3 topic tags, and a clickable original URL. The English site is at `/feedgarden/`, with Simplified Chinese at `/feedgarden/zh-CN/`.
 
+Article lists support independent daily folding with localized dates, weekdays and page-local counts. Only the newest day opens by default; filters and pagination retain manual choices until reload. See [Site features](docs/site.md).
+
 ## Quick start
 
 Use Node 24-26 for the runner (`npm ci`), Node 26 and Ruby 4.0.6 for the pinned Jekyll Obsidian theme. X setup (`npm run setup:twitter`) also requires `uv`. Install OpenCode 2 separately and configure its providers and credentials locally. Feedgarden defaults to `opencode acp` and inherits OpenCode's model and reasoning variant unless `agent.model` / `agent.effort` override them. OpenCode 2.0.31 is the acceptance baseline. DSH remains an optional backend; see [agent configuration](docs/configuration.md#agent-execution). Keys stay out of Git and generated content. Windows npm/pnpm launchers with literal entrypoints are resolved without a shell. Cache identities include the agent version; a source configuration error is reported without blocking healthy sources.

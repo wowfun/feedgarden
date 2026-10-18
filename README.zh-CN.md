@@ -8,9 +8,9 @@ Feedgarden 将开发者和 AI 信息源采集到本地 SQLite，并发布按时�
 
 ## 快速开始
 
-运行器使用 Node 24 至 26（`npm ci`），锁定版本的 Jekyll Obsidian 主题使用 Node 26 和 Ruby 4.0.6。X 环境配置（`npm run setup:twitter`）还需要 `uv`。请另行安装 OpenCode 2，并在本机配置 provider 和凭据。Feedgarden 默认运行 `opencode acp`；未设置 `agent.model` / `agent.effort` 时继承 OpenCode 的模型与推理 variant，以 OpenCode 2.0.31 为验收基线。DSH 保留为可选后端，详见 [agent 配置](docs/configuration.md#agent-execution)。密钥不进入 Git 或生成的内容。Windows 上可直接解析 npm/pnpm 启动器中的明确入口，无需 shell。缓存身份包含 agent 版本；单个来源配置失败会单独报告，其他正常来源继续处理。
+运行器使用 Node 24 至 26（`npm ci`），锁定版本的 Jekyll Obsidian gem 使用 Ruby 4.0.6 和 Bundler，已包含编译后的前端资源。X 环境配置（`npm run setup:twitter`）还需要 `uv`。请另行安装 OpenCode 2，并在本机配置 provider 和凭据。Feedgarden 默认运行 `opencode acp`；未设置 `agent.model` / `agent.effort` 时继承 OpenCode 的模型与推理 variant，以 OpenCode 2.0.31 为验收基线。DSH 保留为可选后端，详见 [agent 配置](docs/configuration.md#agent-execution)。密钥不进入 Git 或生成的内容。Windows 上可直接解析 npm/pnpm 启动器中的明确入口，无需 shell。缓存身份包含 agent 版本；单个来源配置失败会单独报告，其他正常来源继续处理。
 
-在 Windows 上，请全局安装共用工具链。两个项目均使用 Node 26，并安装 RubyInstaller **Ruby+Devkit 4.0.6**、Bundler 4.0.16、Git 和 uv。安装后打开新的 PowerShell，使更新后的 PATH 生效。RubyInstaller 的 MSYS2 工具链用于构建原生 gem。`node_modules` 和经过修补的 X CLI 环境保留在项目本地，因为其版本及身份验证行为由本项目管理。
+在 Windows 上，请全局安装共用工具链。Feedgarden 使用 Node 24 至 26，并安装 RubyInstaller **Ruby+Devkit 4.0.6**、Bundler 4.0.16、Git 和 uv。安装后打开新的 PowerShell，使更新后的 PATH 生效。RubyInstaller 的 MSYS2 工具链用于构建原生 gem。`node_modules` 和经过修补的 X CLI 环境保留在项目本地，因为其版本及身份验证行为由本项目管理。
 
 Agent 子进程使用环境变量白名单。如果 OpenCode provider 从环境变量读取凭据，请在 `agent.inheritEnvironment` 中列出变量名，例如 `["DEEPSEEK_API_KEY"]`；OpenCode 配置目录中保存的认证仍然可用。
 
@@ -18,6 +18,7 @@ Agent 子进程使用环境变量白名单。如果 OpenCode provider 从环境�
 winget install --id RubyInstallerTeam.RubyWithDevKit.4.0 --exact --version 4.0.6-1
 gem install bundler -v 4.0.16 --no-document
 npm ci
+bundle install
 npm run setup:twitter
 npm run feedgarden -- doctor
 npm run site:build

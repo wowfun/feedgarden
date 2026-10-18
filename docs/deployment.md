@@ -2,7 +2,7 @@
 
 ## Build environment
 
-Publishing is disabled automatically by default. The remote theme lock must match the locally trusted repository and full SHA before topic/content changes or validation. Theme builds use an environment allowlist, excluding provider/Git tokens, proxy variables and injected runtime options; Git fetch/push retain the caller’s credentials. This environment boundary is not an operating-system sandbox.
+Publishing is disabled automatically by default. The remote `Gemfile` and `Gemfile.lock` must match the locally trusted files (ignoring CRLF/LF differences) before topic/content changes or validation. Temporary publication worktrees build with the trusted local bundle, never with a remote replacement Gemfile. Dependencies are installed in frozen mode; the build must leave both files unchanged. Theme builds use an environment allowlist, excluding provider/Git tokens, proxy variables and injected runtime options; Git fetch/push retain the caller’s credentials. This environment boundary is not an operating-system sandbox.
 
 ## Publication
 

@@ -1,6 +1,6 @@
 # Third-party notices
 
-The Chinese UI message catalog in `config/locales/zh-CN.json` is adapted from [Jekyll Obsidian](https://github.com/wowfun/jekyll-obsidian), pinned in `.github/theme.lock.json`. Its license follows. Other installed dependencies retain their own licenses.
+The Chinese UI message catalog in `config/locales/zh-CN.json` is adapted from [Jekyll Obsidian at commit 64ea04c](https://github.com/wowfun/jekyll-obsidian/tree/64ea04c265ca727fcfb2734d6e4bbd2341cf7f6b). Its license follows. The site runtime is pinned separately in `Gemfile.lock`; other installed dependencies retain their own licenses.
 
 MIT License
 

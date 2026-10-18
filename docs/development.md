@@ -4,7 +4,7 @@ Run all commands from the repository root.
 
 ## Pinned theme changes
 
-`verify:scale`, `site:build` and publication require a clean theme checkout at the full SHA in `.github/theme.lock.json`. After changing the upstream theme, commit and push it there, then update this lock to the published SHA before running the pinned build. Uncommitted upstream changes deliberately stop it; a local theme preview does not establish publication readiness.
+`verify:scale`, `site:build` and publication use the exact published gem in the root `Gemfile` and `Gemfile.lock`. Run `bundle install` after checkout. Implement reusable theme changes upstream, publish and verify the gem, then update the exact version and run `bundle update jekyll-obsidian-site`. Commit both dependency files with Windows and Linux platforms. Builds use frozen Bundler resolution and precompiled gem assets; they do not clone the theme or run its frontend toolchain.
 
 ## Validation commands
 

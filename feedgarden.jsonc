@@ -216,7 +216,7 @@
     {
       "id": "github",
       "name": "GitHub",
-      "enabled": false,
+      "enabled": true,
       "timezone": "Asia/Shanghai",
       "intervalHours": 6,
       "streams": [

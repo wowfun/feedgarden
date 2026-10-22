@@ -4,6 +4,11 @@
   "dir": "ltr",
   "tag_labels": { "source/podcast": "播客" },
   "messages": {
+    "show_hidden_topics": "显示隐藏主题",
+    "hide_hidden_topics": "收起隐藏主题",
+    "include_tab_sources": "显示独立栏目",
+    "hide_tab_sources": "收起独立栏目",
+
     "export": "导出",
     "export_title": "导出 Markdown",
     "export_close": "关闭导出",

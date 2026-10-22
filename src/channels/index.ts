@@ -79,7 +79,7 @@ async function githubSearch(c: ChannelContext): Promise<Collection> {
 }
 async function followBuilders(c: ChannelContext): Promise<Collection> {
   const { generatedAt: generated, items } = parseFollowBuilders((await c.http.shared(c.channel.url!)).body, base(c));
-  const result = collected(c, items, ['Third-party daily sample: up to 3 posts per account; replies and complete threads are not covered. Missing accounts do not imply no activity.']);
+  const result = collected(c, items, [`Third-party daily sample generated at ${generated}: up to 3 posts per account; replies and complete threads are not covered. Missing accounts do not imply no activity.`]);
   if (Date.parse(c.now) - Date.parse(generated) > 36 * 3600_000) result.coverage.status = 'stale';
   return result;
 }
@@ -165,7 +165,7 @@ async function productHunt(c: ChannelContext): Promise<Collection> {
 async function officialPages(c: ChannelContext): Promise<Collection> {
   const origin = new URL(c.channel.url!).origin;
   const articlePath = (path: string) => c.source.id === 'anthropic'
-    ? path.startsWith(`/${c.stream.id}/`) || c.stream.id === 'blog' && origin === 'https://claude.com' && path.startsWith('/resources/articles/')
+    ? (c.stream.id === 'engineering' ? /^\/(engineering|research)\/[^/]+\/?$/.test(path) : new RegExp(`^/${c.stream.id}/[^/]+/?$`).test(path)) || c.stream.id === 'blog' && origin === 'https://claude.com' && /^\/resources\/articles\/[^/]+\/?$/.test(path)
     : /^\/(index|news|research)\//.test(path);
   const urls = new Set<string>();
   const first = await c.http.page(c.channel.url!);
@@ -182,32 +182,63 @@ async function officialPages(c: ChannelContext): Promise<Collection> {
     }
   } else {
     const $ = load(first.body);
+    $('nav,footer,header:not(main header)').remove();
     $('a[href]').each((_index, element) => {
       const href = $(element).attr('href'); if (!href) return;
       const url = new URL(href, origin); if (url.origin === origin && articlePath(url.pathname)) urls.add(url.href);
     });
   }
   if (!urls.size) throw new Error('Official list/sitemap contained no recognizable article links');
-  const items: Item[] = []; let failures = 0;
+  const items: Item[] = []; let failures = 0, nonArticles = 0, outsideEngineering = 0;
   // URLs already stored retain their original publication date; sitemap lastmod is never used as publication time.
   const known = c.store.db.prepare('SELECT 1 FROM items WHERE source=? AND id=?');
-  const unseen = [...urls].filter(url => !known.get(c.source.id, safeUrl(url)));
+  const skipped = c.store.statement('SELECT checked_at FROM feed_discovery_skips WHERE source=? AND stream=? AND url=?');
+  const skip = (url: string, reason: string) => { c.store.assertLease(); c.store.statement('INSERT OR REPLACE INTO feed_discovery_skips(source,stream,url,reason,checked_at) VALUES (?,?,?,?,?)').run(c.source.id, c.stream.id, safeUrl(url), reason, c.now); };
+  const fresh: string[] = [], rechecks: {url:string;checkedAt:number}[] = [];
+  const expiredBefore = Date.parse(c.now) - 7 * 86400_000;
+  for (const url of urls) {
+    if (known.get(c.source.id, safeUrl(url))) continue;
+    const decision = skipped.get(c.source.id, c.stream.id, safeUrl(url)) as {checked_at:string} | undefined;
+    if (!decision) { fresh.push(url); continue; }
+    const checkedAt = Date.parse(decision.checked_at);
+    if (!Number.isFinite(checkedAt) || checkedAt <= expiredBefore) rechecks.push({url, checkedAt: Number.isFinite(checkedAt) ? checkedAt : 0});
+  }
+  rechecks.sort((a,b) => a.checkedAt - b.checkedAt);
+  // Keep the same total budget while giving expired decisions a share even
+  // during steady discovery. If fresh URLs are scarce, rechecks fill the batch.
+  const due = rechecks.map(row => row.url);
+  const unseen = [...due.slice(0,10), ...fresh, ...due.slice(10)];
   for (const url of unseen.slice(0, 50)) {
     try {
       const raw = await c.http.page(url); const $ = load(raw.body);
       const objects: any[] = [];
       $('script[type="application/ld+json"]').each((_i, element) => { try { objects.push(JSON.parse($(element).text())); } catch {} });
       const entities = objects.flatMap(object => array<any>(object['@graph'] ?? object));
-      const article = entities.find(object => /Article|BlogPosting|NewsArticle/.test(text(object['@type'])));
+      const article = entities.find(object => array(object?.['@type']).some(type => ['Article', 'BlogPosting', 'NewsArticle'].includes(String(type)))
+        && (!object.url || new URL(String(object.url), url).href === url));
+      // Category pages also use <article>/<h1>. Require page-level article
+      // metadata before allowing an undated page to become a first observation.
+      const pageType = $('meta[property="og:type"]').attr('content')?.toLowerCase();
+      if (!article && pageType !== 'article') { if (pageType === 'website') { nonArticles++; skip(url, 'non-article'); } else failures++; continue; }
+      if (c.stream.id === 'engineering' && c.channel.kind === 'sitemap'
+        && !/engineering/i.test(text(article?.articleSection))
+        && !$('article header a[href]').toArray().some(element => new URL($(element).attr('href')!, url).pathname.replace(/\/$/, '') === '/engineering')) { outsideEngineering++; skip(url, 'outside-engineering'); continue; }
       const published = date(article?.datePublished ?? $('meta[property="article:published_time"]').attr('content') ?? $('time[datetime]').first().attr('datetime'), c.source.timezone);
       const title = plain(article?.headline ?? $('h1').first().text());
-      if (!title) { failures++; continue; }
       $('script,style,nav,footer,header').remove();
+      const body = plain($('article').first().find('p').text() || $('main').first().find('p').text());
+      if (!title || !body) { failures++; continue; }
+      c.store.assertLease();
+      c.store.statement('DELETE FROM feed_discovery_skips WHERE source=? AND stream=? AND url=?').run(c.source.id, c.stream.id, safeUrl(url));
       items.push({ ...base(c), id: safeUrl(url), title, url: safeUrl(url), publishedAt: published ?? c.now, basis: published ? 'published' : 'observed', metrics: {},
         text: plain($('article').first().text() || $('main').first().text()).slice(0, 100000),
       });
     } catch { failures++; }
   }
-  return collected(c, items, [...(failures ? [`${failures} official pages were inaccessible or lacked an article title.`] : []), ...(items.some(item => item.basis === 'observed') ? ['Pages without a verifiable publication date use their first observation.'] : []), ...(unseen.length > 50 ? ['Discovery budget is 50 previously unseen detail pages per run.'] : [])]);
+  if (unseen.length && !items.length && failures) throw new Error('All official article pages were inaccessible or lacked article content');
+  const result = collected(c, items, [...(failures ? [`${failures} official pages were inaccessible or lacked article content.`] : []), ...(unseen.length > 50 ? ['Discovery budget is 50 detail pages per run; remaining new URLs and expired skip decisions will be checked on later runs.'] : [])]);
+  // Informational filtering and date provenance do not indicate missing coverage.
+  result.coverage.notes.push(...(nonArticles ? [`Skipped ${nonArticles} non-article pages; category/list pages are discovery only.`] : []), ...(outsideEngineering ? [`Skipped ${outsideEngineering} article pages outside the Engineering section.`] : []), ...(items.some(item => item.basis === 'observed') ? ['Pages without a verifiable publication date use their first observation.'] : []));
+  return result;
 }
 export const adapters: Record<Channel['kind'], Adapter> = { 'hn-api': hn, feed, 'podcast-rss': podcast, sitemap: officialPages, 'anthropic-html': officialPages, 'github-trending': trending, 'github-search': githubSearch, 'x-cli': xCli, 'follow-builders': followBuilders, 'arxiv-api': arxiv, 'ph-html': productHunt };

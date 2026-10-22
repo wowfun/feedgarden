@@ -19,8 +19,11 @@ import { pruneWorkspaces } from '../src/workspaces.js';
 import type { Item } from '../src/types.js';
 import { transcriptStep } from '../src/podcasts.js';
 import type { TaskGenerator } from '../src/fixed-tasks.js';
+import { maintainArchive } from '../src/archives.js';
+import { itemWindowSql, resolveItemWindow } from '../src/item-window.js';
+import { initializePublications } from '../src/publications.js';
 const at='2026-10-09T10:00:00.000Z';
-const topic={id:'coding',name:{en:'Coding','zh-CN':'编程'},description:'Developer tools',aliases:[],deprecated:false};
+const topic={id:'coding',name:{en:'Coding','zh-CN':'编程'},description:'Developer tools',aliases:[],deprecated:false,hidden:false};
 const registry:Registry={version:1,topics:[topic]};
 const item=(id:string,source='one',overrides:Partial<Item>={}):Item=>({id,source,stream:'main',channel:'rss',title:'Title '+id,text:'Supplied facts',url:'https://example.test/'+encodeURIComponent(id),publishedAt:at,observedAt:at,basis:'published',metrics:{},...overrides});
 function save(store:Store,items:Item[]) {for(const i of items) store.saveCollection(i.source,'main','rss',{items:[i],raw:[],coverage:{status:'complete',to:i.observedAt,notes:[]}},'');}
@@ -31,12 +34,327 @@ async function fixture() {
  const store=new Store(config.storage.database);store.setMeta('cutoff','1970-01-01T00:00:00.000Z');
  return {root,config,store,cleanup:async()=>{store.close();await rm(root,{recursive:true,force:true});}};
 }
+
+test('source-ineligible queue rows are decoded at most once per run plus final diagnostics',async t=>{
+ const f=await fixture();try{
+  f.config.sources=[{...f.config.sources[0]!,id:'arxiv',includeKeywords:['agent']}];f.config.agent.maxBatchItems=1;
+  const rejected=Array.from({length:24},(_,i)=>item('a-rejected-'+i,'arxiv')),good=Array.from({length:8},(_,i)=>item('z-agent-'+i,'arxiv',{text:'Agent research'}));save(f.store,[...rejected,...good]);
+  const data=new Set(rejected.map(i=>JSON.stringify({item:i,firstSeen:at})));
+  for(const i of rejected)f.store.db.prepare("INSERT INTO feed_jobs VALUES (?,?,?,?,'pending',0,'',NULL)").run(i.source,i.id,i.id,JSON.stringify({item:i,firstSeen:at}));
+  const parse=JSON.parse;let decoded=0;
+  t.mock.method(JSON,'parse',(...args:Parameters<typeof JSON.parse>)=>{if(data.has(args[0]))decoded++;return parse(...args);});
+  const result=await summarize(f.config,f.store,{},generator,at);assert.equal(result.generated,8);assert.equal(result.pending,0);assert.equal(result.failed,0);
+  assert.ok(decoded<=rejected.length*2,`Decoded ${decoded} rejected queue rows`);
+  assert.equal((f.store.db.prepare("SELECT count(*) n FROM feed_jobs WHERE state='pending'").get() as {n:number}).n,rejected.length,'Source rejection is local to this run, not a durable exclusion');
+ }finally{await f.cleanup();}
+});
+
+test('cached batches walk FIFO without sorting the complete private cache backlog',async()=>{
+ const f=await fixture();try{
+  const prepare=f.store.db.prepare.bind(f.store.db);let query='';
+  f.store.db.prepare=((sql:string)=>{if(sql.startsWith('SELECT j.* FROM feed_jobs j')&&sql.includes("state='cached'"))query=sql;return prepare(sql);}) as typeof f.store.db.prepare;
+  await summarize(f.config,f.store,{},generator,at);
+  const args=itemWindowSql('j.data',"json_extract(j.data,'$.firstSeen')",resolveItemWindow({},'1970-01-01T00:00:00.000Z',at),'$.item').parameters;
+  const plan=prepare('EXPLAIN QUERY PLAN '+query).all('one',...args,'[]') as {detail:string}[];
+  assert.ok(plan.some(row=>row.detail.includes('feed_jobs_cached_order')),JSON.stringify(plan));assert.ok(!plan.some(row=>row.detail.includes('TEMP B-TREE')),JSON.stringify(plan));
+ }finally{await f.cleanup();}
+});
+
+test('bounded eligibility counts include reusable accepted candidates rather than remaining work',async()=>{
+ const f=await fixture();try{
+  save(f.store,[item('a')]);await summarize(f.config,f.store,{},generator,at);await writeSite(f.config,f.store);
+  const result=await summarize(f.config,f.store,{since:'2026-10-09',until:'2026-10-10'},()=>{throw new Error('Reuse accepted copy');},at);
+  assert.equal(result.eligibleCandidates,1);assert.equal(result.generated,0);assert.equal(result.pending,0);
+ }finally{await f.cleanup();}
+});
+
+test('standalone rendering adopts installed bilingual history before applying a narrower window',async()=>{
+ const f=await fixture();try{
+  save(f.store,[item('history')]);await summarize(f.config,f.store,{},generator,at);
+  // Model an installation from before the publication ledger existed.
+  f.store.db.exec("DELETE FROM feed_meta WHERE key='publications_initialized'");
+  const record=acceptedItems(f.store)[0]!,path=itemPath('one','2026-10-09',f.store.itemNumber('one','history','2026-10-09'));
+  for(const locale of ['en','zh-CN'] as const){const prefix=locale==='en'?'':'_translations/zh-CN/';await mkdir(join(f.config.feed.directory,prefix,'one/2026-10/09'),{recursive:true});await writeFile(join(f.config.feed.directory,prefix,path),renderItem(record,locale));}
+  f.store.setMeta('publication_windows',JSON.stringify({one:resolveItemWindow({since:'2026-10-20',until:'2026-10-21'},'1970-01-01T00:00:00Z',at)}));
+  await writeSite(f.config,f.store,undefined,true);
+  assert.ok(f.store.db.prepare("SELECT 1 FROM feed_publications WHERE source='one' AND id='history'").get());
+  for(const prefix of ['','_translations/zh-CN/'])assert.equal(await readFile(join(f.config.feed.directory,prefix,path),'utf8'),renderItem(record,prefix?'zh-CN':'en'));
+ }finally{await f.cleanup();}
+});
+
+test('review: repeated observed windows preserve enrichment schedules and skip unchanged renders',async()=>{
+ const f=await fixture();try{
+  const options={source:'one',since:'2026-10-09',until:'2026-10-10',observedDays:7};
+  save(f.store,[item('a')]);await summarize(f.config,f.store,options,generator,at);await writeSite(f.config,f.store);
+  f.store.db.prepare('INSERT OR REPLACE INTO feed_planning VALUES (?,?,?)').run('one','a','2026-10-10T10:00:00Z');
+  let prepared=0;await summarize(f.config,f.store,options,generator,'2026-10-09T11:00:00Z',async i=>{prepared++;return i;});
+  assert.equal(prepared,0);assert.equal(await writeSite(f.config,f.store),false);
+  await summarize(f.config,f.store,{...options,source:'two'},generator,'2026-10-09T11:01:00Z');
+  assert.equal(await writeSite(f.config,f.store),false);
+ }finally{await f.cleanup();}
+});
+
+test('review: source windows neither block another source nor expose its expired private copies',async()=>{
+ const f=await fixture();try{
+  save(f.store,[item('a'),item('b','two')]);await summarize(f.config,f.store,{},generator,at);
+  await summarize(f.config,f.store,{source:'one',since:'2026-10-09',until:'2026-10-10'},generator,at);
+  await summarize(f.config,f.store,{source:'two',since:'2026-10-10',until:'2026-10-11'},generator,at);
+  assert.deepEqual(acceptedItems(f.store).map(r=>r.item.id),['a']);
+  await summarize(f.config,f.store,{source:'one'},generator,at);
+  assert.deepEqual(acceptedItems(f.store).map(r=>r.item.id),['a']);
+  await writeSite(f.config,f.store);assert.equal((f.store.db.prepare('SELECT count(*) n FROM feed_publications').get() as {n:number}).n,1);
+ }finally{await f.cleanup();}
+});
+
+test('review: SQL candidate scans admit offset dates and avoid parsing dates outside the bounded window',async t=>{
+ const f=await fixture();try{
+  save(f.store,[item('offset','one',{publishedAt:'2026-10-08T13:00:00-04:00',observedAt:'2026-10-01T00:00:00Z'}),...Array.from({length:40},(_,i)=>item('future'+i,'one',{publishedAt:'2026-10-11T10:00:00Z'}))]);
+  // Force the policy scan, rather than the insertion trigger, to find the offset item.
+  f.store.db.exec('DELETE FROM feed_planning');
+  const parse=JSON.parse;let futureParses=0;
+  t.mock.method(JSON,'parse',(...args:Parameters<typeof JSON.parse>)=>{if(args[0].startsWith('{"id":"future'))futureParses++;return parse(...args);});
+  const result=await summarize(f.config,f.store,{since:'2026-10-09T00:00:00+08:00',until:'2026-10-10T00:00:00+08:00',observedDays:7},generator,at);
+  assert.equal(result.generated,1);assert.equal(result.eligibleCandidates,1);assert.equal(futureParses,0);
+ }finally{await f.cleanup();}
+});
+
+test('review: recovered fifth-attempt artifacts retain private topic proposals without failing or paying again',async()=>{
+ const f=await fixture(),cancel=new AbortController();try{
+  save(f.store,[item('old')]);
+  await assert.rejects(summarize(f.config,f.store,{signal:cancel.signal},async(...args)=>{
+   const result=await generator(...args);result.output.newTopics=[{...topic,id:'novel',name:{en:'Novel','zh-CN':'新主题'}}];result.output.items[0]!.topics=['novel'];
+   await writeFile(join(args[3]!,'result.json'),JSON.stringify(result.output));cancel.abort(new Error('Interrupted'));return result;
+  },at),/Interrupted/);
+  f.store.db.exec("UPDATE feed_jobs SET attempts=5");
+  await summarize(f.config,f.store,{source:'two'},()=>{throw new Error('No work');},at);
+  assert.equal((f.store.db.prepare('SELECT state FROM feed_jobs').get() as {state:string}).state,'pending');
+  await summarize(f.config,f.store,{source:'one',since:'2026-10-10',until:'2026-10-11'},()=>{throw new Error('Expired');},at);
+  assert.equal((f.store.db.prepare('SELECT state FROM feed_jobs').get() as {state:string}).state,'cached');
+  assert.deepEqual((await loadTopics(f.config.feed.topics)).topics.map(t=>t.id),['coding']);
+  assert.equal(acceptedItems(f.store).length,0);
+  const before=(f.store.db.prepare('SELECT count(*) n FROM agent_calls').get() as {n:number}).n;
+  await summarize(f.config,f.store,{source:'one',since:'2026-10-09',until:'2026-10-10'},()=>{throw new Error('Reuse cached artifact');},at);
+  assert.deepEqual(acceptedItems(f.store)[0]!.copy.topics,['novel']);
+  assert.equal((f.store.db.prepare('SELECT count(*) n FROM agent_calls').get() as {n:number}).n,before);
+ }finally{await f.cleanup();}
+});
+
+test('review: hidden false normalizes and replacements require a visible active target',()=>{
+ const {hidden:_,...implicit}=topic;assert.deepEqual(validateRegistry({version:1,topics:[implicit]}),validateRegistry(registry));
+ assert.throws(()=>validateRegistry({version:1,topics:[{...topic,deprecated:true,replacedBy:'other'},{...topic,id:'other',name:{en:'Other','zh-CN':'其他'},hidden:true}]}),/visible/);
+});
+
+test('review: a mixed recovered batch applies only admitted topic proposals and later reuses the rest',async()=>{
+ const f=await fixture(),cancel=new AbortController();try{
+  save(f.store,[item('a-live'),item('b-expired','one',{publishedAt:'2026-10-08T10:00:00Z'})]);
+  await assert.rejects(summarize(f.config,f.store,{signal:cancel.signal},async(...args)=>{
+   const result=await generator(...args);result.output.newTopics=['live','private'].map(id=>({...topic,id,name:{en:id,'zh-CN':id}}));
+   result.output.items.forEach((copy,i)=>copy.topics=[i===0?'live':'private']);
+   await writeFile(join(args[3]!,'result.json'),JSON.stringify(result.output));cancel.abort(new Error('Interrupted'));return result;
+  },at),/Interrupted/);
+  await summarize(f.config,f.store,{source:'one',since:'2026-10-09',until:'2026-10-10'},()=>{throw new Error('Recover');},at);
+  assert.deepEqual((await loadTopics(f.config.feed.topics)).topics.map(t=>t.id),['coding','live']);
+  assert.deepEqual(acceptedItems(f.store).map(r=>r.item.id),['a-live']);
+  await summarize(f.config,f.store,{source:'one'},()=>{throw new Error('Reuse');},at);
+  assert.deepEqual((await loadTopics(f.config.feed.topics)).topics.map(t=>t.id),['coding','live','private']);
+  assert.equal(acceptedItems(f.store).length,2);
+ }finally{await f.cleanup();}
+});
+
+test('review: render journals contain only first publications',async()=>{
+ const f=await fixture();try{
+  save(f.store,[item('old')]);await summarize(f.config,f.store,{},generator,at);await writeSite(f.config,f.store);
+  f.store.db.exec("CREATE TRIGGER reject_redundant_publication BEFORE INSERT ON feed_publications WHEN EXISTS(SELECT 1 FROM feed_publications p WHERE p.source=NEW.source AND p.id=NEW.id) BEGIN SELECT RAISE(ABORT,'redundant publication'); END");
+  await writeSite(f.config,f.store,undefined,true);
+  save(f.store,[item('new')]);await summarize(f.config,f.store,{},generator,at);await writeSite(f.config,f.store);
+  assert.equal((f.store.db.prepare('SELECT count(*) n FROM feed_publications').get() as {n:number}).n,2);
+ }finally{await f.cleanup();}
+});
+
+test('review: placeholder reservations are not publication identities and opaque item removal is bilingual',async()=>{
+ const f=await fixture();try{
+  const path='one/2026-10/09/item-1.md';
+  f.store.itemNumber('one','archive:'+path,'2026-10-09');
+  for(const prefix of ['','_translations/zh-CN/']){await mkdir(join(f.config.feed.directory,prefix,'one/2026-10/09'),{recursive:true});await writeFile(join(f.config.feed.directory,prefix,path),'Opaque archive');f.store.db.prepare('INSERT INTO feed_archive_files VALUES (?,?)').run(prefix+path,Buffer.from('Opaque archive'));}
+  await initializePublications(f.config,f.store);assert.equal((f.store.db.prepare('SELECT count(*) n FROM feed_publications').get() as {n:number}).n,0);
+  await maintainArchive(f.config,f.store,'remove','_translations/zh-CN/'+path);await writeSite(f.config,f.store);
+  for(const prefix of ['','_translations/zh-CN/'])await assert.rejects(stat(join(f.config.feed.directory,prefix,path)),{code:'ENOENT'});
+ }finally{await f.cleanup();}
+});
+
+test('review: narrowed source eligibility filters stale failed jobs and pending queue candidates',async()=>{
+ const f=await fixture();try{
+  f.config.sources=[{...f.config.sources[0]!,id:'arxiv',includeKeywords:['agent']},{...f.config.sources[1]!,id:'x'}];
+  const ignored=[item('paper','arxiv'),item('repost','x',{kind:'repost'})];save(f.store,ignored);
+  for(const i of ignored)f.store.db.prepare("INSERT INTO feed_jobs VALUES (?,?,?,?,'failed',5,'','Stale failure')").run(i.source,i.id,i.id,JSON.stringify({item:i,firstSeen:at}));
+  const result=await summarize(f.config,f.store,{},()=>{throw new Error('Ineligible');},at);
+  assert.equal(result.failed,0);assert.deepEqual(result.jobErrors,[]);
+  // Pending ineligible rows cannot occupy the first batch and block eligible work.
+  f.store.db.exec("UPDATE feed_jobs SET state='pending',attempts=0");save(f.store,[item('eligible','arxiv',{text:'Useful agent research'})]);
+  const generated=await summarize(f.config,f.store,{},generator,at);assert.equal(generated.generated,1);assert.equal(generated.pending,0);
+  assert.deepEqual(acceptedItems(f.store).map(r=>r.item.id),['eligible']);
+ }finally{await f.cleanup();}
+});
+
+test('unchanged unbounded summaries do not parse history just to count diagnostics',async t=>{
+ const f=await fixture();
+ try {
+  save(f.store,Array.from({length:128},(_,i)=>item('history-'+i)));
+  await summarize(f.config,f.store,{},generator,at);
+  const rawItems=new Set((f.store.db.prepare('SELECT data FROM items').all() as {data:string}[]).map(row=>row.data));
+  const parse=JSON.parse;let historicalParses=0;
+  t.mock.method(JSON,'parse',(...args:Parameters<typeof JSON.parse>)=>{
+   if(rawItems.has(args[0]))historicalParses++;
+   return parse(...args);
+  });
+  const result=await summarize(f.config,f.store,{},()=>{throw new Error('No new work');},at);
+  assert.ok(historicalParses<=1,`Unchanged run parsed ${historicalParses} historical items`);
+  assert.equal(result.eligibleCandidates,null);
+ }finally{await f.cleanup();}
+});
+
+test('publication readers load scope once and avoid per-row publication lookups',async t=>{
+ const f=await fixture();
+ try {
+  save(f.store,[item('a'),item('b'),item('c')]);
+  await summarize(f.config,f.store,{},generator,at);await writeSite(f.config,f.store);
+  const meta=f.store.meta.bind(f.store),statement=f.store.statement.bind(f.store);
+  let scopeReads=0,pointLookups=0;
+  t.mock.method(f.store,'meta',(key:string)=>{if(key==='publication_windows')scopeReads++;return meta(key);});
+  t.mock.method(f.store,'statement',(sql:string)=>{if(sql==='SELECT 1 FROM feed_publications WHERE source=? AND id=?')pointLookups++;return statement(sql);});
+  assert.equal(acceptedItems(f.store).length,3);
+  const unboundedReads=scopeReads;
+  f.store.setMeta('publication_windows',JSON.stringify({one:resolveItemWindow({since:'2026-10-20',until:'2026-10-21'},'1970-01-01T00:00:00.000Z',at)}));
+  await writeSite(f.config,f.store,undefined,true);
+  assert.deepEqual({unboundedReads,pointLookups},{unboundedReads:1,pointLookups:0});
+ }finally{await f.cleanup();}
+});
+
+test('daily admission separates publication dates from first observations and retains published history',async()=>{
+ const f=await fixture(), runAt='2026-10-21T22:00:00.000Z';
+ const options={source:'one',since:'2026-10-20T00:00:00+08:00',until:'2026-10-21T00:00:00+08:00',observedDays:7};
+ try {
+  save(f.store,[item('history','one',{publishedAt:'2026-10-01T00:00:00.000Z'})]);
+  await summarize(f.config,f.store,{},generator,runAt);await writeSite(f.config,f.store);
+  const historyPath=(f.store.db.prepare("SELECT day,number FROM feed_item_paths WHERE id='history'").get() as {day:string;number:number});
+  const historyFile=join(f.config.feed.directory,itemPath('one',historyPath.day,historyPath.number));const history=await readFile(historyFile,'utf8');
+  save(f.store,[
+   item('start','one',{publishedAt:'2026-10-19T16:00:00.000Z'}),
+   item('last','one',{publishedAt:'2026-10-20T15:59:59.999Z'}),
+   item('before','one',{publishedAt:'2026-10-19T15:59:59.999Z'}),
+   item('today','one',{publishedAt:'2026-10-20T16:00:00.000Z'}),
+   item('observed-edge','one',{basis:'observed',observedAt:'2026-10-14T22:00:00.000Z'}),
+   item('observed-expired','one',{basis:'observed',observedAt:'2026-10-14T21:59:59.999Z'}),
+   item('observed-future','one',{basis:'observed',observedAt:'2026-10-21T22:00:00.001Z'}),
+   item('other-source','two',{publishedAt:'2026-10-19T16:00:00.000Z'}),
+  ]);
+  // Seeing an old snapshot again cannot make its first observation recent.
+  save(f.store,[item('observed-expired','one',{basis:'observed',observedAt:runAt})]);
+  const result=await summarize(f.config,f.store,options,generator,runAt);
+  assert.equal(result.generated,3);assert.equal(result.pending,0);assert.equal(result.eligibleCandidates,3);
+  await writeSite(f.config,f.store);
+  assert.deepEqual(acceptedItems(f.store).map(r=>r.item.id).sort(),['history','last','observed-edge','start']);
+  assert.equal(await readFile(historyFile,'utf8'),history);
+  // Changing the date scope must invalidate rendering even without new summaries.
+  await summarize(f.config,f.store,{...options,since:'2026-10-21T00:00:00+08:00',until:'2026-10-22T00:00:00+08:00'},generator,runAt);
+  assert.equal(await writeSite(f.config,f.store),true);
+  assert.ok(acceptedItems(f.store).some(r=>r.item.id==='today'));
+  assert.ok(acceptedItems(f.store).some(r=>r.item.id==='start'));
+ } finally {await f.cleanup();}
+});
+
+test('expired interrupted artifacts and queued failures cannot generate or publish in a later window',async()=>{
+ const f=await fixture(), cancellation=new AbortController(), runAt='2026-10-21T10:00:00.000Z';
+ try {
+  save(f.store,[item('expired','one',{publishedAt:'2026-10-18T12:00:00.000Z'})]);
+  await assert.rejects(summarize(f.config,f.store,{signal:cancellation.signal},async(...args)=>{
+   const result=await generator(...args);await writeFile(join(args[3]!,'result.json'),JSON.stringify(result.output));cancellation.abort(new Error('Stopped'));return result;
+  },runAt),/Stopped/);
+  const options={since:'2026-10-20T00:00:00+08:00',until:'2026-10-21T00:00:00+08:00',observedDays:7,retryFailed:true};
+  const result=await summarize(f.config,f.store,options,()=>{throw new Error('Expired item must not spend another call');},runAt);
+  assert.equal(result.generated,0);assert.equal(result.pending,0);
+  assert.equal((f.store.db.prepare('SELECT COUNT(*) n FROM feed_cache').get() as {n:number}).n,1);
+  assert.equal((f.store.db.prepare('SELECT COUNT(*) n FROM feed_summaries').get() as {n:number}).n,0);
+  await writeSite(f.config,f.store);assert.equal((f.store.db.prepare('SELECT COUNT(*) n FROM feed_publications').get() as {n:number}).n,0);
+ } finally {await f.cleanup();}
+});
+
+test('a later render cannot publish out-of-window cached summaries or private archives',async()=>{
+ const f=await fixture();try{
+  save(f.store,[item('private'),item('other','two')]);await summarize(f.config,f.store,{},generator,at);
+  const archived=item('archived');save(f.store,[archived]);
+  f.store.db.prepare('INSERT INTO feed_archives VALUES (?,?,?,?,?,?,?,?)').run('one/2026-10/09/item-30.md','one','archived','2026-10-09',30,JSON.stringify(archived),'Private archive','私有归档');
+  await summarize(f.config,f.store,{source:'one',since:'2026-10-10T00:00:00Z',until:'2026-10-11T00:00:00Z'},()=>{throw new Error('No candidates');},'2026-10-11T10:00:00Z');
+  await writeSite(f.config,f.store,undefined,true);
+  assert.deepEqual(acceptedItems(f.store).map(r=>r.item.id),['other']);assert.equal((f.store.db.prepare('SELECT COUNT(*) n FROM feed_publications').get() as {n:number}).n,1);
+  await assert.rejects(stat(join(f.config.feed.directory,'one/2026-10/09/item-30.md')),{code:'ENOENT'});
+  const reopened=new Store(f.config.storage.database);try{assert.deepEqual(acceptedItems(reopened).map(r=>r.item.id),['other']);assert.equal(await writeSite(f.config,reopened),false);}finally{reopened.close();}
+ }finally{await f.cleanup();}
+});
+
+test('generated article removal excludes both languages by identity and is idempotent',async()=>{
+ const f=await fixture();try{
+  save(f.store,[item('invalid'),item('keep')]);await summarize(f.config,f.store,{},generator,at);await writeSite(f.config,f.store);
+  const row=f.store.db.prepare("SELECT day,number FROM feed_item_paths WHERE id='invalid'").get() as {day:string;number:number};const path=itemPath('one',row.day,row.number);
+  await maintainArchive(f.config,f.store,'remove','_translations/zh-CN/'+path);await writeSite(f.config,f.store);
+  await assert.rejects(readFile(join(f.config.feed.directory,path)),/ENOENT/);await assert.rejects(readFile(join(f.config.feed.directory,'_translations/zh-CN',path)),/ENOENT/);
+  await maintainArchive(f.config,f.store,'remove',path);await writeSite(f.config,f.store,undefined,true);
+  assert.deepEqual(acceptedItems(f.store).map(r=>r.item.id),['keep']);
+  assert.equal((f.store.db.prepare('SELECT COUNT(*) n FROM feed_publications').get() as {n:number}).n,2);
+  assert.equal((f.store.db.prepare('SELECT COUNT(*) n FROM feed_summaries').get() as {n:number}).n,2);
+  await assert.rejects(maintainArchive(f.config,f.store,'remove','../outside.md'),/Invalid archive path/);
+ }finally{await f.cleanup();}
+});
+
+test('hidden topics preserve accepted labels but reject new assignments, synonyms and stale caches', async () => {
+ const f=await fixture();
+ try {
+  const original=item('hidden');save(f.store,[original]);await summarize(f.config,f.store,{},generator,at);
+  const revised={version:1 as const,topics:[{...topic,hidden:true},{...topic,id:'dev',name:{en:'Development','zh-CN':'开发'}}]};
+  await applyTopics(f.config.feed.topics,revised);
+  assert.equal((await summarize(f.config,f.store,{},()=>{throw new Error('Accepted history must remain');},at)).generated,0);
+  await writeSite(f.config,f.store);
+  assert.match(await readFile(join(f.config.feed.directory,itemPath('one','2026-10-09',1)),'utf8'),/topics\/coding/);
+  for(const locale of ['','_translations/zh-CN/']){
+   const manifest=JSON.parse(await readFile(join(f.config.feed.directory,locale+'_locale.yml'),'utf8'));
+   assert.deepEqual(manifest.hidden_tags,['topics/coding']);assert.ok(manifest.tag_labels['topics/coding']);
+  }
+  const input={contractVersion:2 as const,topics:revised,items:[original]};
+  const output={contractVersion:2,newTopics:[],items:[{source:'one',id:'hidden',topics:['coding'],en:{title:'Title',summary:'Facts'},'zh-CN':{title:'标题',summary:'事实'}}]};
+  assert.throws(()=>validateArtifact(output,input),/hidden/);
+  assert.throws(()=>validateArtifact({...output,newTopics:[{...topic,id:'other'}]},input),/Duplicate topic name/);
+  assert.throws(()=>validateArtifact({...output,newTopics:[{...topic,id:'other',name:{en:'Other','zh-CN':'其他'},hidden:true}]},input),/visible topics/);
+  const updated:Generator=async(...args)=>{const result=await generator(...args);result.output.items[0]!.topics=['dev'];return result;};
+  save(f.store,[{...original,title:'Changed'}]);await summarize(f.config,f.store,{},updated,at);
+  save(f.store,[original]);let calls=0;
+  const result=await summarize(f.config,f.store,{},async(...args)=>{calls++;return updated(...args);},at);
+  assert.equal(result.generated,1);assert.equal(calls,1);assert.deepEqual(acceptedItems(f.store)[0]!.copy.topics,['dev']);
+ } finally {await f.cleanup();}
+});
+
+test('recovered artifacts cannot restore hidden topic policy or publish hidden assignments', async () => {
+ const f=await fixture(),cancellation=new AbortController();
+ try {
+  save(f.store,[item('recover-hidden')]);
+  await assert.rejects(summarize(f.config,f.store,{signal:cancellation.signal},async(...args)=>{
+   const result=await generator(...args);await writeFile(join(args[3]!,'result.json'),JSON.stringify(result.output));
+   cancellation.abort(new Error('Interrupted'));return result;
+  },at),/Interrupted/);
+  await applyTopics(f.config.feed.topics,{version:1,topics:[{...topic,hidden:true},{...topic,id:'dev',name:{en:'Development','zh-CN':'开发'}}]});
+  let calls=0;
+  await summarize(f.config,f.store,{},async(...args)=>{calls++;const result=await generator(...args);result.output.items[0]!.topics=['dev'];return result;},at);
+  assert.equal(calls,1);assert.deepEqual(acceptedItems(f.store)[0]!.copy.topics,['dev']);
+  assert.equal((await loadTopics(f.config.feed.topics)).topics[0]!.hidden,true);
+  assert.equal((f.store.db.prepare("SELECT count(*) n FROM feed_batches WHERE state='interrupted'").get() as {n:number}).n,1);
+ } finally {await f.cleanup();}
+});
 test('invalid summary cutoffs fail before touching the queue or archive snapshot', async () => {
  const f=await fixture();try{
   f.config.sources[0]!.selection={method:'hn-engagement',dailyLimit:50,updateDays:7};
   await mkdir(f.config.feed.directory);await writeFile(join(f.config.feed.directory,'notes.md'),'Retained archive');
   const before=f.store.db.prepare('SELECT total_changes() n').get();
   for(const since of ['not-a-date','']) await assert.rejects(summarize(f.config,f.store,{since},generator,at),/Invalid --since/);
+  for(const options of [{until:at},{since:at,until:at},{since:at,until:'bad'},{since:at,observedDays:7},{since:at,until:'2026-10-10',observedDays:0},{since:at,until:'2026-10-10',observedDays:1.5}]) await assert.rejects(summarize(f.config,f.store,options,generator,at),/--until|--observed-days/);
   assert.deepEqual(f.store.db.prepare('SELECT total_changes() n').get(),before);
   assert.equal(f.store.meta('selection_archives'),undefined);
   assert.equal((f.store.db.prepare('SELECT count(*) n FROM feed_archive_files').get() as {n:number}).n,0);
@@ -169,10 +487,10 @@ test('native ID path safety and source-aware cache; metadata updates reuse copy,
 test('source navigation pages survive subsequent publication renders after archive import', async () => {
  const f=await fixture();
  try {
-  for (const id of ['podcast','github']) f.config.sources.push({...f.config.sources[0]!,id,name:id});
+  for (const id of ['podcast','github','arxiv']) f.config.sources.push({...f.config.sources[0]!,id,name:id,enabled:false});
   f.store.setMeta('selection_archives','1');
   await writeSite(f.config,f.store);
-  const paths=['podcast/index.md','_translations/zh-CN/podcast/index.md','github/index.md','_translations/zh-CN/github/index.md'];
+  const paths=['podcast/index.md','_translations/zh-CN/podcast/index.md','github/index.md','_translations/zh-CN/github/index.md','arxiv/index.md','_translations/zh-CN/arxiv/index.md'];
   const before=await Promise.all(paths.map(path=>readFile(join(f.config.feed.directory,path),'utf8')));
   assert.match(before[0]!,/"id":"podcasts","order":10/);
   assert.match(before[1]!,/title: "播客"/);
@@ -180,8 +498,10 @@ test('source navigation pages survive subsequent publication renders after archi
   assert.equal(locale.tag_labels['source/podcast'],'播客');
   assert.match(before[2]!,/"id":"github","order":12/);
   assert.match(before[3]!,/title: "GitHub"/);
-  for (const index of [0,2]) assert.match(before[index]!,/"layout":"archive"/);
-  for (const index of [1,3]) assert.doesNotMatch(before[index]!,/"layout":/);
+  assert.match(before[4]!,/"id":"arxiv","order":14/);
+  assert.match(before[5]!,/title: "arXiv"/);
+  for (const index of [0,2,4]) assert.match(before[index]!,/"layout":"archive"/);
+  for (const index of [1,3,5]) assert.doesNotMatch(before[index]!,/"layout":/);
   f.store.setMeta('content_version','2');
   await writeSite(f.config,f.store);
   assert.deepEqual(await Promise.all(paths.map(path=>readFile(join(f.config.feed.directory,path),'utf8'))),before);
@@ -338,12 +658,13 @@ test('pending batch selection uses an ordered index and preserves first-seen ord
  const f=await fixture();
  try {
   const prepare=f.store.db.prepare.bind(f.store.db);let queuedSQL='';
-  f.store.db.prepare=((sql:string)=>{if(sql.includes("ORDER BY json_extract(data,'$.firstSeen')"))queuedSQL=sql;return prepare(sql);}) as typeof f.store.db.prepare;
+  f.store.db.prepare=((sql:string)=>{if(sql.includes('INDEXED BY feed_jobs_pending_order'))queuedSQL=sql;return prepare(sql);}) as typeof f.store.db.prepare;
   const rows=Array.from({length:120},(_,i)=>item(String(119-i).padStart(3,'0'),'one',{observedAt:new Date(Date.parse(at)+(i%3)*1000).toISOString()}));
   save(f.store,rows);const order:string[]=[];
   await summarize(f.config,f.store,{},async(...args)=>{order.push(...args[1].items.map(item=>item.id));return generator(...args);},at);
   assert.deepEqual(order,rows.toSorted((a,b)=>a.observedAt.localeCompare(b.observedAt)||a.id.localeCompare(b.id)).map(item=>item.id));
-  const plan=prepare('EXPLAIN QUERY PLAN '+queuedSQL).all('one',at,'1970-01-01T00:00:00.000Z','[]',10) as {detail:string}[];
+  const parameters=itemWindowSql('item','firstSeen',resolveItemWindow({},'1970-01-01T00:00:00.000Z',at)).parameters;
+  const plan=prepare('EXPLAIN QUERY PLAN '+queuedSQL).all('one',at,...parameters,'[]') as {detail:string}[];
   assert.ok(plan.some(row=>row.detail.includes('feed_jobs_pending_order')),JSON.stringify(plan));
   assert.ok(!plan.some(row=>row.detail.includes('TEMP B-TREE')),JSON.stringify(plan));
  } finally {await f.cleanup();}
@@ -413,9 +734,22 @@ test('legacy stale date indexes reconcile once without changing first observatio
   } finally {reopened.close();}
  } finally {await f.cleanup();}
 });
-test('content journal recovers the staged tree between its two renames',async()=>{
- const f=await fixture();try{const staging=join(f.root,'.content-stage-test'),previous=join(f.root,'content.previous-test');await mkdir(staging);await writeFile(join(staging,'index.md'),'new');await mkdir(previous);await writeFile(join(previous,'index.md'),'old');await writeFile(join(f.root,'content-journal.json'),JSON.stringify({destination:f.config.feed.directory,staging,previous}));await recoverContent(f.config);assert.equal(await readFile(join(f.config.feed.directory,'index.md'),'utf8'),'new');await assert.rejects(readFile(join(f.root,'content-journal.json')));
- }finally{await f.cleanup();}
+for(const legacy of [false,true]) test(legacy?'legacy content journals recover every swap phase without a publication field':'content journal records publications only when the new tree is installed',async()=>{
+ for(const phase of ['prepared','between-renames','installed','rollback']) {
+  const f=await fixture();try{
+   const staging=join(f.root,'.content-stage-test'),previous=join(f.root,'content.previous-test');
+   if(phase==='prepared'||phase==='installed') {await mkdir(f.config.feed.directory,{recursive:true});await writeFile(join(f.config.feed.directory,'index.md'),phase==='installed'?'new':'old');}
+   if(phase==='prepared'||phase==='between-renames') {await mkdir(staging);await writeFile(join(staging,'index.md'),'new');}
+   if(phase!=='prepared') {await mkdir(previous);await writeFile(join(previous,'index.md'),'old');}
+   await writeFile(join(f.root,'content-journal.json'),JSON.stringify({destination:f.config.feed.directory,staging,previous,...(legacy?{}:{publications:[['one','a']]})}));
+   await recoverContent(f.config,f.store);
+   const installed=phase==='between-renames'||phase==='installed';
+   assert.equal(await readFile(join(f.config.feed.directory,'index.md'),'utf8'),installed?'new':'old');
+   assert.equal(!!f.store.db.prepare("SELECT 1 FROM feed_publications WHERE source='one' AND id='a'").get(),!legacy&&installed);
+   await assert.rejects(readFile(join(f.root,'content-journal.json')));
+   await recoverContent(f.config,f.store);
+  }finally{await f.cleanup();}
+ }
 });
 test('three-way topic merge admits independent additions and rejects same-ID conflicts and unmanaged publication paths',()=>{
  const b=registry,l={version:1 as const,topics:[topic,{...topic,id:'models',name:{en:'Models','zh-CN':'模型'}}]},r={version:1 as const,topics:[topic,{...topic,id:'research',name:{en:'Research','zh-CN':'研究'}}]};assert.equal(mergeTopics(b,l,r).topics.length,3);

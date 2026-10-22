@@ -53,10 +53,11 @@ export class Store {
     if (version < 3) initializeFeedSchema(this.db, iso(DateTime.now().setZone('Asia/Shanghai').startOf('day').toUTC()), false);
     // Bump this revision when the additive schema below changes. Current stores
     // need only a read here, including when another connection holds a write lock.
-    if (this.meta('runtime_schema_revision') !== '3' || this.meta('items_date_revision') !== '1') this.db.transaction(() => {
+    if (this.meta('runtime_schema_revision') !== '6' || this.meta('items_date_revision') !== '1') this.db.transaction(() => {
       this.db.exec('CREATE INDEX IF NOT EXISTS agent_calls_at ON agent_calls(at); CREATE INDEX IF NOT EXISTS items_first_seen ON items(source,first_seen,id);');
       this.db.exec('CREATE INDEX IF NOT EXISTS items_selection_published ON items(source,julianday(published_at),id); CREATE INDEX IF NOT EXISTS items_selection_seen ON items(source,julianday(first_seen),id);');
       this.db.exec("CREATE INDEX IF NOT EXISTS feed_jobs_pending_order ON feed_jobs(source,json_extract(data,'$.firstSeen'),id,next_at) WHERE state='pending' AND attempts<5;");
+      this.db.exec("CREATE INDEX IF NOT EXISTS feed_jobs_cached_order ON feed_jobs(source,json_extract(data,'$.firstSeen'),id) WHERE state='cached';");
       this.db.exec('CREATE INDEX IF NOT EXISTS raw_responses_fingerprint ON raw_responses(source,stream,channel,url,hash,status);');
       this.db.exec('CREATE TABLE IF NOT EXISTS feed_item_paths(source TEXT NOT NULL,id TEXT NOT NULL,day TEXT NOT NULL,number INTEGER NOT NULL CHECK(number>0),PRIMARY KEY(source,id,day),UNIQUE(source,day,number));');
       this.db.exec(`
@@ -65,6 +66,9 @@ export class Store {
         CREATE TABLE IF NOT EXISTS feed_selection(source TEXT NOT NULL,id TEXT NOT NULL,day TEXT NOT NULL,selected INTEGER NOT NULL CHECK(selected IN (0,1)),score REAL,method TEXT NOT NULL,scored_at TEXT,PRIMARY KEY(source,id));
         CREATE INDEX IF NOT EXISTS feed_selection_day ON feed_selection(source,day,selected);
         CREATE TABLE IF NOT EXISTS feed_selection_days(source TEXT NOT NULL,day TEXT NOT NULL,policy TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(source,day));
+        CREATE TABLE IF NOT EXISTS feed_publications(source TEXT NOT NULL,id TEXT NOT NULL,PRIMARY KEY(source,id));
+        CREATE TABLE IF NOT EXISTS feed_cache_topics(key TEXT PRIMARY KEY,topics TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS feed_discovery_skips(source TEXT NOT NULL,stream TEXT NOT NULL,url TEXT NOT NULL,reason TEXT NOT NULL,checked_at TEXT NOT NULL DEFAULT '',PRIMARY KEY(source,stream,url));
         CREATE TABLE IF NOT EXISTS feed_archives(path TEXT PRIMARY KEY,source TEXT NOT NULL,id TEXT,day TEXT NOT NULL,number INTEGER NOT NULL,item TEXT,en TEXT NOT NULL,zh TEXT NOT NULL);
         CREATE UNIQUE INDEX IF NOT EXISTS feed_archives_identity ON feed_archives(source,id) WHERE id IS NOT NULL;
         CREATE TABLE IF NOT EXISTS feed_archive_files(path TEXT PRIMARY KEY,body BLOB NOT NULL);
@@ -129,7 +133,18 @@ export class Store {
         this.db.exec("UPDATE items SET published_at=json_extract(data,'$.publishedAt') WHERE typeof(json_extract(data,'$.publishedAt'))='text' AND published_at IS NOT json_extract(data,'$.publishedAt');");
         this.setMeta('items_date_revision', '1');
       }
-      this.setMeta('runtime_schema_revision', '3');
+      const legacyScope = this.meta('new_publication_scope');
+      if (legacyScope && !this.meta('publication_windows')) {
+        const { sources, window } = JSON.parse(legacyScope) as { sources: string[]; window: unknown };
+        this.setMeta('publication_windows', JSON.stringify(Object.fromEntries(sources.map(source => [source, window]))));
+      }
+      this.db.exec("DELETE FROM feed_meta WHERE key='new_publication_scope'; DELETE FROM feed_publications WHERE id LIKE 'archive:%';");
+      if (!(this.db.prepare('PRAGMA table_info(feed_discovery_skips)').all() as {name:string}[]).some(column => column.name === 'checked_at')) {
+        // Older decisions have no check time, so they are eligible for a bounded
+        // recheck rather than silently becoming permanent exclusions.
+        this.db.exec("ALTER TABLE feed_discovery_skips ADD COLUMN checked_at TEXT NOT NULL DEFAULT '';");
+      }
+      this.setMeta('runtime_schema_revision', '6');
     }).immediate();
   }
   acquireLease(owner: string): void {
@@ -177,13 +192,16 @@ export class Store {
       source, stream, channel, raw.fetchedAt, raw.url, raw.status, headers, raw.body, digest,
       source, stream, channel, raw.url, digest, raw.status, headers);
   }
-  saveCollection(source: string, stream: string, channel: string, result: Collection, nextAttempt: string, attemptedAt = result.coverage.to): void {
+  saveCollection(source: string, stream: string, channel: string, result: Collection, nextAttempt: string, attemptedAt = result.coverage.to): { newItems: number } {
     const upsertItem = this.statement('INSERT INTO items VALUES (?,?,?,?,?,?,?) ON CONFLICT(source,id) DO UPDATE SET published_at=excluded.published_at,last_seen=excluded.last_seen,data=excluded.data,content_hash=excluded.content_hash');
     const insertVersion = this.statement('INSERT OR IGNORE INTO item_versions VALUES (?,?,?,?,?)');
     const insertObservation = this.statement('INSERT INTO observations(source,item_id,stream,channel,observed_at,data) VALUES (?,?,?,?,?,?)');
-    this.db.transaction(() => {
+    return this.db.transaction(() => {
+      let newItems = 0;
+      const known = this.statement('SELECT 1 FROM items WHERE source=? AND id=?');
       for (const raw of result.raw) this.saveRaw(source, stream, channel, raw);
       for (const item of result.items) {
+        if (!known.get(source, item.id)) newItems++;
         const ranking = rankingObservation(item);
         const data = JSON.stringify(ranking ? { ...item, ranking } : item);
         const contentHash = hash({ title: item.title, text: item.text, url: item.url, author: item.author, ...(item.media?.length ? { media: item.media } : {}) });
@@ -199,6 +217,7 @@ export class Store {
         successful ? result.cursor ?? previous?.cursor ?? null : previous?.cursor ?? null,
         successful ? result.coverage.to : previous?.last_success ?? null, attemptedAt, nextAttempt, result.coverage.status, JSON.stringify(result.coverage.notes));
       if (result.coverage.status !== 'complete') this.statement('INSERT INTO gaps(source,stream,channel,at,details) VALUES (?,?,?,?,?)').run(source, stream, channel, attemptedAt, JSON.stringify(result.coverage));
+      return { newItems };
     })();
   }
   saveRanking(source: string, id: string, ranking: RankingObservation): boolean {

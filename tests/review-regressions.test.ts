@@ -41,7 +41,7 @@ test('additive schema upgrades run atomically and failed constructors close thei
   old.close();
   try {
     const upgraded = new Store(path);
-    assert.equal(upgraded.meta('runtime_schema_revision'), '3');
+    assert.equal(upgraded.meta('runtime_schema_revision'), '6');
     assert.deepEqual(upgraded.db.prepare('SELECT * FROM feed_relation_pairs').all(), []);
     upgraded.db.exec("DELETE FROM feed_meta WHERE key='runtime_schema_revision';"); upgraded.close();
     t.mock.method(Store.prototype, 'setMeta', () => { throw new Error('Injected schema failure'); });
@@ -49,6 +49,20 @@ test('additive schema upgrades run atomically and failed constructors close thei
     // Windows refuses this removal if the failed constructor leaked its handle.
     await rm(root, { recursive: true, force: true });
   } finally { t.mock.restoreAll(); await rm(root, { recursive: true, force: true }); }
+});
+
+test('revision five discovery decisions become due for recheck without losing their reason',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'feedgarden-discovery-upgrade-')),path=join(root,'data.sqlite');
+ const seed=new Store(path);
+ seed.db.exec("DROP TABLE feed_discovery_skips; CREATE TABLE feed_discovery_skips(source TEXT NOT NULL,stream TEXT NOT NULL,url TEXT NOT NULL,reason TEXT NOT NULL,PRIMARY KEY(source,stream,url)); INSERT INTO feed_discovery_skips VALUES ('anthropic','news','https://www.anthropic.com/news/changed','non-article'); DROP INDEX feed_jobs_cached_order;");
+ seed.setMeta('runtime_schema_revision','5');seed.close();
+ try{
+  const store=new Store(path);try{
+   assert.equal(store.meta('runtime_schema_revision'),'6');
+   assert.deepEqual(store.db.prepare('SELECT * FROM feed_discovery_skips').get(),{source:'anthropic',stream:'news',url:'https://www.anthropic.com/news/changed',reason:'non-article',checked_at:''});
+   assert.ok(store.db.prepare("SELECT 1 FROM sqlite_master WHERE name='feed_jobs_cached_order'").get());
+  }finally{store.close();}
+ }finally{await rm(root,{recursive:true,force:true});}
 });
 
 test('simultaneous expired-lease contenders yield one owner and an explicit lease rejection', { timeout: 20_000 }, async () => {

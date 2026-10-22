@@ -33,11 +33,13 @@ media is correct when the source supplies no relevant candidates. The same selec
 media applies to both languages, and its source caption is retained by the renderer.
 
 Read the entire input.topics registry before classifying. Assign 1–3 active stable topic
-IDs per item. Prefer existing topics and their aliases, including deprecated topics'
-active replacements. Avoid source names as topics and avoid one-off topics.
+IDs per item, excluding topics marked hidden or deprecated. Hidden defaults to false.
+Read hidden topics too: their IDs, names and aliases remain reserved, and must not
+be recreated as new topics or synonyms. Prefer existing visible topics and their aliases,
+including deprecated topics' visible active replacements. Avoid source names as topics and avoid one-off topics.
 Maintain this vocabulary when a distinct reusable topic is missing: append it to
 newTopics with id (lowercase ASCII slug), name {en, "zh-CN"}, description, aliases [],
-and deprecated false. Do not edit, rename, remove or deprecate existing topics.
+and deprecated false (hidden must be absent or false). Do not edit, rename, remove or deprecate existing topics.
 Compare normalized names and aliases to avoid duplicates. Every assigned ID must exist
 in the registry or newTopics. Do not create an alias that belongs to another topic.
 The same topics apply to both languages. Finish only after feedgarden_result validates

@@ -48,7 +48,7 @@ test('collection persists the bounded reset and resumes when the saved cooldown 
   try {
     await collect(config, store, undefined, true, registry);
     assert.equal(store.channel('one', 'main', 'feed')?.next_attempt, new Date(now + 60_000).toISOString());
-    assert.deepEqual(await collect(config, store, undefined, true, registry), [{ source: 'one', stream: 'main', status: 'deferred' }]);
+    assert.deepEqual(await collect(config, store, undefined, true, registry), [{ source: 'one', stream: 'main', status: 'deferred', reason: 'Channels are cooling down' }]);
     assert.equal(calls, 1);
     t.mock.timers.tick(61_000);
     assert.equal((await collect(config, store, undefined, true, registry))[0]?.status, 'complete');

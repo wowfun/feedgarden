@@ -36,8 +36,8 @@ test('channel failure retains its cursor, stores raw evidence, and uses the back
 test('collection persistence is atomic and versions exclude metric-only updates', () => {
   const store = new Store(':memory:');
   try {
-    store.saveCollection('hackernews', 'main', 'primary', collection([item('a')]), '');
-    store.saveCollection('hackernews', 'main', 'primary', collection([item('a', { metrics: { score: 99 } })]), '');
+    assert.equal(store.saveCollection('hackernews', 'main', 'primary', collection([item('a'),item('a')]), '').newItems,1);
+    assert.equal(store.saveCollection('hackernews', 'other', 'backup', collection([item('a', { metrics: { score: 99 } })]), '').newItems,0);
     assert.equal(store.items('hackernews').length, 1);
     assert.equal((store.db.prepare('SELECT count(*) count FROM item_versions').get() as { count: number }).count, 1);
     assert.throws(() => store.saveCollection('hackernews', 'main', 'primary', collection([item('b'), item('bad', { id: undefined as unknown as string })], 'bad'), ''));
@@ -180,7 +180,7 @@ test('Claude article discovery recognizes current resources paths while keeping 
   const now = '2026-10-09T14:00:00Z';
   http.page = async url => {
     requests.push(url);
-    return { url, status: 200, headers: {}, fetchedAt: now, body: url.endsWith('/blog') ? '<main><a href="/resources/articles/current">Current</a><a href="https://evil.test/resources/articles/foreign">Other</a><a href="/resources/guides/guide">Guide</a></main>' : '<main><h1>Current article</h1><time datetime="2026-10-09T00:00:00Z">October 9</time><article>Supplied evidence</article></main>' };
+    return { url, status: 200, headers: {}, fetchedAt: now, body: url.endsWith('/blog') ? '<main><a href="/resources/articles/current">Current</a><a href="https://evil.test/resources/articles/foreign">Other</a><a href="/resources/guides/guide">Guide</a></main>' : '<meta property="og:type" content="article"><main><h1>Current article</h1><time datetime="2026-10-09T00:00:00Z">October 9</time><article><p>Supplied evidence</p></article></main>' };
   };
   try {
     const result = await adapters['anthropic-html']({ source, stream, channel, store, http, now, since: '2026-10-08T16:00:00Z' });
@@ -241,7 +241,7 @@ test('official discovery budgets count unseen identities and explicitly identify
   const urls=Array.from({length:61},(_,i)=>'https://www.anthropic.com/news/item-'+i), requests:string[]=[];
   try {
     for(const url of urls.slice(0,60))store.saveCollection(source.id,stream.id,channel.id,{raw:[],coverage:{status:'complete',to:now,notes:[]},items:[item(url,{source:source.id,url})]},'');
-    http.page=async url=>{requests.push(url);return {url,status:200,headers:{},fetchedAt:now,body:url===channel.url?urls.map(url=>'<a href="'+url+'">Article</a>').join(''):'<article><h1>Undated article</h1><p>Source facts.</p></article>'};};
+    http.page=async url=>{requests.push(url);return {url,status:200,headers:{},fetchedAt:now,body:url===channel.url?urls.map(url=>'<a href="'+url+'">Article</a>').join(''):'<meta property="og:type" content="article"><article><h1>Undated article</h1><p>Source facts.</p></article>'};};
     const result=await adapters['anthropic-html']({source,stream,channel,store,http,now,since:now});
     assert.deepEqual(requests,[channel.url,urls[60]]);
     assert.equal(result.items[0]?.basis,'observed');

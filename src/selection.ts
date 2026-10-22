@@ -123,7 +123,7 @@ export function reconcileSelection(config: Config, store: Store, options: { sour
       const retained = initialized ? previous.map(row => row.id) : group.filter(row => row.selected !== false && row.existing).map(row => row.item.id);
       const report: SelectionReport = { source: source.id, day, candidates: group.length, unknown: group.filter(row => !row.ranking && !row.inactive).length, method: source.selection.method, status: 'selected', kept: [], notes: [] };
       const inactive = group.filter(row => row.inactive);
-      if (inactive.length) report.notes.push(`${inactive.length} HN stories marked dead/deleted by the official API are excluded; private archive copies remain stored.`);
+      if (inactive.length) report.notes.push(`${inactive.length} HN stories marked dead/deleted by the official API are excluded from candidate processing; published articles are retained.`);
       if (!options.history && (day < earliest || day > today)) {
         if (initialized && initialized.policy !== policy) report.notes.push('This frozen day retains the selection policy under which it was last ranked.');
         report.status = 'frozen'; report.kept = retained; reports.push(report); continue;

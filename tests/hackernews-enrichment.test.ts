@@ -219,10 +219,11 @@ test('HN output budgeting preserves FIFO items and resumes quota-deferred work w
       return { output: { contractVersion: 2, newTopics: [], items: input.items.map(row => ({ source: row.source, id: row.id, topics: ['coding'], en: { title: row.title, summary: row.text }, 'zh-CN': { title: '有界系统', summary: '文章介绍有界系统。' }, discussion: { commentIds: [row.discussion!.comments[0]!.id], en: row.discussion!.comments[0]!.text, 'zh-CN': '一位评论者讨论实践限制。' } })) }, directory: workspace!, events: [], usage: [] };
     };
     const prepare = async (row: Parameters<typeof enrichItem>[0]) => row;
-    assert.deepEqual(await summarize(config, store, {}, generator, item.observedAt, prepare), { generated: 4, pending: 2, failed: 0, deferred: true, sourceErrors: [] });
+    const window = { since: '1970-01-01T00:00:00.000Z', until: undefined, observedSince: '1970-01-01T00:00:00.000Z', observedUntil: undefined, observedInclusive: false };
+    assert.deepEqual(await summarize(config, store, {}, generator, item.observedAt, prepare), { generated: 4, pending: 2, failed: 0, deferred: true, sourceErrors: [], jobErrors: [], window, eligibleCandidates: null });
     const accepted = acceptedItems(store);
     config.agent.maxDailyCalls = 3;
-    assert.deepEqual(await summarize(config, store, {}, generator, item.observedAt, prepare), { generated: 2, pending: 0, failed: 0, deferred: false, sourceErrors: [] });
+    assert.deepEqual(await summarize(config, store, {}, generator, item.observedAt, prepare), { generated: 2, pending: 0, failed: 0, deferred: false, sourceErrors: [], jobErrors: [], window, eligibleCandidates: null });
     assert.deepEqual(batches, [['200', '201'], ['202', '203'], ['204', '205']]);
     assert.deepEqual(acceptedItems(store).slice(0, 4), accepted);
   } finally { store.close(); await rm(directory, { recursive: true, force: true }); }

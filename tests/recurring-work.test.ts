@@ -61,7 +61,7 @@ test('a stream with every enabled channel cooling down is deferred, without a fa
     f.store.saveCollection('one', 'main', 'feed', { items: [], raw: [], coverage: { status: 'failed', to: at, notes: ['rate limited'] } }, '9999-01-01T00:00:00Z', at);
     f.store.saveCollection('one', 'main', 'disabled', { items: [], raw: [], coverage: { status: 'complete', to: at, notes: [] } }, '', '2026-10-10T01:00:00Z');
     const result = await collect(f.config, f.store, undefined, true, { ...adapters, feed: async () => { throw new Error('cooldown must not make requests'); } });
-    assert.deepEqual(result, [{ source: 'one', stream: 'main', status: 'deferred' }]);
+    assert.deepEqual(result, [{ source: 'one', stream: 'main', status: 'deferred', reason: 'Channels are cooling down' }]);
   } finally { await f.cleanup(); }
 });
 test('a later failed fallback cannot postpone a due primary, while a successful round sets the stream cadence', async () => {
@@ -73,7 +73,7 @@ test('a later failed fallback cannot postpone a due primary, while a successful 
   const channels:string[]=[];
   const result=await collect(f.config,f.store,undefined,true,{...adapters,feed:async c=>{channels.push(c.channel.id);return {items:[],raw:[],coverage:{status:'complete',to:c.now,notes:[]}};}});
   assert.deepEqual(channels,['feed']);assert.equal(result[0]?.status,'complete');
-  assert.deepEqual(await collect(f.config,f.store,undefined,true,{...adapters,feed:async()=>{throw new Error('Successful stream should wait');}}),[]);
+  assert.deepEqual(await collect(f.config,f.store,undefined,true,{...adapters,feed:async()=>{throw new Error('Successful stream should wait');}}),[{source:'one',stream:'main',status:'deferred',reason:'Collection interval has not elapsed'}]);
  } finally {await f.cleanup();}
 });
 test('sources sharing an origin reuse robots policy instead of resetting it between sources', async () => {

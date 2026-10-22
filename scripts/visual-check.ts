@@ -43,6 +43,11 @@ try{
   const size=viewport.width>600?'desktop':'mobile',context=await browser.newContext({viewport}),page=await context.newPage(),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   const prefix='/feedgarden/'+(locale==='en'?'':locale+'/');assert.equal((await page.goto(origin+prefix))?.status(),200);await ready(page);
   assert.equal(await page.locator('html').getAttribute('lang'),locale);assert.equal(await page.locator('h1').count(),1);
+  const backToTop=page.locator('[data-back-to-top]'),backToTopLabel=locale==='en'?'Back to top':'回到顶部';
+  await expect(backToTop).toHaveCount(1);await expect(backToTop).toHaveAttribute('aria-label',backToTopLabel);await expect(backToTop).toHaveAttribute('title',backToTopLabel);await expect(backToTop).toBeHidden();
+  if(await page.evaluate(()=>document.documentElement.scrollHeight>innerHeight*2)){
+   const url=page.url();await page.keyboard.press('Control+End');await expect(backToTop).toBeVisible();await expect(backToTop).toHaveAccessibleName(backToTopLabel);await backToTop.press('Enter');await expect(backToTop).toBeHidden();await expect(page.locator('#main-content')).toBeFocused();assert.equal(page.url(),url);
+  }
   if(!fixture){
    for(const [key,facet] of [['include_tabs','source'],['show_hidden','topic']] as const){
     const toggle=page.locator(`[data-archive-visibility="${key}"][data-archive-visibility-facet="${facet}"]`).first();

@@ -4,6 +4,7 @@
   "dir": "ltr",
   "tag_labels": { "source/podcast": "播客" },
   "messages": {
+    "back_to_top": "回到顶部",
     "show_hidden_topics": "显示隐藏主题",
     "hide_hidden_topics": "收起隐藏主题",
     "include_tab_sources": "显示独立栏目",

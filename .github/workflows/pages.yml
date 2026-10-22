@@ -12,41 +12,67 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      pages_ready: ${{ steps.pages.outcome == 'success' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
+      - name: Classify changes
+        id: changes
+        run: node scripts/ci-changes.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        if: steps.changes.outputs.mode != 'docs'
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run typecheck && npm test && npm run build
+        if: steps.changes.outputs.mode != 'docs'
+      - name: Compile and typecheck
+        if: steps.changes.outputs.mode == 'full'
+        run: npm run build
+      - name: Run tests
+        if: steps.changes.outputs.mode == 'full'
+        run: npm test
       - name: Install the OpenCode acceptance baseline
+        if: steps.changes.outputs.mode == 'full'
         run: npm install --prefix "$RUNNER_TEMP/feedgarden-opencode" --no-save --ignore-scripts @opencode/cli-linux-x64@2.0.31
       - name: Verify ACP against a local simulated model
+        if: steps.changes.outputs.mode == 'full'
         run: npm run verify:opencode -- --command "$RUNNER_TEMP/feedgarden-opencode/node_modules/@opencode/cli-linux-x64/bin/opencode"
       - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8
+        if: steps.changes.outputs.mode != 'docs'
         with:
           ruby-version: '4.0.6'
           bundler-cache: true
       - run: npm run site:build
-      - run: npx playwright install --with-deps chromium
+        if: steps.changes.outputs.mode != 'docs'
+      - run: npx playwright install --with-deps --only-shell chromium
+        if: steps.changes.outputs.mode != 'docs'
       - run: npm run test:visual
+        if: steps.changes.outputs.mode != 'docs'
       - run: npm run verify:scale
+        if: steps.changes.outputs.mode == 'full'
       - run: FEEDGARDEN_VISUAL_ROOT=.local/validation/fixture/.jekyll-obsidian-cache/site FEEDGARDEN_VISUAL_FIXTURE=1 npm run test:visual
+        if: steps.changes.outputs.mode == 'full'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always()
+        if: always() && steps.changes.outputs.mode != 'docs'
         with:
           name: visual-validation
           path: .local/validation/visual
           retention-days: 7
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
-        if: github.event_name != 'pull_request'
+        id: pages
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && steps.changes.outputs.mode != 'docs'
         with:
           path: .jekyll-obsidian-cache/site
   deploy:
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && needs.build.result == 'success' && needs.build.outputs.pages_ready == 'true'
     needs: build
     runs-on: ubuntu-latest
     permissions:

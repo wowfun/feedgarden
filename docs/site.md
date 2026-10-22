@@ -16,7 +16,7 @@ The header provides dedicated Podcasts, GitHub and arXiv collection tabs between
 
 Home enables `website.home.hide_tab_sources: true`: sources belonging to actual archive tabs (Podcasts, GitHub and arXiv) and their items are excluded initially. “Include tab sources” below Sources reveals both. “Show hidden topics” below Topics reveals configured hidden choices without changing the results. Article labels, search, collection tabs and Favorites retain all history. A selected hidden topic stays visible so it can be cleared.
 
-`include_tabs=1` and `show_hidden_topics=1` preserve disclosure state through links, pagination, reloads, language changes and browser history. Old links explicitly selecting a tab source automatically include it. Collapsing sources clears selected tab sources and resets the page, retaining other filters. Export inherits the page's state but keeps subsequent changes local to its dialog. Without JavaScript the default first page and counts remain correct, and tab/article links remain usable.
+`include_tabs=1` and `show_hidden=topic` preserve disclosure state through links, pagination, reloads, language changes and browser history. Old links explicitly selecting a tab source automatically include it. Collapsing sources clears selected tab sources and resets the page, retaining other filters. Export inherits the page's state but keeps subsequent changes local to its dialog. Without JavaScript the default first page and counts remain correct, and tab/article links remain usable.
 
 These settings are supported by the pinned `jekyll-obsidian-site` 0.3.1 release. Both themes also provide a Back to top button after scrolling beyond one viewport. [简体中文说明](site.zh-CN.md)
 

@@ -18,7 +18,7 @@ Home enables `website.home.hide_tab_sources: true`: sources belonging to actual 
 
 `include_tabs=1` and `show_hidden_topics=1` preserve disclosure state through links, pagination, reloads, language changes and browser history. Old links explicitly selecting a tab source automatically include it. Collapsing sources clears selected tab sources and resets the page, retaining other filters. Export inherits the page's state but keeps subsequent changes local to its dialog. Without JavaScript the default first page and counts remain correct, and tab/article links remain usable.
 
-These settings require the matching upstream theme build; a local candidate gem can verify them before upgrading the published dependency. [简体中文说明](site.zh-CN.md)
+These settings are supported by the pinned `jekyll-obsidian-site` 0.3.1 release. Both themes also provide a Back to top button after scrolling beyond one viewport. [简体中文说明](site.zh-CN.md)
 
 The feed shows 50 cards per page. Sources and topics support multiple selection: OR within a group, AND across groups and chronology. Query parameters preserve selection, page, language switching and browser history. Unknown IDs produce an empty result. Facet and timeline counts describe the current homepage source scope; matching counts are shown separately. The theme writes a small generation manifest, lazy per-facet bitmaps and 50-card chunks. A Worker evaluates queries, network concurrency is capped at four, and resource caching at 20 entries. Failed loads retain the last successful page and offer retry. Search includes the latest 3,000 item titles/tags/summary excerpts; Atom includes 100 items. Full static builds still render every item page.
 

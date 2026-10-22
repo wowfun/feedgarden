@@ -8,6 +8,6 @@ Feedgarden 开启 `website.home.hide_tab_sources: true`，首页默认排除已�
 
 首页的“全部”、来源及主题计数、日期导航、分页、导出均使用当前来源范围。导出弹窗打开时继承页面状态，弹窗内调整不改变页面 URL。无 JavaScript 时，默认首页内容与计数仍正确，栏目及文章链接可正常访问。
 
-这些设置需要对应的上游主题构建。本地候选 gem 可用于升级正式依赖前的验收。
+这些设置由已锁定的 `jekyll-obsidian-site` 0.3.1 正式版本支持。两套主题还会在滚动超过一屏后显示“回到顶部”按钮。
 
 [English](site.md) · [主题治理](topics.zh-CN.md)

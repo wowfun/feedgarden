@@ -30,7 +30,7 @@ const evidencePath = join(validationDirectory, 'live-agent.json');
 try {
   store.setMeta('cutoff', '1970-01-01T00:00:00.000Z');
   const collection = await collect(config, store);
-  assert.ok(collection.some(row => 'items' in row && Number(row.items) > 0));
+  assert.ok(collection.some(row => 'fetchedItems' in row && (row.fetchedItems ?? 0) > 0));
 
   // Keep a bounded sample of actual collected items for the paid live run.
   const all = store.items('openai');

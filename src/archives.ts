@@ -11,6 +11,7 @@ import type { Item } from './types.js';
 import { hash, safeUrl, errorText, nowIso } from './util.js';
 import { selectionDay } from './selection.js';
 import { collectionTabs } from './collections.js';
+import { initializePublications, recordPublications } from './publications.js';
 
 export interface ArchivePost { path: string; source: string; id: string; day: string; number: number; item: Item; firstSeen: string; en: string; zh: string }
 export interface ArchiveIssue { path: string; source: string; day: string; message: string }
@@ -139,6 +140,7 @@ export async function archiveManifestSignature(config: Config): Promise<string> 
   return hash({ topics, manifests: [en, zh], sources: config.sources.map(({ id, name, timezone }) => ({ id, name, timezone })) });
 }
 export async function importArchives(config: Config, store: Store, signal?: AbortSignal): Promise<string | undefined> {
+  await initializePublications(config, store, signal);
   if (!config.sources.some(source => source.selection)) return;
   // The database owns the snapshot after its first import. A new output path
   // must not re-import a rendered subset or replace private original bytes.
@@ -182,6 +184,7 @@ export async function importArchives(config: Config, store: Store, signal?: Abor
           insertItem.run(post.source, post.id, post.item.publishedAt, post.firstSeen, post.firstSeen, JSON.stringify(post.item), hash({ title: post.item.title, url: post.item.url, text: '' }));
         }
         store.db.exec('INSERT INTO feed_archive_files SELECT * FROM archive_import.files');
+        recordPublications(store, scan.posts.map(post => [post.source, post.id]));
         for (const path of scan.files) {
           const match = path.match(/^([a-z0-9][a-z0-9_-]*)\/(\d{4}-\d{2})\/(\d{2})\/item-(\d+)\.md$/);
           // Reserving existing numbers protects other sources when their historical
@@ -206,13 +209,25 @@ export async function maintainArchive(config: Config, store: Store, action: 'upd
   const root = resolve(config.feed.directory), file = resolve(root, requestedPath), rel = relative(root, file);
   if (!requestedPath || /^[a-z]:/i.test(requestedPath) || requestedPath.includes('\\') || isAbsolute(requestedPath) || isAbsolute(rel) || rel === '..' || rel.startsWith('..' + sep) || !rel) throw new Error('Invalid archive path: ' + requestedPath);
   let path = rel.split(sep).join('/');
-  const paired = /^(?:_translations\/zh-CN\/)?((?:reddit|hackernews)\/\d{4}-\d{2}\/\d{2}\/item-\d+\.md)$/.exec(path);
-  if (paired) path = paired[1]!;
+  const platformPair = /^(?:_translations\/zh-CN\/)?((?:reddit|hackernews)\/\d{4}-\d{2}\/\d{2}\/item-\d+\.md)$/.exec(path);
+  let paired = !!platformPair;
+  if (platformPair) path = platformPair[1]!;
   const collection = collectionTabs(config.sources).some(tab => path === tab.source + '/index.md' || path === '_translations/zh-CN/' + tab.source + '/index.md');
   if (['index.md', '_locale.yml', '_recommendations.json', '_translations/zh-CN/index.md', '_translations/zh-CN/_locale.yml'].includes(path)
     || collection) throw new Error('This file is generated from configuration: ' + path);
   await importArchives(config, store, signal);
-  const current = store.db.prepare('SELECT source,id,day,number FROM feed_archives WHERE path=?').get(path) as { source: string; id: string; day: string; number: number } | undefined;
+  const generatedPath = path.replace(/^_translations\/zh-CN\//, '');
+  const route = /^([a-z0-9][a-z0-9_-]*)\/(\d{4}-\d{2})\/(\d{2})\/item-([1-9]\d*)\.md$/.exec(generatedPath);
+  type Identity = { source: string; id: string; day: string; number: number };
+  const generated = route ? store.db.prepare(`SELECT p.* FROM feed_item_paths p WHERE p.source=? AND p.day=? AND p.number=? AND EXISTS(SELECT 1 FROM feed_summaries f WHERE f.source=p.source AND f.id=p.id)`).get(route[1], route[2] + '-' + route[3], Number(route[4])) as Identity | undefined : undefined;
+  if (generated) {
+    if (action === 'update') throw new Error('This archive has a generated summary; use summarize --refresh: ' + generatedPath);
+    path = generatedPath; paired = true;
+  }
+  // Non-platform historical item routes are opaque, but still form bilingual
+  // pairs. Remove both copies; updates retain their opaque-file behavior.
+  if (action === 'remove' && route) { path = generatedPath; paired = true; }
+  const current = generated ?? store.db.prepare('SELECT source,id,day,number FROM feed_archives WHERE path=?').get(path) as Identity | undefined;
   const paths = paired ? [path, '_translations/zh-CN/' + path] : [path];
   const opaque = store.db.prepare('SELECT 1 FROM feed_archive_files WHERE path=?');
   if (!current && !paths.some(path => opaque.get(path))) throw new Error('Unknown private archive path: ' + path);
@@ -221,7 +236,6 @@ export async function maintainArchive(config: Config, store: Store, action: 'upd
     const post = scan?.post(path);
     if (action === 'update' && paired && !post) throw new Error(scan?.issues.find(issue => issue.path === path)?.message ?? 'Missing bilingual archive pair: ' + path);
     if (post && current && (post.source !== current.source || post.id !== current.id || post.day !== current.day || post.number !== current.number)) throw new Error('Archive update cannot change identity, date or reserved number: ' + path);
-    if (action === 'update' && current && store.db.prepare('SELECT 1 FROM feed_summaries WHERE source=? AND id=?').get(current.source, current.id)) throw new Error('This archive has a generated summary; use summarize --refresh: ' + path);
     const bytes = !paired && action === 'update' ? scan?.file(path) : undefined;
     if (action === 'update' && !paired && !bytes) throw new Error('Missing archive file: ' + path);
     function validatePost(): void {
@@ -243,9 +257,11 @@ export async function maintainArchive(config: Config, store: Store, action: 'upd
         // Promoting a repaired quarantined pair replaces only its placeholder
         // reservation. Valid native-ID reservations and dropped rows stay intact.
         store.db.prepare('DELETE FROM feed_item_paths WHERE source=? AND day=? AND number=? AND id=?').run(post.source, post.day, post.number, 'archive:' + path);
+        store.db.prepare('DELETE FROM feed_publications WHERE source=? AND id=?').run(post.source, 'archive:' + path);
         store.db.prepare('INSERT OR IGNORE INTO feed_item_paths VALUES (?,?,?,?)').run(post.source, post.id, post.day, post.number);
         store.db.prepare('INSERT INTO feed_archives VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(path) DO UPDATE SET en=excluded.en,zh=excluded.zh').run(path, post.source, post.id, post.day, post.number, JSON.stringify(post.item), post.en, post.zh);
         store.db.prepare('INSERT OR IGNORE INTO items VALUES (?,?,?,?,?,?,?)').run(post.source, post.id, post.item.publishedAt, post.firstSeen, post.firstSeen, JSON.stringify(post.item), hash({ title: post.item.title, url: post.item.url, text: '' }));
+        recordPublications(store, [[post.source, post.id]]);
         for (const path of paths) store.db.prepare('DELETE FROM feed_archive_files WHERE path=?').run(path);
       } else store.db.prepare('UPDATE feed_archive_files SET body=? WHERE path=?').run(bytes, path);
       const issues = JSON.parse(store.meta('selection_archive_issues') ?? '[]') as ArchiveIssue[];

@@ -67,7 +67,8 @@
       },
       "description": "Research methods, papers and scientific advances.",
       "aliases": [],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "products",
@@ -87,7 +88,8 @@
       },
       "description": "Organizations, funding, policy and the technology industry.",
       "aliases": [],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "energy",
@@ -117,7 +119,8 @@
       },
       "description": "Standards and techniques for proving the origin and authorship of text, images and media.",
       "aliases": [],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "hardware",
@@ -137,7 +140,8 @@
       },
       "description": "Human conversation, interpersonal communication and the social dynamics of talking with others.",
       "aliases": [],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "health",
@@ -175,7 +179,8 @@
       "aliases": [
         "historical archives"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "astronomy",
@@ -215,7 +220,8 @@
         "FOSS",
         "free software"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "quantum-physics",
@@ -228,7 +234,8 @@
         "quantum mechanics",
         "quantum information"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "agriculture",
@@ -255,7 +262,8 @@
         "systems thinking",
         "反馈回路"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "geopolitics",
@@ -268,7 +276,8 @@
         "international conflict",
         "military technology"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "ai-safety",
@@ -309,7 +318,8 @@
         "compute access",
         "GPU allocation"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "memory-management",
@@ -322,7 +332,8 @@
         "memory allocation",
         "allocators"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "land-use",
@@ -335,7 +346,8 @@
         "public land",
         "property boundaries"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "linux",
@@ -362,7 +374,8 @@
         "AI-assisted commits",
         "vibe coding policy"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "ai-and-work",
@@ -390,7 +403,8 @@
         "software preservation",
         "right to own"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "agent-memory",
@@ -429,7 +443,8 @@
         "assistive technology",
         "a11y"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "computer-graphics",
@@ -455,7 +470,8 @@
         "wildlife populations",
         "species decline"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "hallucination-detection",
@@ -495,7 +511,8 @@
         "migration",
         "emigration"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "agent-self-improvement",
@@ -518,7 +535,8 @@
       },
       "description": "Preservation of websites and born-digital web content through crawls, archives and searchable collections, including efforts to keep defunct services such as GeoCities accessible.",
       "aliases": [],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "politics",
@@ -531,7 +549,8 @@
         "government",
         "political news"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "amateur-radio",
@@ -546,7 +565,8 @@
         "software-defined radio",
         "RF equipment"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "ai-financing",
@@ -587,7 +607,8 @@
         "911 dispatch",
         "crisis response"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "game-engines",
@@ -600,7 +621,8 @@
         "game engine",
         "game development"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "invasive-species",
@@ -613,7 +635,8 @@
         "biological invasions",
         "non-native species"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "cloud-computing",
@@ -627,6 +650,20 @@
         "SaaS"
       ],
       "deprecated": false
+    },
+    {
+      "id": "electric-vehicles",
+      "name": {
+        "en": "Electric Vehicles",
+        "zh-CN": "电动汽车"
+      },
+      "description": "Electric vehicles, battery-powered cars, charging speed and range, and the market push for affordable mass-market EVs.",
+      "aliases": [
+        "EV",
+        "electric cars"
+      ],
+      "deprecated": false,
+      "hidden": false
     }
   ]
 }

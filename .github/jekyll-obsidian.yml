@@ -24,6 +24,7 @@ website:
     favorites: true
   home:
     layout: archive
+    hide_tab_sources: true
   blog:
     page_size: 50
     utc_offset: "+08:00"

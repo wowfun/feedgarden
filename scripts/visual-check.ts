@@ -43,6 +43,23 @@ try{
   const size=viewport.width>600?'desktop':'mobile',context=await browser.newContext({viewport}),page=await context.newPage(),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   const prefix='/feedgarden/'+(locale==='en'?'':locale+'/');assert.equal((await page.goto(origin+prefix))?.status(),200);await ready(page);
   assert.equal(await page.locator('html').getAttribute('lang'),locale);assert.equal(await page.locator('h1').count(),1);
+  const backToTop=page.locator('[data-back-to-top]'),backToTopLabel=locale==='en'?'Back to top':'回到顶部';
+  await expect(backToTop).toHaveCount(1);await expect(backToTop).toHaveAttribute('aria-label',backToTopLabel);await expect(backToTop).toHaveAttribute('title',backToTopLabel);await expect(backToTop).toBeHidden();
+  if(await page.evaluate(()=>document.documentElement.scrollHeight>innerHeight*2)){
+   const url=page.url();await page.keyboard.press('Control+End');await expect(backToTop).toBeVisible();await expect(backToTop).toHaveAccessibleName(backToTopLabel);await backToTop.press('Enter');await expect(backToTop).toBeHidden();await expect(page.locator('#main-content')).toBeFocused();assert.equal(page.url(),url);
+  }
+  if(!fixture){
+   for(const [key,facet] of [['include_tabs','source'],['show_hidden','topic']] as const){
+    const toggle=page.locator(`[data-archive-visibility="${key}"][data-archive-visibility-facet="${facet}"]`).first();
+    await expect(toggle).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','false');
+    const collapsed=await toggle.textContent();assert.ok(collapsed);await toggle.press('Enter');await ready(page);
+    await expect(toggle).toHaveAttribute('aria-expanded','true');assert.notEqual(await toggle.textContent(),collapsed);
+    assert.equal(new URL(page.url()).searchParams.get(key),key==='include_tabs'?'1':facet);
+    if(key==='include_tabs')for(const source of ['podcast','github','arxiv'])await expect(page.locator(`button[data-archive-facet="source"][data-archive-value="${source}"]`).first()).toBeVisible();
+    await toggle.press('Enter');await ready(page);await expect(toggle).toHaveAttribute('aria-expanded','false');assert.equal(new URL(page.url()).searchParams.has(key),false);
+    checks.push({locale,size,disclosure:key,keyboard:'expand and collapse passed'});
+   }
+  }
   const repository=page.locator('.site-header .site-action--github');assert.equal(await repository.getAttribute('href'),'https://github.com/wowfun/feedgarden');assert.equal(await repository.locator('svg').count(),1);assert.equal(await repository.getAttribute('aria-label'),locale==='en'?'Open Feedgarden on GitHub':'在 GitHub 上打开 Feedgarden');await repository.click({trial:true});
   for(const action of await page.locator('.site-header .site-actions button, .site-header .site-actions summary').all()){if(await action.isVisible()){assert.ok(await action.getAttribute('aria-label'));assert.ok(await action.getAttribute('title'));assert.ok(await action.locator('svg').count());}}
   const rows=page.locator('[data-filter-item]'),count=await rows.count();assert.ok(count<=50);if(fixture)assert.equal(count,50);
@@ -96,7 +113,8 @@ try{
    await page.goto(origin+prefix+'?source=missing&source=missing&page=invalid');await ready(page);assert.equal(await rows.count(),0);assert.ok(page.url().endsWith('?source=missing'));await page.locator('[data-archive-clear]').click();await ready(page);assert.equal(await rows.count(),50);
    await page.screenshot({path:join(output,artifactPrefix+'filters-'+locale+'-'+size+'.png')});
   }
-  const collections=await page.locator('.site-header [data-navigation-id="podcasts"] > a, .site-header [data-navigation-id="github"] > a').evaluateAll(links=>links.map(link=>({id:link.parentElement!.getAttribute('data-navigation-id')!,href:link.getAttribute('href')!})));
+  const collections=await page.locator('.site-header [data-navigation-id="podcasts"] > a, .site-header [data-navigation-id="github"] > a, .site-header [data-navigation-id="arxiv"] > a').evaluateAll(links=>links.map(link=>({id:link.parentElement!.getAttribute('data-navigation-id')!,href:link.getAttribute('href')!})));
+  if(!fixture)assert.deepEqual(collections.map(c=>c.id).sort(),['arxiv','github','podcasts']);
   for(const collection of collections){
    const url=new URL(collection.href,origin);assert.equal(url.origin,origin);assert.equal((await page.goto(url.href))?.status(),200);await ready(page);
    assert.ok((await page.locator('[data-paged-archive]').getAttribute('data-archive-current-url'))?.includes('/tabs/'+collection.id+'/'));

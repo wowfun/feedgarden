@@ -61,9 +61,15 @@
     "topics/public-safety": "公共安全",
     "topics/game-engines": "游戏引擎",
     "topics/invasive-species": "入侵物种",
-    "topics/cloud-computing": "云计算"
+    "topics/cloud-computing": "云计算",
+    "topics/electric-vehicles": "电动汽车"
   },
   "messages": {
+    "back_to_top": "回到顶部",
+    "show_hidden_topics": "显示隐藏主题",
+    "hide_hidden_topics": "收起隐藏主题",
+    "include_tab_sources": "显示独立栏目",
+    "hide_tab_sources": "收起独立栏目",
     "export": "导出",
     "export_title": "导出 Markdown",
     "export_close": "关闭导出",
@@ -285,5 +291,30 @@
     "ledger_entry": "{count} 条",
     "ledger_entries": "{count} 条"
   },
+  "hidden_tags": [
+    "topics/accessibility",
+    "topics/ai-code-policy",
+    "topics/amateur-radio",
+    "topics/biodiversity",
+    "topics/communication",
+    "topics/content-provenance",
+    "topics/digital-ownership",
+    "topics/ethics-compute-access",
+    "topics/game-engines",
+    "topics/geopolitics",
+    "topics/history",
+    "topics/immigration",
+    "topics/industry",
+    "topics/invasive-species",
+    "topics/land-use",
+    "topics/memory-management",
+    "topics/open-source",
+    "topics/politics",
+    "topics/public-safety",
+    "topics/quantum-physics",
+    "topics/research",
+    "topics/system-dynamics",
+    "topics/web-archiving"
+  ],
   "tag_aliases": {}
 }

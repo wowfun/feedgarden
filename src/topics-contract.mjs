@@ -2,7 +2,7 @@
 import { z } from 'zod';
 /** @typedef {import('./agent.js').SummaryInput} SummaryInput */
 const slug = z.string().regex(/^[a-z0-9][a-z0-9_-]*$/);
-export const topicSchema = z.object({ id: slug, name: z.object({ en: z.string().trim().min(1).max(100), 'zh-CN': z.string().trim().min(1).max(100) }).strict(), description: z.string().trim().min(1).max(400), aliases: z.array(z.string().trim().min(1).max(100)).default([]), deprecated: z.boolean().default(false), replacedBy: slug.optional() }).strict();
+export const topicSchema = z.object({ id: slug, name: z.object({ en: z.string().trim().min(1).max(100), 'zh-CN': z.string().trim().min(1).max(100) }).strict(), description: z.string().trim().min(1).max(400), aliases: z.array(z.string().trim().min(1).max(100)).default([]), deprecated: z.boolean().default(false), hidden: z.boolean().default(false), replacedBy: slug.optional() }).strict();
 export const registrySchema = z.object({ version: z.literal(1), topics: z.array(topicSchema) }).strict();
 /** @param {string} value */
 export const normalizedName = value => value.normalize('NFKC').trim().toLocaleLowerCase('en').replace(/[\s_-]+/g, ' ');
@@ -24,7 +24,7 @@ export function validateRegistry(value) {
   }
   for (const topic of registry.topics) if (topic.replacedBy) {
     const target = ids.get(topic.replacedBy);
-    if (!topic.deprecated || !target || target.deprecated || topic.replacedBy === topic.id) throw new Error('Topic replacement must target an active topic: ' + topic.id);
+    if (!topic.deprecated || !target || target.deprecated || target.hidden || topic.replacedBy === topic.id) throw new Error('Topic replacement must target an active, visible topic: ' + topic.id);
   }
   return registry;
 }
@@ -37,12 +37,12 @@ function parseArtifact(value, input) {
   const output = outputSchema.parse(value);
   if (input.contractVersion !== 2 || output.items.length !== input.items.length || output.items.some((copy, i) => copy.id !== input.items[i]?.id || copy.source !== input.items[i]?.source)) throw new Error('Agent output identity/order differs from the fixed input');
   const registry = validateRegistry({ version: 1, topics: [...input.topics.topics, ...output.newTopics] });
-  if (output.newTopics.some(topic => topic.deprecated || topic.replacedBy)) throw new Error('Agents may only append active topics');
-  const active = new Set(registry.topics.filter(topic => !topic.deprecated).map(topic => topic.id));
+  if (output.newTopics.some(topic => topic.deprecated || topic.hidden || topic.replacedBy)) throw new Error('Agents may only append active, visible topics');
+  const active = new Set(registry.topics.filter(topic => !topic.deprecated && !topic.hidden).map(topic => topic.id));
   for (const [i, copy] of output.items.entries()) {
     const supplied = input.items[i];
     if (!supplied) throw new Error('Agent output identity/order differs from the fixed input');
-    if (new Set(copy.topics).size !== copy.topics.length || copy.topics.some(id => !active.has(id))) throw new Error('Unknown, duplicate or deprecated item topics');
+    if (new Set(copy.topics).size !== copy.topics.length || copy.topics.some(id => !active.has(id))) throw new Error('Unknown, duplicate, hidden or deprecated item topics');
     if (!supplied.text && (copy.en.summary || copy['zh-CN'].summary)) throw new Error('Title-only input must have empty summaries');
     if (supplied.articleQuote && (copy.en.summary || copy['zh-CN'].summary)) throw new Error('Quoted short originals must have empty main summaries');
     if (supplied.source === 'hackernews') {

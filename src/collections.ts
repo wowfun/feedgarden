@@ -3,6 +3,7 @@ import type { Config } from './config.js';
 const tabs = [
   { source: 'podcast', id: 'podcasts', title: { en: 'Podcasts', 'zh-CN': '播客' }, order: 10 },
   { source: 'github', id: 'github', title: { en: 'GitHub', 'zh-CN': 'GitHub' }, order: 12 },
+  { source: 'arxiv', id: 'arxiv', title: { en: 'arXiv', 'zh-CN': 'arXiv' }, order: 14 },
 ] as const;
 
 // Disabled sources retain their public history. Rendering and archive protection

@@ -66,7 +66,8 @@ The [schema](../src/store.ts) separates source evidence, scheduling, accepted re
 | Source evidence | `raw_responses`, `items`, `item_versions`, `observations`, `http_cache` | Retain source responses, current normalized items, fact revisions, observations and reusable HTTP representations. |
 | Collection progress | `channel_state`, `gaps` | Track stream cursors, attempt times, coverage and failures. |
 | Ranking | `feed_rankings`, `feed_rank_snapshots`, `feed_selection`, `feed_selection_days` | Keep ranking observations and materialized selection decisions separate from source identity. |
-| Summary work | `feed_planning`, `feed_jobs`, `feed_batches`, `feed_cache`, `feed_summaries` | Track preparation, attempts, fixed batch inputs, reusable copy and accepted bilingual snapshots. |
+| Publication history | `feed_publications` | Retain items that have entered the published content tree independently of later ranking changes; explicit exclusions still apply. |
+| Summary work | `feed_planning`, `feed_jobs`, `feed_batches`, `feed_cache`, `feed_cache_topics`, `feed_summaries` | Track preparation, attempts, fixed batch inputs, reusable copy with private topic proposals, and accepted bilingual snapshots. |
 | Archive state | `feed_archives`, `feed_archive_files`, `feed_excluded`, `feed_item_paths` | Preserve historical bodies and opaque bytes, explicit exclusions and stable source/day numbers. |
 | Auxiliary work | `podcast_transcripts`, `feed_tasks`, `feed_relation_pairs` | Retain full transcripts, intermediate tasks and evidence-backed relation verdicts. |
 | Coordination and audit | `feed_meta`, `job_lease`, `agent_calls`, `runs` | Record revisions and policy markers, ownership, quota usage and run outcomes. |

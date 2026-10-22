@@ -14,7 +14,21 @@ HN comments follow the API's ranked display order, with up to six valid top-leve
 
 ## X
 
-X includes all 26 configured builders; without explicit cookies, the public fallback remains a limited daily sample, not a complete timeline.
+X includes all 26 configured builders; without explicit cookies, the public fallback remains a limited daily sample of up to three posts per account, excluding replies and complete threads. Coverage reports include the sample generation timestamp; samples older than 36 hours are stale. Missing accounts or zero matches do not establish no activity. The configured cookie channel can fail over to this sample; no credentials are inferred or installed automatically.
+
+## Anthropic
+
+Official HTML and sitemap discovery require article metadata (`og:type=article` or Article/BlogPosting/NewsArticle structured data) and an article body before producing an item. Category pages remain discovery links even if they contain an `<article>` wrapper and heading. A genuine article without a verifiable date uses its first observation. Engineering also discovers `/research/...` links in its main list; the sitemap fallback requires an Engineering section marker before admitting a research URL and reports the number of article pages skipped outside that section. Unknown article layouts report failed/partial coverage instead of a misleading successful empty result.
+
+Explicit non-article and outside-section decisions are cached per source and stream for seven days, then rechecked when their URLs appear in discovery again. Each run checks at most 50 detail pages: up to ten expired decisions first, followed by fresh URLs, with remaining slots available for further rechecks. Older decisions without a check timestamp are immediately due. A newly valid article keeps its real source date; normal summary/publication windows still apply, so rechecking does not authorize expired-item backfill. These informational skips and first-observation date notes do not create coverage gaps. Inaccessible or unrecognized pages remain retryable and report incomplete coverage. Body validation removes navigation, headers, footers, scripts and styles first; a paragraph in page chrome is not article evidence.
+
+## GitHub, Reddit and arXiv date semantics
+
+GitHub Trending and its repository-search fallback are discovery snapshots, dated by first observation. Search is based on recent pushes and total stars; it is not a substitute Trending ranking. GitHub is enabled in the checked-in configuration.
+
+Reddit continues to collect weekly Top RSS snapshots and select daily Top 50 candidates by their original dates; a weekly feed does not imply that every entry belongs to yesterday. Already published items survive later ranking changes.
+
+arXiv API dates represent submission dates, and the existing lexical keyword filter still applies. Delayed public availability can put an item outside a strict yesterday window even in an evening run. Product Hunt leaderboard items use the start of their source-local day in America/Los_Angeles, converted to an instant; they are not exact launch timestamps. The [daily task policy](daily-updates.md) keeps those date bases and intentionally does not backfill expired candidates.
 
 ## Related documentation
 

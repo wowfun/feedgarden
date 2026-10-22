@@ -2,7 +2,9 @@
 
 [English](README.md) | 简体中文
 
-Feedgarden 将开发者和 AI 信息源采集到本地 SQLite，并发布按时间排列的双语信息流。每个条目都有独立的 Markdown 页面、来源标签、1 至 3 个主题标签，以及可点击的原文链接。英文站点位于 `/feedgarden/`，简体中文站点位于 `/feedgarden/zh-CN/`。
+Feedgarden 将开发者和 AI 信息源采集到本地 SQLite，并发布按时间排列的双语信息流。每个条目都有独立的 Markdown 页面、来源标签、1 至 3 个主题标签，以及可点击的原文链接。
+
+站点由 [jekyll-obsidian](https://github.com/wowfun/jekyll-obsidian) 构建。在线预览：[英文](https://sinputer.top/feedgarden/) | [简体中文](https://sinputer.top/feedgarden/zh-CN/)。
 
 文章列表支持按日独立折叠，标题显示本地化日期、星期及当前页条数。默认只展开最新一天，筛选和翻页保留手动开合状态，刷新后重置。详见[站点功能](docs/site.md)。
 
@@ -42,7 +44,7 @@ npm run feedgarden -- run --due --no-publish
 
 ## 文档
 
-详细文档仅提供英文版。
+部分专题提供中英文版本，其余详细文档为英文。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -57,6 +59,7 @@ npm run feedgarden -- run --due --no-publish
 | [站点功能](docs/site.md) | 文章、媒体、筛选、阅读、导出与收藏 |
 | [相关进展](docs/related-items.md) | 证据要求、到期规则与关联命令 |
 | [运行维护](docs/operations.md) | 调度、持久化、备份、限制与诊断 |
+| [每日任务 prompt](docs/daily-updates.zh-CN.md) | 上海时间 06:00／18:00、昨天的日期窗口与首次观察日期 |
 | [部署与发布](docs/deployment.md) | 构建环境、发布边界与冲突处理 |
 | [迁移与回滚](docs/migration.md) | 数据库升级、迁移归档与回滚 |
 | [开发与验证](docs/development.md) | 主题归属、检查与隔离测试夹具 |

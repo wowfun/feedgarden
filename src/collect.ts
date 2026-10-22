@@ -8,13 +8,14 @@ import type { Coverage } from './types.js';
 import { importArchives } from './archives.js';
 import { reconcileSelection } from './selection.js';
 
-export type CollectionResult = { source: string; stream: string } & ({ channel: string; items?: number } & Coverage | { status: 'unavailable' | 'deferred' });
+export type CollectionResult = { source: string; status: 'disabled'; reason: string } | { source: string; stream: string } & ({ channel: string; fetchedItems?: number; newItems?: number } & Coverage | { status: 'unavailable' | 'deferred'; reason?: string });
 export async function collect(config: Config, store: Store, selected?: string, due = false, registry = adapters, sinceOverride?: string, signal?: AbortSignal): Promise<CollectionResult[]> {
   signal?.throwIfAborted();
   if (sinceOverride && !DateTime.fromISO(sinceOverride).isValid) throw new Error('Invalid --since ISO date or timestamp');
   const results: CollectionResult[] = [];
   const sources = config.sources.filter(source => source.enabled && (!selected || source.id === selected));
   if (selected && !sources.length) throw new Error(`Unknown or disabled source: ${selected}`);
+  for (const source of config.sources.filter(source => !source.enabled && !selected)) results.push({ source: source.id, status: 'disabled', reason: 'Disabled in source configuration' });
   await importArchives(config, store, signal);
   const http = new Http(store, undefined, signal);
   for (const source of sources) {
@@ -25,7 +26,9 @@ export async function collect(config: Config, store: Store, selected?: string, d
       const latestAttempt = states.reduce((latest, state) => state.last_attempt > latest ? state.last_attempt : latest, '');
       // A successful round sets stream cadence. After a failed round, each
       // enabled channel owns its own retry time; a fallback cannot delay a primary.
-      if (due && states.some(state => state.last_attempt === latestAttempt && (state.status === 'complete' || state.status === 'partial') && Date.parse(state.next_attempt) > Date.now())) continue;
+      if (due && states.some(state => state.last_attempt === latestAttempt && (state.status === 'complete' || state.status === 'partial') && Date.parse(state.next_attempt) > Date.now())) {
+        results.push({ source: source.id, stream: stream.id, status: 'deferred', reason: 'Collection interval has not elapsed' }); continue;
+      }
       const now = nowIso(); let accepted = false, attempted = false, coolingDown = false;
       for (const channel of channels) {
         const state = store.channel(source.id, stream.id, channel.id);
@@ -37,8 +40,8 @@ export async function collect(config: Config, store: Store, selected?: string, d
           const result = await (registry[channel.kind] as Adapter)({ source, stream, channel, store, http, now, since, restartRange: !!sinceOverride });
           signal?.throwIfAborted();
           store.assertLease();
-          store.saveCollection(source.id, stream.id, channel.id, result, next(source, now), now);
-          results.push({ source: source.id, stream: stream.id, channel: channel.id, items: result.items.length, ...result.coverage });
+          const { newItems } = store.saveCollection(source.id, stream.id, channel.id, result, next(source, now), now);
+          results.push({ source: source.id, stream: stream.id, channel: channel.id, fetchedItems: result.items.length, newItems, ...result.coverage });
           if (result.coverage.status === 'complete' || result.coverage.status === 'partial') { accepted = true; break; }
         } catch (error) {
           signal?.throwIfAborted();
@@ -49,7 +52,7 @@ export async function collect(config: Config, store: Store, selected?: string, d
           results.push({ source: source.id, stream: stream.id, channel: channel.id, ...coverage });
         }
       }
-      if (!accepted) results.push({ source: source.id, stream: stream.id, status: !attempted && coolingDown ? 'deferred' : 'unavailable' });
+      if (!accepted) results.push({ source: source.id, stream: stream.id, status: !attempted && coolingDown ? 'deferred' : 'unavailable', reason: !attempted && coolingDown ? 'Channels are cooling down' : 'No enabled channel returned usable coverage' });
       // arXiv enforces one connection and at least three seconds between API requests, including category changes.
       if (source.id === 'arxiv') await sleep(3100, signal);
     }

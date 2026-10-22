@@ -3,6 +3,11 @@
   "hreflang": "en",
   "dir": "ltr",
   "messages": {
+    "back_to_top": "Back to top",
+    "show_hidden_topics": "Show hidden topics",
+    "hide_hidden_topics": "Hide hidden topics",
+    "include_tab_sources": "Include tab sources",
+    "hide_tab_sources": "Hide tab sources",
     "export": "Export",
     "export_title": "Export Markdown",
     "export_close": "Close export",
@@ -148,7 +153,33 @@
     "topics/public-safety": "Public Safety",
     "topics/game-engines": "Game Engines",
     "topics/invasive-species": "Invasive Species",
-    "topics/cloud-computing": "Cloud Computing"
+    "topics/cloud-computing": "Cloud Computing",
+    "topics/electric-vehicles": "Electric Vehicles"
   },
+  "hidden_tags": [
+    "topics/accessibility",
+    "topics/ai-code-policy",
+    "topics/amateur-radio",
+    "topics/biodiversity",
+    "topics/communication",
+    "topics/content-provenance",
+    "topics/digital-ownership",
+    "topics/ethics-compute-access",
+    "topics/game-engines",
+    "topics/geopolitics",
+    "topics/history",
+    "topics/immigration",
+    "topics/industry",
+    "topics/invasive-species",
+    "topics/land-use",
+    "topics/memory-management",
+    "topics/open-source",
+    "topics/politics",
+    "topics/public-safety",
+    "topics/quantum-physics",
+    "topics/research",
+    "topics/system-dynamics",
+    "topics/web-archiving"
+  ],
   "tag_aliases": {}
 }

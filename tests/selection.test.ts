@@ -106,7 +106,7 @@ test('platform/day caps combine communities and retain all private candidates', 
   } finally { await f.cleanup(); }
 });
 
-test('only selected items are enriched/generated; dropped ready copies return without ACP', async () => {
+test('only selected candidates are processed while published copies survive reranking without ACP', async () => {
   const f = await fixture(); try {
     save(f.store, Array.from({ length: 60 }, (_, i) => item('hackernews', String(i + 1), { metrics: { score: i + 1, comments: 0 } })));
     let prepared = 0, generated = 0;
@@ -114,16 +114,23 @@ test('only selected items are enriched/generated; dropped ready copies return wi
     const generate: Generator = async (...args) => { generated += args[1].items.length; return generator(...args); };
     await summarize(f.config, f.store, { source: 'hackernews' }, generate, at, prepare);
     assert.equal(prepared, 50); assert.equal(generated, 50); assert.equal(acceptedItems(f.store).length, 50);
+    await writeSite(f.config, f.store);
+    const original = await readFile(join(f.config.feed.directory, 'hackernews/2026-10/09/item-1.md'));
     save(f.store, [item('hackernews', '1', { metrics: { score: 10000, comments: 1000 } })]);
     await summarize(f.config, f.store, { source: 'hackernews' }, generate, at, prepare);
-    assert.equal(generated, 51); assert.equal(acceptedItems(f.store).length, 50); assert.equal((f.store.db.prepare('SELECT count(*) n FROM feed_summaries').get() as { n: number }).n, 51);
+    assert.equal(generated, 51); assert.equal(acceptedItems(f.store).length, 51); assert.equal((f.store.db.prepare('SELECT count(*) n FROM feed_summaries').get() as { n: number }).n, 51);
     assert.ok(!f.store.isSelected('hackernews', '11'));
+    await writeSite(f.config, f.store);
+    assert.deepEqual(await readFile(join(f.config.feed.directory, 'hackernews/2026-10/09/item-1.md')), original);
     save(f.store, [item('hackernews', '1', { metrics: { score: 0, comments: 0 } })]);
     await summarize(f.config, f.store, { source: 'hackernews' }, () => { throw new Error('Ready summaries must be reused'); }, at, prepare);
-    assert.ok(f.store.isSelected('hackernews', '11')); assert.equal(acceptedItems(f.store).length, 50);
+    assert.ok(f.store.isSelected('hackernews', '11')); assert.equal(acceptedItems(f.store).length, 51);
     await writeSite(f.config, f.store);
     const paths = (await readdir(join(f.config.feed.directory, 'hackernews/2026-10/09'))).filter(path => path.endsWith('.md'));
-    assert.equal(paths.length, 50); assert.equal((await readdir(join(f.config.feed.directory, '_translations/zh-CN/hackernews/2026-10/09'))).length, 50);
+    assert.equal(paths.length, 51); assert.equal((await readdir(join(f.config.feed.directory, '_translations/zh-CN/hackernews/2026-10/09'))).length, 51);
+    f.store.db.prepare("INSERT INTO feed_excluded VALUES ('hackernews','11')").run();
+    await writeSite(f.config, f.store);
+    assert.equal(acceptedItems(f.store).length, 50, 'explicit exclusion still removes a published item');
   } finally { await f.cleanup(); }
 });
 
@@ -402,7 +409,7 @@ test('a late RSS arrival before the seventh Shanghai date stays private until ex
   } finally { await f.cleanup(); }
 });
 
-test('history backs up and preserves archive bytes/paths, caps both locales and reuses caches', async () => {
+test('history caps candidate processing and preserves every published archive in both locales', async () => {
   const f = await fixture(); try {
     const originals = new Map([...await archive(f, 'hackernews', 60), ...await archive(f, 'reddit', 60)]);
     await mkdir(join(f.config.feed.directory, 'other'), { recursive: true });
@@ -416,7 +423,7 @@ test('history backs up and preserves archive bytes/paths, caps both locales and 
     assert.deepEqual(await readFile(join(f.config.feed.directory, 'other/keep.md')), unrelated);
     for (const source of ['reddit', 'hackernews']) for (const prefix of ['', '_translations/zh-CN/']) {
       const paths = await readdir(join(f.config.feed.directory, prefix, source, '2026-10/09'));
-      assert.equal(paths.length, 50);
+      assert.equal(paths.length, 60);
       for (const path of paths) { const relative = prefix + source + '/2026-10/09/' + path; assert.equal(await readFile(join(f.config.feed.directory, relative), 'utf8'), originals.get(relative)); }
     }
     assert.equal((f.store.db.prepare('SELECT count(*) n FROM feed_archives').get() as { n: number }).n, 120);
@@ -444,7 +451,32 @@ test('history failures preserve unranked and previously selected days instead of
     reports = await rankItems(f.config, f.store, { history: true, at: later }, failed.http);
     assert.ok(reports.every(row => row.status === 'deferred')); assert.deepEqual(reports.map(row => [...row.kept].sort()), kept.map(ids => [...ids].sort()));
     await writeSite(f.config, f.store);
-    assert.equal((await readdir(join(f.config.feed.directory, 'reddit/2026-10/09'))).length, 2);
+    assert.equal((await readdir(join(f.config.feed.directory, 'reddit/2026-10/09'))).length, 3);
+  } finally { await f.cleanup(); }
+});
+
+test('publication adoption retains current output across restarts without exposing private archives', async () => {
+  const f = await fixture(1); try {
+    const originals = await archive(f, 'hackernews', 3);
+    await rankItems(f.config, f.store, { source: 'hackernews', history: true, at }, rankingHttp(f.store).http);
+    // Simulate a database/output created before publication retention existed:
+    // item 1 was private, item 2 is published but no longer in the Top 1.
+    for (const prefix of ['', '_translations/zh-CN/']) await rm(join(f.config.feed.directory, prefix + 'hackernews/2026-10/09/item-1.md'));
+    f.store.db.exec("DELETE FROM feed_publications; DELETE FROM feed_meta WHERE key='publications_initialized'");
+    await writeSite(f.config, f.store);
+    assert.ok(!f.store.isSelected('hackernews', '1002'));
+    const reopened = new Store(f.config.storage.database);
+    try {
+      f.config.feed.directory = join(f.root, 'new-output');
+      await writeSite(f.config, reopened);
+      for (const prefix of ['', '_translations/zh-CN/']) {
+        await assert.rejects(readFile(join(f.config.feed.directory, prefix + 'hackernews/2026-10/09/item-1.md')), { code: 'ENOENT' });
+        for (const number of [2, 3]) {
+          const path = prefix + `hackernews/2026-10/09/item-${number}.md`;
+          assert.equal(await readFile(join(f.config.feed.directory, path), 'utf8'), originals.get(path));
+        }
+      }
+    } finally { reopened.close(); }
   } finally { await f.cleanup(); }
 });
 
@@ -654,13 +686,13 @@ test('reconciliation prepares a fixed number of statements as the candidate set 
 
 test('official dead/deleted HN stories leave the candidate set without inventing missing metrics', async () => {
   const f = await fixture(2); try {
-    await archive(f, 'hackernews', 3);
+    const originals = await archive(f, 'hackernews', 3);
     const { http } = rankingHttp(f.store), get = http.get;
     http.get = async (...args) => args[0].includes('/item/1001') ? { url: args[0], status: 200, headers: {}, fetchedAt: at, body: JSON.stringify({ id: 1001, type: 'story', dead: true, score: 12 }) } : get(...args);
     const reports = await rankItems(f.config, f.store, { history: true, source: 'hackernews', at }, http);
     assert.equal(reports[0]!.status, 'selected'); assert.equal(reports[0]!.kept.length, 2); assert.ok(!reports[0]!.kept.includes('1001'));
     await writeSite(f.config, f.store);
-    await assert.rejects(readFile(join(f.config.feed.directory, 'hackernews/2026-10/09/item-1.md')), { code: 'ENOENT' });
+    for (const [path, body] of originals) assert.equal(await readFile(join(f.config.feed.directory, path), 'utf8'), body);
     assert.equal((f.store.db.prepare('SELECT count(*) n FROM feed_archives').get() as { n: number }).n, 3);
     assert.equal(f.store.items('hackernews').find(row => row.id === '1001')!.metrics.comments, undefined);
   } finally { await f.cleanup(); }

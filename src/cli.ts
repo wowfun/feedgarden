@@ -16,19 +16,27 @@ import { atomicWrite, errorText } from './util.js';
 import { reportSkill } from './report-skill.js';
 import { createAgentResolver } from './agent.js';
 import { rankItems, previewRank } from './rank.js';
-import { maintainArchive } from './archives.js';
+import { importArchives, maintainArchive } from './archives.js';
 import { relate } from './relations.js';
+import { resolveItemWindow } from './item-window.js';
 
 const { values, positionals } = parseArgs({ allowPositionals: true, options: {
-  config: { type: 'string' }, source: { type: 'string' }, since: { type: 'string' },
+  config: { type: 'string' }, source: { type: 'string' }, since: { type: 'string' }, until: { type: 'string' }, 'observed-days': { type: 'string' },
   due: { type: 'boolean' }, rebuild: { type: 'boolean' }, refresh: { type: 'boolean' }, history: { type: 'boolean' }, 'dry-run': { type: 'boolean' }, 'remote-base': { type: 'string' }, 'retry-failed': { type: 'boolean' }, live: { type: 'boolean' }, 'no-publish': { type: 'boolean' }, help: { type: 'boolean', short: 'h' },
 } });
 const command = positionals[0];
-if (values.help || !command) console.log('Feedgarden: migrate | rollback ARCHIVE | collect [--since ISO] | rank [--history] [--source ID] [--dry-run] | archives update|remove PATH | summarize [--source ID] [--refresh] [--rebuild] [--retry-failed] | relate [--retry-failed] | topics apply FILE | run --due | doctor [--live] | render | backup | publish\nOptions: --config FILE --no-publish');
+const windowOptions = { since: values.since, until: values.until, observedDays: values['observed-days'] === undefined ? undefined : Number(values['observed-days']) };
+if (values.help || !command) console.log('Feedgarden: migrate | rollback ARCHIVE | collect [--since ISO] | rank [--history] [--source ID] [--dry-run] | archives update|remove PATH | summarize [--source ID] [--refresh] [--rebuild] [--retry-failed] | relate [--retry-failed] | topics apply FILE | run --due | doctor [--live] | render | backup | publish\nOptions: --config FILE --no-publish\nrun/summarize: --since ISO [--until ISO] [--observed-days N] (exclusive until; observed days use first observation)');
 else {
   const configFile = resolveConfigFile(values.config);
   const config = command === 'migrate' || command === 'rollback' ? convertConfig(readConfig(configFile)) : loadConfig(configFile);
   try {
+    if ((values.until !== undefined || values['observed-days'] !== undefined) && !['run', 'summarize'].includes(command)) throw new Error('--until and --observed-days are supported only by run and summarize');
+    if (['run', 'summarize'].includes(command)) {
+      // Preflight without opening storage; summarize later applies its durable cutoff.
+      resolveItemWindow(windowOptions, '1970-01-01T00:00:00.000Z', new Date().toISOString());
+      if (values.source && !config.sources.some(source => source.enabled && source.id === values.source)) throw new Error('Unknown or disabled source: ' + values.source);
+    }
     if (values['dry-run'] && command !== 'rank') throw new Error('--dry-run is supported only by rank');
     if (command === 'rank' && values['dry-run']) {
       const reports = await previewRank(config, { source: values.source, history: values.history });
@@ -49,7 +57,12 @@ async function runWithRunner(command: string, config: Config, configFile: string
   const owner = randomUUID();
   let store: Store | undefined, run: number | undefined, heartbeat: NodeJS.Timeout | undefined;
   const failures: { kind: string; key: string; error: string }[] = [];
+  const collections: CollectionResult[] = [];
+  let summary: Awaited<ReturnType<typeof summarize>> | undefined;
+  let publishedBefore = 0;
+  const report = () => ({ failures, ...(collections.length ? { collections } : {}), ...(summary && store ? { summary: { ...summary, newPublications: (store.statement('SELECT COUNT(*) n FROM feed_publications').get() as { n: number }).n - publishedBefore } } : {}) });
   const recordCollection = (results: CollectionResult[]) => {
+    collections.push(...results);
     console.log(JSON.stringify(results, null, 2));
     for (const result of results) if (result.status === 'unavailable') failures.push({ kind: 'collection', key: `${result.source}/${result.stream}`, error: 'All enabled channels unavailable; see channel_state and gaps' });
   };
@@ -59,14 +72,16 @@ async function runWithRunner(command: string, config: Config, configFile: string
     else {
       store = new Store(config.storage.database); store.acquireLease(owner);
       heartbeat = store.watchLease(owner, cancellation);
-      run = store.run(command); await recoverContent(config);
+      if (command === 'summarize' || command === 'run') resolveItemWindow(windowOptions, store.meta('cutoff')!, new Date().toISOString());
+      run = store.run(command); await recoverContent(config, store);
+      // Adoption/import describes previously installed output, not new publications.
+      if (command === 'summarize' || (command === 'run' && values.due)) await importArchives(config, store, signal);
+      publishedBefore = (store.statement('SELECT COUNT(*) n FROM feed_publications').get() as { n: number }).n;
       async function summaries() {
-        const result = await summarize(config, store!, { source: values.source, since: values.since, rebuild: values.rebuild, refresh: values.refresh, retryFailed: values['retry-failed'], signal, resolveAgent: agentResolver });
-        console.log(JSON.stringify(result));
+        const result = await summarize(config, store!, { source: values.source, ...windowOptions, rebuild: values.rebuild, refresh: values.refresh, retryFailed: values['retry-failed'], signal, resolveAgent: agentResolver });
+        summary = result;
         for (const error of result.sourceErrors) failures.push({ kind: 'summary-config', key: error.source, error: error.error });
-        const errors = store!.db.prepare("SELECT source,id,error FROM feed_jobs WHERE error IS NOT NULL AND state!='ready'").all() as { source: string; id: string; error: string }[];
-        const selected = new Set(config.sources.filter(source => source.enabled && (!values.source || source.id === values.source)).map(source => source.id));
-        for (const error of errors.filter(error => selected.has(error.source) && store!.isSelected(error.source, error.id))) failures.push({ kind: 'summary', key: error.source + '/' + error.id, error: error.error });
+        for (const error of result.jobErrors) failures.push({ kind: 'summary', key: error.source + '/' + error.id, error: error.error });
       }
       async function relations() {
         const result = await relate(config, store!, { signal, retryFailed: values['retry-failed'], resolveAgent: agentResolver });
@@ -129,11 +144,14 @@ async function runWithRunner(command: string, config: Config, configFile: string
       } else if (command === 'publish') { const { publish } = await import('./publish.js'); await publish(config, store, undefined, signal); }
       else throw new Error('Unknown command: ' + command);
       signal.throwIfAborted();
-      store.finishRun(run, failures.length ? 'partial' : 'succeeded', { failures });
+      const details = report();
+      if (details.summary) console.log(JSON.stringify(details.summary));
+      store.finishRun(run, failures.length ? 'partial' : 'succeeded', details);
       if (failures.length) { console.error(`Run incomplete: ${failures.length} task(s) failed; successful work retained.`); process.exitCode = 1; }
     }
   } catch (error) {
-    if (run) store?.finishRun(run, 'failed', { error: errorText(error), failures });
+    if (summary) console.log(JSON.stringify(report().summary));
+    if (run) store?.finishRun(run, 'failed', { error: errorText(error), ...report() });
     throw error;
   } finally {
     if (heartbeat) clearInterval(heartbeat);

@@ -1,21 +1,22 @@
 import { readFile, mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { DateTime } from 'luxon';
 import type { z } from 'zod';
 import type { Config, Source } from './config.js';
 import { generateBatch, agentIdentity, configuredAgent, createAgentResolver, resolveAgent, type AgentResolver, type ResolvedAgent, type AgentResult, type SummaryInput } from './agent.js';
-import { validateArtifact, ArtifactError, outputSchema } from './topics-contract.mjs';
+import { validateArtifact, validateRegistry, ArtifactError, outputSchema } from './topics-contract.mjs';
 import { applyTopics, loadTopics, type Registry } from './topics.js';
 import { Store, QuotaDeferred } from './store.js';
 import type { Item } from './types.js';
-import { atomicWrite, errorText, hash, nowIso, safeUrl, iso } from './util.js';
+import { atomicWrite, errorText, hash, nowIso, safeUrl } from './util.js';
 import { enrichItem, enrichmentInterval } from './source-content.js';
 import { Http } from './http.js';
 import { reportSkill } from './report-skill.js';
 import { pruneWorkspaces } from './workspaces.js';
 import { importArchives } from './archives.js';
 import { reconcileSelection, selectionClause } from './selection.js';
+import { publicationClause, publicationScope, admitsPublication } from './publications.js';
+import { inItemWindow, itemWindowSql, resolveItemWindow, type ItemWindow, type WindowOptions } from './item-window.js';
 import { transcriptStep } from './podcasts.js';
 
 export type ItemCopy = z.infer<typeof outputSchema>['items'][number];
@@ -36,34 +37,46 @@ export function itemPath(source: string, day: string, number: number): string {
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(source) || !/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isSafeInteger(number) || number < 1) throw new Error('Invalid item path components');
   return `${source}/${day.slice(0, 7)}/${day.slice(8)}/item-${number}.md`;
 }
-export function eligible(item: Item, firstSeen: string, cutoff: string, source: Source): boolean {
+export function eligible(item: Item, firstSeen: string, cutoff: string, source: Source, window?: ItemWindow): boolean {
   // Source/date gate shared by the conservative probe scan and final planning
   // check. SQL date scans below must remain a superset of this predicate.
+  if (!(window ? inItemWindow(item, firstSeen, window) : Date.parse(item.basis === 'observed' ? firstSeen : item.publishedAt) >= Date.parse(cutoff))) return false;
   if (item.source === 'x' && item.kind === 'repost') return false;
-  if (item.source === 'arxiv' && source.includeKeywords.length && !source.includeKeywords.some(word => (item.title + ' ' + item.text).toLowerCase().includes(word.toLowerCase()))) return false;
-  return (item.basis === 'observed' ? firstSeen : item.publishedAt) >= cutoff;
+  if (item.source === 'arxiv' && source.includeKeywords.length) {
+    const text = (item.title + ' ' + item.text).toLowerCase();
+    return source.includeKeywords.some(word => text.includes(word.toLowerCase()));
+  }
+  return true;
 }
-export function* iterateAcceptedItems(store: Store): IterableIterator<AcceptedItem> {
-  const query = store.statement(`SELECT f.source,f.id,f.accepted FROM feed_summaries f LEFT JOIN feed_excluded e ON e.source=f.source AND e.id=f.id WHERE e.id IS NULL AND ${selectionClause('f', true)} AND (f.source,f.id)>(?,?) ORDER BY f.source,f.id LIMIT 128`);
+export function* iterateAcceptedItems(store: Store): IterableIterator<AcceptedItem & { published: boolean }> {
+  const scope = publicationScope(store);
+  const query = store.statement(`SELECT f.source,f.id,f.accepted,p.id IS NOT NULL AS published FROM feed_summaries f LEFT JOIN feed_excluded e ON e.source=f.source AND e.id=f.id LEFT JOIN feed_publications p ON p.source=f.source AND p.id=f.id WHERE e.id IS NULL AND ${publicationClause('f', 'p')} AND (f.source,f.id)>(?,?) ORDER BY f.source,f.id LIMIT 128`);
   let source = '', id = '';
   while (true) {
-    const rows = query.all(source, id) as { source: string; id: string; accepted: string }[];
+    const rows = query.all(source, id) as { source: string; id: string; accepted: string; published: number }[];
     if (!rows.length) return;
-    for (const row of rows) yield JSON.parse(row.accepted) as AcceptedItem;
+    for (const row of rows) {
+      const record = JSON.parse(row.accepted) as AcceptedItem;
+      if (admitsPublication(record.item, record.firstSeen, row.published === 1, scope)) yield { ...record, published: row.published === 1 };
+    }
     ({ source, id } = rows.at(-1)!);
   }
 }
 export function acceptedItems(store: Store): AcceptedItem[] { return [...iterateAcceptedItems(store)]; }
-export async function summarize(config: Config, store: Store, options: { source?: string; since?: string; rebuild?: boolean; refresh?: boolean; retryFailed?: boolean; signal?: AbortSignal; resolveAgent?: AgentResolver } = {}, generator: Generator = generateBatch, at = nowIso(), prepare: typeof enrichItem = enrichItem): Promise<{ generated: number; pending: number; failed: number; deferred: boolean; sourceErrors: { source: string; error: string }[] }> {
+export async function summarize(config: Config, store: Store, options: WindowOptions & { source?: string; rebuild?: boolean; refresh?: boolean; retryFailed?: boolean; signal?: AbortSignal; resolveAgent?: AgentResolver } = {}, generator: Generator = generateBatch, at = nowIso(), prepare: typeof enrichItem = enrichItem): Promise<{ generated: number; pending: number; failed: number; deferred: boolean; window: ItemWindow; eligibleCandidates: number | null; sourceErrors: { source: string; error: string }[]; jobErrors: { source: string; id: string; error: string }[] }> {
   options.signal?.throwIfAborted();
   const resolver = createAgentResolver(options.resolveAgent ?? (generator === generateBatch ? resolveAgent : configuredAgent));
   const agents = new Map<string, ResolvedAgent>();
   const sourceErrors: { source: string; error: string }[] = [];
-  const since = options.since === undefined ? undefined : iso(DateTime.fromISO(options.since).toUTC(), '--since');
-  const cutoff = since ? new Date(Math.max(Date.parse(store.meta('cutoff')!), Date.parse(since))).toISOString() : store.meta('cutoff')!;
+  const window = resolveItemWindow(options, store.meta('cutoff')!, at);
+  const cutoff = window.since;
   const sources = config.sources.filter(source => source.enabled && (!options.source || source.id === options.source));
+  const sourceById = new Map(sources.map(source => [source.id, source]));
   if (options.source && !sources.length) throw new Error('Unknown or disabled source: ' + options.source);
   await importArchives(config, store, options.signal);
+  const windows = publicationScope(store) ?? {};
+  for (const source of sources) windows[source.id] = window;
+  store.setMeta('publication_windows', JSON.stringify(windows));
   reconcileSelection(config, store, { source: options.source, at, signal: options.signal });
   const skillHashes = new Map(await Promise.all(sources.map(async source => [source.id, hash(await reportSkill([source.id]))] as const)));
   const http = new Http(store, undefined, options.signal);
@@ -88,34 +101,44 @@ export async function summarize(config: Config, store: Store, options: { source?
     present: store.statement('UPDATE feed_summaries SET accepted=? WHERE source=? AND id=?'),
     schedule: store.statement('UPDATE feed_planning SET due_at=? WHERE source=? AND id=?'),
   };
+  const admitted = (job: FixedJob) => {
+    const source = sourceById.get(job.source);
+    return !!source && !planning.excluded.get(job.source, job.id) && eligible(job.item, job.firstSeen, cutoff, source, window);
+  };
   // Recover a saved artifact before spending another ACP attempt.
   async function accept(batch: Batch, result: unknown, validated?: ReturnType<typeof validateArtifact>): Promise<void> {
     store.assertLease();
     options.signal?.throwIfAborted();
     const input = JSON.parse(batch.input) as SummaryInput;
     const { output, registry: validatedRegistry } = validated ?? validateArtifact(result, input);
-    const previous = await loadTopics(config.feed.topics);
-    if (hash(previous) !== hash(input.topics) && hash(previous) !== hash(validatedRegistry)) throw new Error('Topic registry changed while a task was running');
-    const next = validatedRegistry as Registry;
-    store.assertLease();
-    await applyTopics(config.feed.topics, next, hash(previous), options.signal);
-    options.signal?.throwIfAborted();
-    registry = next;
     const jobs = JSON.parse(batch.jobs) as FixedJob[];
+    const previous = await loadTopics(config.feed.topics);
+    const admittedJobs = jobs.map(admitted), hasAdmitted = admittedJobs.some(Boolean);
+    const usedTopics = new Set(output.items.filter((_copy, i) => admittedJobs[i]).flatMap(copy => copy.topics));
+    const next = validateRegistry({ version: 1, topics: [...input.topics.topics, ...output.newTopics.filter(topic => usedTopics.has(topic.id))] }) as Registry;
+    if (![input.topics, next, validatedRegistry].some(candidate => hash(previous) === hash(validateRegistry(candidate)))) throw new ArtifactError('Topic registry changed while a task was running; regenerate with the current registry');
+    store.assertLease();
+    // A previous acceptance may have flushed topics before its DB commit.
+    // Preserve those durable IDs when recovery now admits only part of the batch.
+    if (hasAdmitted) await applyTopics(config.feed.topics, { version: 1, topics: [...previous.topics, ...next.topics.filter(topic => !previous.topics.some(old => old.id === topic.id))] }, hash(previous), options.signal);
+    options.signal?.throwIfAborted();
+    if (hasAdmitted) registry = await loadTopics(config.feed.topics);
     store.db.transaction(() => {
       store.assertLease();
       jobs.forEach((job, i) => {
         const copy = output.items[i]! as ItemCopy;
         const accepted: AcceptedItem = { item: job.item, copy, firstSeen: job.firstSeen, date: job.item.basis === 'observed' ? job.firstSeen : job.item.publishedAt, dateBasis: job.item.basis === 'observed' ? 'observed' : 'published', updated: at };
         store.statement('INSERT OR REPLACE INTO feed_cache VALUES (?,?)').run(job.key, JSON.stringify(copy));
-        // A recovered artifact can outlive its selection. Complete its job and
-        // keep the accepted copy privately; output queries enforce selection.
+        store.statement('INSERT OR REPLACE INTO feed_cache_topics VALUES (?,?)').run(job.key, JSON.stringify(output.newTopics.filter(topic => copy.topics.includes(topic.id))));
+        store.statement('UPDATE feed_jobs SET state=?,error=NULL WHERE source=? AND id=? AND cache_key=?').run(admittedJobs[i] ? 'ready' : 'cached', job.source, job.id, job.key);
+        if (!admittedJobs[i]) return; // Complete privately; proposals travel with the cached copy.
+        // A recovered artifact can outlive its selection. Complete its job;
+        // first publication still requires selection, while published items stay.
         store.statement('INSERT OR REPLACE INTO feed_summaries VALUES (?,?,?,?,?)').run(job.source, job.id, job.key, JSON.stringify(accepted), at);
-        store.statement("UPDATE feed_jobs SET state='ready',error=NULL WHERE source=? AND id=? AND cache_key=?").run(job.source, job.id, job.key);
       });
       store.statement("UPDATE feed_batches SET state='accepted',error=NULL WHERE id=?").run(batch.id);
     })();
-    generated += jobs.filter(job => store.isSelected(job.source, job.id)).length;
+    generated += jobs.filter((job, i) => admittedJobs[i] && store.isSelected(job.source, job.id)).length;
   }
   const unfinished = store.statement("SELECT * FROM feed_batches WHERE state IN ('prepared','running') ORDER BY created_at,id").all() as Batch[];
   for (const batch of unfinished) {
@@ -129,22 +152,27 @@ export async function summarize(config: Config, store: Store, options: { source?
     }
     else store.statement("UPDATE feed_batches SET state='interrupted',error='Interrupted without valid artifact' WHERE id=?").run(batch.id);
   }
-  store.statement("UPDATE feed_jobs SET state='failed',error=COALESCE(error,'Attempt limit reached after interruption') WHERE state='pending' AND attempts>=5").run();
+  store.statement("UPDATE feed_jobs SET state='failed',error=COALESCE(error,'Attempt limit reached after interruption') WHERE state='pending' AND attempts>=5 AND source IN (SELECT value FROM json_each(?))").run(JSON.stringify(sources.map(source => source.id)));
   await pruneWorkspaces(config.agent, store, at);
   // Probe only if potentially useful work exists. Keep selection/exclusion and
   // archived-without-summary rules aligned with the final per-row check below;
   // the policy INSERT intentionally also models refresh/unfinished-job state.
+  const candidateWindow = itemWindowSql('i.data', 'i.first_seen', window, '$', 'i.published_at');
   const potential = store.statement(`SELECT i.data,i.first_seen FROM items i
     LEFT JOIN feed_excluded e ON e.source=i.source AND e.id=i.id
     WHERE i.source=? AND e.id IS NULL AND ${selectionClause('i')}
-    AND (i.first_seen>=? OR i.published_at>=?)
+    AND ${candidateWindow.clause}
     AND (? OR NOT EXISTS(SELECT 1 FROM feed_archives a WHERE a.source=i.source AND a.id=i.id
       AND NOT EXISTS(SELECT 1 FROM feed_summaries f WHERE f.source=a.source AND f.id=a.id)))`);
+  let eligibleCandidates: number | null = options.since === undefined ? null : 0;
   function hasEligibleItems(source: Source): boolean {
-    for (const row of potential.iterate(source.id, cutoff, cutoff, options.rebuild || options.refresh ? 1 : 0) as Iterable<{ data: string; first_seen: string }>) {
-      if (eligible(JSON.parse(row.data) as Item, row.first_seen, cutoff, source)) return true;
+    let found = false;
+    for (const row of potential.iterate(source.id, ...candidateWindow.parameters, options.rebuild || options.refresh ? 1 : 0) as Iterable<{ data: string; first_seen: string }>) {
+      if (!eligible(JSON.parse(row.data) as Item, row.first_seen, cutoff, source, window)) continue;
+      if (eligibleCandidates === null) return true;
+      eligibleCandidates++; found = true;
     }
-    return false;
+    return found;
   }
   for (const source of sources) {
     // An inherited identity still has to be refreshed when eligible accepted
@@ -160,16 +188,19 @@ export async function summarize(config: Config, store: Store, options: { source?
     }
     options.signal?.throwIfAborted(); store.assertLease();
     agents.set(source.id, agent);
-    const policy = hash({ cutoff, keywords: source.includeKeywords, ...agentIdentity(agent), maxItemChars: agent.maxItemChars, skillHash, summaryRevision: 3, planningRevision: 2, enrichmentRefreshDays: config.collection.enrichmentRefreshDays });
-    if (options.rebuild || options.refresh || store.meta('planning_policy:' + source.id) !== policy) {
+    const policy = hash({ keywords: source.includeKeywords, ...agentIdentity(agent), maxItemChars: agent.maxItemChars, skillHash, summaryRevision: 3, planningRevision: 3, enrichmentRefreshDays: config.collection.enrichmentRefreshDays });
+    const windowPolicy = hash({ cutoff: store.meta('cutoff'), since: options.since, until: options.until, observedDays: options.observedDays });
+    const changedPolicy = options.rebuild || options.refresh || store.meta('planning_policy:' + source.id) !== policy;
+    if (changedPolicy || store.meta('planning_window:' + source.id) !== windowPolicy) {
       // This is incremental scheduling, not the full eligibility predicate:
       // the probe above is conservative; queued rows are rechecked below.
       // Policy changes revisit recent items and unfinished copies. Historical accepted
       // items require changed source facts or an explicit refresh/rebuild.
       const refreshSince = new Date(Date.parse(at) - config.collection.enrichmentRefreshDays * 86400_000).toISOString();
       store.db.transaction(() => {
-        store.statement("INSERT OR REPLACE INTO feed_planning SELECT i.source,i.id,'' FROM items i LEFT JOIN feed_excluded e ON e.source=i.source AND e.id=i.id LEFT JOIN feed_summaries f ON f.source=i.source AND f.id=i.id LEFT JOIN feed_jobs j ON j.source=i.source AND j.id=i.id WHERE i.source=? AND e.id IS NULL AND (i.first_seen>=? OR json_extract(i.data,'$.publishedAt')>=?) AND (? OR f.id IS NULL OR j.state!='ready' OR julianday(i.first_seen)>julianday(?))").run(source.id, cutoff, cutoff, options.rebuild || options.refresh ? 1 : 0, refreshSince);
+        store.statement(`INSERT OR ${changedPolicy ? 'REPLACE' : 'IGNORE'} INTO feed_planning SELECT i.source,i.id,'' FROM items i LEFT JOIN feed_excluded e ON e.source=i.source AND e.id=i.id LEFT JOIN feed_summaries f ON f.source=i.source AND f.id=i.id LEFT JOIN feed_jobs j ON j.source=i.source AND j.id=i.id WHERE i.source=? AND e.id IS NULL AND ${candidateWindow.clause} AND (? OR f.id IS NULL OR j.state!='ready' OR julianday(i.first_seen)>julianday(?))`).run(source.id, ...candidateWindow.parameters, options.rebuild || options.refresh ? 1 : 0, refreshSince);
         store.setMeta('planning_policy:' + source.id, policy);
+        store.setMeta('planning_window:' + source.id, windowPolicy);
       })();
     }
     if (options.retryFailed) store.statement("INSERT OR REPLACE INTO feed_planning SELECT source,id,'' FROM feed_jobs WHERE source=? AND state='failed'").run(source.id);
@@ -186,7 +217,7 @@ export async function summarize(config: Config, store: Store, options: { source?
         let item = JSON.parse(row.data) as Item;
         // Final gate for both new policy scans and trigger-enqueued facts. See
         // potential/hasEligibleItems above and the eligibility matrix regression.
-        if (!store.isSelected(source.id, row.id) || planning.archived.get(source.id, row.id) && !options.refresh && !options.rebuild || planning.excluded.get(source.id, row.id) || !eligible(item, row.first_seen, cutoff, source)) {
+        if (!store.isSelected(source.id, row.id) || planning.archived.get(source.id, row.id) && !options.refresh && !options.rebuild || planning.excluded.get(source.id, row.id) || !eligible(item, row.first_seen, cutoff, source, window)) {
           planning.remove.run(source.id, row.id); continue;
         }
         safeUrl(item.url);
@@ -223,7 +254,14 @@ export async function summarize(config: Config, store: Store, options: { source?
   const blockedJobs = new Set<string>();
   // The due-time index requires sorting the entire pending queue per batch.
   // Walk the partial FIFO index instead; next_at still filters delayed retries.
-  const pendingJobs = store.statement(`SELECT j.* FROM feed_jobs j INDEXED BY feed_jobs_pending_order WHERE source=? AND state='pending' AND next_at<=? AND attempts<5 AND julianday(CASE WHEN json_extract(data,'$.item.basis')='observed' THEN json_extract(data,'$.firstSeen') ELSE json_extract(data,'$.item.publishedAt') END)>=julianday(?) AND ${selectionClause('j')} AND j.source||'/'||j.id NOT IN (SELECT value FROM json_each(?)) ORDER BY json_extract(data,'$.firstSeen'),id LIMIT ?`);
+  const jobWindow = itemWindowSql('j.data', "json_extract(j.data,'$.firstSeen')", window, '$.item');
+  const jobGate = `${jobWindow.clause} AND NOT EXISTS(SELECT 1 FROM feed_excluded e WHERE e.source=j.source AND e.id=j.id) AND ${selectionClause('j')}`;
+  const pendingJobs = store.statement(`SELECT j.* FROM feed_jobs j INDEXED BY feed_jobs_pending_order WHERE source=? AND state='pending' AND next_at<=? AND attempts<5 AND ${jobGate} AND j.source||'/'||j.id NOT IN (SELECT value FROM json_each(?)) ORDER BY json_extract(data,'$.firstSeen'),id`);
+  const cachedJobs = store.statement(`SELECT j.* FROM feed_jobs j INDEXED BY feed_jobs_cached_order WHERE source=? AND state='cached' AND ${jobGate} AND j.source||'/'||j.id NOT IN (SELECT value FROM json_each(?)) ORDER BY json_extract(data,'$.firstSeen'),id`);
+  const eligibleJob = (job: Job, source: Source) => {
+    const data = JSON.parse(job.data) as { item: Item; firstSeen: string };
+    return eligible(data.item, data.firstSeen, cutoff, source, window);
+  };
   while (sources.length) {
     options.signal?.throwIfAborted();
     const start = (sources.findIndex(source => source.id === cursor) + 1) % sources.length;
@@ -235,7 +273,17 @@ export async function summarize(config: Config, store: Store, options: { source?
       // HN produces both article and discussion copy in two languages. Its output
       // can exceed the model's token limit even when a larger batch fits the input.
       const batchLimit = source.id === 'hackernews' ? Math.min(2, config.agent.maxBatchItems) : config.agent.maxBatchItems;
-      const candidates = pendingJobs.all(source.id, at, cutoff, blocked, batchLimit) as Job[];
+      const candidates: Job[] = [];
+      for (const rows of [cachedJobs.iterate(source.id, ...jobWindow.parameters, blocked), pendingJobs.iterate(source.id, at, ...jobWindow.parameters, blocked)]) {
+        for (const row of rows as Iterable<Job>) {
+          if (eligibleJob(row, source)) candidates.push(row);
+          // Source rules are fixed for this run. Avoid decoding a rejected
+          // prefix for every batch; a later run reevaluates its current policy.
+          else blockedJobs.add(row.source + '/' + row.id);
+          if (candidates.length === batchLimit) break;
+        }
+        if (candidates.length === batchLimit) break;
+      }
       if (candidates.length) { chosen = source; jobs = candidates; break; }
     }
     if (!chosen) break;
@@ -286,15 +334,27 @@ export async function summarize(config: Config, store: Store, options: { source?
     if (!options.rebuild) {
       if (hasCached) {
         try {
-          await accept(batch, { contractVersion: 2, items: cached.map(copy => JSON.parse(copy!)), newTopics: [] });
+          const proposals = new Map<string, Registry['topics'][number]>();
+          for (const job of fixed) {
+            const row = store.statement('SELECT topics FROM feed_cache_topics WHERE key=?').get(job.key) as {topics:string} | undefined;
+            for (const topic of JSON.parse(row?.topics ?? '[]') as Registry['topics']) if (!registry.topics.some(current => current.id === topic.id)) proposals.set(topic.id, topic);
+          }
+          await accept(batch, { contractVersion: 2, items: cached.map(copy => JSON.parse(copy!)), newTopics: [...proposals.values()] });
           continue;
         } catch (error) {
           if (!(error instanceof ArtifactError) && !(error instanceof SyntaxError)) throw error;
           // Cached copy can outlive its topic assignments. A rejected cache is
           // a miss; paid generation still owns the attempt and backoff budget.
           store.db.transaction(() => {
-            for (const job of fixed) store.statement('DELETE FROM feed_cache WHERE key=?').run(job.key);
+            for (const job of fixed) {
+              store.statement('DELETE FROM feed_cache WHERE key=?').run(job.key);
+              store.statement('DELETE FROM feed_cache_topics WHERE key=?').run(job.key);
+              store.statement("UPDATE feed_jobs SET state=CASE WHEN attempts>=5 THEN 'failed' ELSE 'pending' END,error=? WHERE source=? AND id=?").run(errorText(error), job.source, job.id);
+            }
           })();
+          if (fixed.some(job => (planning.attempts.get(job.source, job.id) as {attempts:number}).attempts >= 5)) {
+            store.statement("UPDATE feed_batches SET state='failed',error=? WHERE id=?").run(errorText(error), id); continue;
+          }
         }
       }
     }
@@ -349,6 +409,12 @@ export async function summarize(config: Config, store: Store, options: { source?
     }
     if (runtimeFailures >= 3) throw new Error('Three consecutive ACP runtime/transport failures; stopping this run');
   }
-  const states = (sources.length ? store.statement("SELECT state,count(*) count FROM feed_jobs j WHERE state!='ready' AND " + selectionClause('j') + " AND source IN (" + sources.map(() => '?').join(',') + ") GROUP BY state").all(...sources.map(source => source.id)) : []) as { state: string; count: number }[];
-  return { generated, pending: states.find(row => row.state === 'pending')?.count ?? 0, failed: states.find(row => row.state === 'failed')?.count ?? 0, deferred, sourceErrors };
+  let pending = 0, failed = 0;
+  const jobErrors: {source:string;id:string;error:string}[] = [];
+  for (const job of store.statement(`SELECT j.* FROM feed_jobs j WHERE state IN ('pending','failed') AND ${jobGate} AND source IN (SELECT value FROM json_each(?))`).iterate(...jobWindow.parameters, JSON.stringify(sources.map(source => source.id))) as Iterable<Job>) {
+    if (!eligibleJob(job, sourceById.get(job.source)!)) continue;
+    if (job.state === 'pending') pending++; else failed++;
+    if (job.error) jobErrors.push({source:job.source,id:job.id,error:job.error});
+  }
+  return { generated, pending, failed, deferred, window, eligibleCandidates, sourceErrors, jobErrors };
 }

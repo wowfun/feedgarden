@@ -19,6 +19,13 @@ export async function checkArchiveExport(page: Page, root: string, output: strin
   assert.equal((Date.parse(end) - Date.parse(start)) / 86400000, 6);
   assert.equal(await panel.locator('[data-export-limit]').textContent(), locale === 'en' ? 'Up to 7 days, including both dates.' : '最多 7 天，包含起止两天。');
   assert.ok(await panel.evaluate(el => el.scrollWidth <= el.clientWidth + 1));
+  // Export inherits the archive's visible source scope (including hidden tab
+  // sources); unchecked facets mean every available source, not every manifest card.
+  const sourceScope = await panel.locator('input[data-export-facet="source"]').evaluateAll(inputs => {
+    const boxes = inputs as HTMLInputElement[], checked = boxes.filter(box => box.checked);
+    return (checked.length ? checked : boxes).map(box => box.value);
+  });
+  const topics = await panel.locator('input[data-export-facet="topic"]:checked').evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value));
   const button = (await panel.locator('[data-export-download]').boundingBox())!;
   assert.ok(button.y + button.height <= page.viewportSize()!.height, 'Download stays visible while filters scroll');
   await page.screenshot({path: join(output, artifact + '.png')});
@@ -28,12 +35,14 @@ export async function checkArchiveExport(page: Page, root: string, output: strin
   assert.equal(download.suggestedFilename(), `feedgarden-${locale}-${start}_${end}.md`);
   const path = join(output, artifact + '.md'); await download.saveAs(path);
   const markdown = await readFile(path, 'utf8');
-  const cards: {id: string; display_date: string | null; markdown_url: string}[] = [];
+  const cards: {id: string; display_date: string | null; markdown_url: string; facets: {source: string[]; topic: string[]}}[] = [];
   for (const chunk of manifest.chunks) {
     const resource = new URL(chunk, new URL(manifestUrl, initialUrl));
     cards.push(...(await (await page.request.get(resource.href)).json()).cards);
   }
-  const selected = cards.filter(card => card.display_date && card.display_date >= start && card.display_date <= end);
+  const selected = cards.filter(card => card.display_date && card.display_date >= start && card.display_date <= end
+    && card.facets.source.some(source => sourceScope.includes(source))
+    && (!topics.length || card.facets.topic.some(topic => topics.includes(topic))));
   assert.equal(new Set(selected.map(card => card.id)).size, selected.length);
   assert.equal((markdown.match(/^(?:Article|站内文章): </gm) || []).length, selected.length);
   let offset = 0;

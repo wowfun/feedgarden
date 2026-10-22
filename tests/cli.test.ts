@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, readFile, rm, writeFile, lstat } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile, lstat, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -16,6 +16,94 @@ const exec = promisify(execFile);
 // Cold SDK/rendering imports are part of process startup. Bound that separately
 // from the cancellation latency measured after the fixture receives a request.
 const cliStartupTimeout = 30_000;
+
+test('durable cutoff validation precedes archive adoption and recovery',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'feedgarden-cutoff-preflight-'));
+ const config=configSchema.parse({version:2,storage:{directory:root,database:join(root,'data.sqlite')},feed:{directory:join(root,'content'),topics:resolve('config/topics.json')},agent:{model:'fixture'},sources:[{id:'hackernews',name:'HN',intervalHours:1,selection:{method:'hn-engagement'},streams:[{id:'main',channels:[{id:'feed',kind:'feed'}]}]}]});
+ await mkdir(config.feed.directory);await writeFile(join(config.feed.directory,'notes.md'),'Untouched archive');const file=join(root,'config.json');await writeFile(file,JSON.stringify(config));
+ const seed=new Store(config.storage.database);seed.setMeta('cutoff','2026-10-22T00:00:00Z');seed.close();
+ try{
+  await assert.rejects(exec(process.execPath,['--import','tsx',resolve('src/cli.ts'),'summarize','--since','2026-10-20','--until','2026-10-21','--config',file],{timeout:cliStartupTimeout}),error=>{assert.match((error as any).stderr,/durable cutoff/);return true;});
+  const store=new Store(config.storage.database);try{assert.equal(store.meta('publications_initialized'),undefined);assert.equal(store.meta('selection_archives'),undefined);assert.equal((store.db.prepare('SELECT count(*) n FROM feed_archive_files').get() as {n:number}).n,0);}finally{store.close();}
+  assert.equal(await readFile(join(config.feed.directory,'notes.md'),'utf8'),'Untouched archive');
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+for(const archive of [false,true]) test(`first bounded summary excludes ${archive?'imported archives':'adopted generated articles'} from new-publication counts`,async()=>{
+  const root=await mkdtemp(join(tmpdir(),'feedgarden-adoption-count-'));
+  const config=configSchema.parse({version:2,storage:{directory:root,database:join(root,'data.sqlite')},feed:{directory:join(root,'content'),topics:join(root,'topics.json')},
+    agent:{command:resolve('tests/fixtures/acp-peer.mjs'),model:'fixture/other',runtimeDirectory:join(root,'tasks')},
+    sources:[{id:'one',name:'One',intervalHours:1,streams:[{id:'main',channels:[{id:'feed',kind:'feed'}]}]},
+      ...(archive?[{id:'hackernews',name:'HN',intervalHours:1,selection:{method:'hn-engagement'},streams:[{id:'main',channels:[{id:'feed',kind:'feed'}]}]}]:[])]});
+  const file=join(root,'config.json'),source=archive?'hackernews':'one',id=archive?'1':'old';
+  const old:Item={source,id,stream:'main',channel:'feed',title:'Retained history',text:'',url:archive?'https://news.ycombinator.com/item?id=1':'https://example.test/old',publishedAt:'2026-10-01T10:00:00.000Z',observedAt:'2026-10-01T10:00:00.000Z',basis:'published',metrics:{}};
+  const oldPath=source+'/2026-10/01/item-1.md';
+  await writeFile(file,JSON.stringify(config));
+  await writeFile(config.feed.topics,JSON.stringify({version:1,topics:[{id:'coding',name:{en:'Coding','zh-CN':'编程'},description:'Tools',aliases:[],deprecated:false}]}));
+  for(const prefix of ['','_translations/zh-CN/']){
+    await mkdir(join(config.feed.directory,prefix,source,'2026-10/01'),{recursive:true});
+    await writeFile(join(config.feed.directory,prefix,oldPath),`---\ntitle: Retained history\ndate: ${old.publishedAt}\npublish: true\ncontent_type: post\nsource_url: ${old.url}\n---\nHistorical body.\n`);
+  }
+  const seed=new Store(config.storage.database);
+  try{
+    seed.setMeta('cutoff','1970-01-01T00:00:00.000Z');
+    if(!archive){
+      seed.itemNumber(source,id,'2026-10-01');
+      const copy={source,id,topics:['coding'],en:{title:'Retained history',summary:''},'zh-CN':{title:'历史',summary:''}};
+      seed.db.prepare('INSERT INTO feed_summaries VALUES (?,?,?,?,?)').run(source,id,'old',JSON.stringify({item:old,copy,firstSeen:old.observedAt,date:old.publishedAt,dateBasis:'published',updated:old.observedAt}),old.observedAt);
+    }
+    const next:Item={...old,source:'one',id:'new',title:'New item',url:'https://example.test/new',publishedAt:'2026-10-20T10:00:00.000Z',observedAt:'2026-10-20T10:00:00.000Z'};
+    seed.saveCollection('one','main','feed',{items:[next],raw:[],coverage:{status:'complete',to:next.observedAt,notes:[]}},'');
+  }finally{seed.close();}
+  try{
+    const result=await exec(process.execPath,['--import','tsx',resolve('src/cli.ts'),'summarize','--source','one','--since','2026-10-20T00:00:00+08:00','--until','2026-10-21T00:00:00+08:00','--config',file],{timeout:cliStartupTimeout});
+    const report=JSON.parse(result.stdout.trim());
+    assert.equal(report.generated,1);
+    assert.equal(report.newPublications,1,'Previously installed history is not newly published by this command');
+    const store=new Store(config.storage.database);
+    try{assert.equal((store.db.prepare('SELECT count(*) n FROM feed_publications').get() as {n:number}).n,2);}finally{store.close();}
+    await lstat(join(config.feed.directory,oldPath));await lstat(join(config.feed.directory,'_translations/zh-CN',oldPath));
+  }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('invalid or unsupported daily windows fail before creating runner storage',async()=>{
+  const root=await mkdtemp(join(tmpdir(),'feedgarden-window-cli-'));
+  const directory=join(root,'private'),file=join(root,'config.json');
+  await writeFile(file,JSON.stringify({version:2,agent:{model:'fixture'},storage:{directory,database:join(directory,'data.sqlite')},sources:[{id:'one',name:'One',intervalHours:1,streams:[{id:'main',channels:[{id:'feed',kind:'feed'}]}]}]}));
+  try{
+    for(const args of [['run','--due','--until','2026-10-21'],['summarize','--since','2026-10-21','--until','2026-10-20'],['collect','--until','2026-10-21']]){
+      await assert.rejects(exec(process.execPath,['--import','tsx',resolve('src/cli.ts'),...args,'--config',file],{timeout:cliStartupTimeout}),error=>{assert.match((error as any).stderr,/--until/);return true;});
+      await assert.rejects(lstat(directory),{code:'ENOENT'});
+    }
+  }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('bounded summary failure reports include only admitted, non-excluded jobs',async()=>{
+  const root=await mkdtemp(join(tmpdir(),'feedgarden-window-errors-'));
+  const config=configSchema.parse({version:2,storage:{directory:root,database:join(root,'data.sqlite')},feed:{directory:join(root,'content'),topics:resolve('config/topics.json')},
+    agent:{command:join(root,'missing.exe'),runtimeDirectory:join(root,'tasks')},sources:['one','two'].map(id=>({id,name:id,intervalHours:1,streams:[{id:'main',channels:[{id:'feed',kind:'feed'}]}]}))});
+  const file=join(root,'config.json');await writeFile(file,JSON.stringify(config));
+  const seed=new Store(config.storage.database);
+  try{
+    seed.setMeta('cutoff','1970-01-01T00:00:00.000Z');
+    for(const [id,source,publishedAt] of [['within','one','2026-10-20T10:00:00Z'],['excluded','one','2026-10-20T10:00:00Z'],['expired','one','2026-10-19T10:00:00Z'],['later','one','2026-10-20T16:00:00Z'],['other-source','two','2026-10-20T10:00:00Z']] as const){
+      const item:Item={id,source,stream:'main',channel:'feed',title:id,text:'Source evidence. '.repeat(6000),url:'https://example.test/'+id,basis:'published',publishedAt,observedAt:publishedAt,metrics:{}};
+      seed.db.prepare("INSERT INTO feed_jobs VALUES (?,?,?,?,'failed',5,'',?)").run(source,id,id,JSON.stringify({item,firstSeen:publishedAt}),'Failure for '+id);
+    }
+    seed.db.prepare('INSERT INTO feed_excluded VALUES (?,?)').run('one','excluded');
+  }finally{seed.close();}
+  try{
+    await assert.rejects(exec(process.execPath,['--import','tsx',resolve('src/cli.ts'),'summarize','--source','one','--since','2026-10-20T00:00:00+08:00','--until','2026-10-21T00:00:00+08:00','--config',file],{timeout:cliStartupTimeout}),error=>{
+      const result=error as any;assert.equal(result.code,1);assert.match(result.stderr,/Run incomplete: 1 task/);assert.equal(JSON.parse(result.stdout.trim()).failed,1);return true;
+    });
+    const store=new Store(config.storage.database);
+    try{
+      const details=JSON.parse((store.db.prepare('SELECT details FROM runs ORDER BY id DESC LIMIT 1').get() as {details:string}).details);
+      assert.deepEqual(details.failures,[{kind:'summary',key:'one/within',error:'Failure for within'}]);
+      assert.equal((store.db.prepare('SELECT count(*) n FROM agent_calls').get() as {n:number}).n,0);
+    }finally{store.close();}
+  }finally{await rm(root,{recursive:true,force:true});}
+});
 
 for (const backupFails of [false, true]) test('relation configuration failures retain diagnostics and ' + (backupFails ? 'survive a later hard backup failure' : 'finish scheduled rendering and backup'), async () => {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-relations-config-'));
@@ -33,6 +121,8 @@ for (const backupFails of [false, true]) test('relation configuration failures r
     await assert.rejects(exec(process.execPath, ['--import', 'tsx', resolve('src/cli.ts'), 'run', '--due', '--no-publish', '--config', file], { timeout: cliStartupTimeout }), error => {
       assert.equal((error as any).code, 1);
       if (!backupFails) assert.match((error as any).stderr, /Run incomplete/);
+      assert.match((error as any).stdout, /"generated":0/);
+      assert.match((error as any).stdout, /"newPublications":0/);
       return true;
     });
     const store = new Store(config.storage.database);
@@ -40,6 +130,7 @@ for (const backupFails of [false, true]) test('relation configuration failures r
       const run = store.db.prepare('SELECT status,details FROM runs ORDER BY id DESC LIMIT 1').get() as { status: string; details: string };
       assert.equal(run.status, backupFails ? 'failed' : 'partial');
       const details = JSON.parse(run.details);
+      assert.ok(details.collections.length>0);assert.equal(details.summary.newPublications,0);
       assert.ok(details.failures.some((failure: any) => failure.kind === 'collection'));
       assert.ok(details.failures.some((failure: any) => failure.kind === 'relations' && failure.key === 'config'));
       if (backupFails) assert.match(details.error, /EEXIST|ENOTDIR/);
@@ -61,13 +152,17 @@ test('an empty scheduled run completes without an installed agent executable', a
     seed.saveCollection('one', 'main', 'feed', { items: [], raw: [], coverage: { status: 'complete', to: new Date().toISOString(), notes: [] } }, '2999-01-01T00:00:00.000Z');
   } finally { seed.close(); }
   try {
-    const result = await exec(process.execPath, ['--import', 'tsx', resolve('src/cli.ts'), 'run', '--due', '--no-publish', '--config', file], { timeout: cliStartupTimeout });
+    const result = await exec(process.execPath, ['--import', 'tsx', resolve('src/cli.ts'), 'run', '--due', '--no-publish', '--since', '2026-10-20T00:00:00+08:00', '--until', '2026-10-21T00:00:00+08:00', '--observed-days', '7', '--config', file], { timeout: cliStartupTimeout });
     assert.match(result.stdout, /"generated":0/); assert.match(result.stdout, /"candidates":0/);
+    assert.match(result.stdout, /"newPublications":0/);assert.match(result.stdout, /"until":"2026-10-20T16:00:00.000Z"/);
     await assert.rejects(lstat(config.agent.runtimeDirectory), { code: 'ENOENT' });
     const store = new Store(config.storage.database);
     try {
       assert.equal((store.db.prepare('SELECT count(*) n FROM agent_calls').get() as { n: number }).n, 0);
       assert.equal((store.db.prepare('SELECT status FROM runs ORDER BY id DESC LIMIT 1').get() as { status: string }).status, 'succeeded');
+      const details=JSON.parse((store.db.prepare('SELECT details FROM runs ORDER BY id DESC LIMIT 1').get() as {details:string}).details);
+      assert.equal(details.collections[0].status,'deferred');assert.equal(details.summary.newPublications,0);assert.equal(details.summary.eligibleCandidates,0);
+      assert.equal(JSON.parse(store.meta('publication_windows')!).one.since,'2026-10-19T16:00:00.000Z');
     } finally { store.close(); }
   } finally { await rm(root, { recursive: true, force: true }); }
 });

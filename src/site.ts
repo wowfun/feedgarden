@@ -9,7 +9,8 @@ import { iterateAcceptedItems, itemPath, type AcceptedItem } from './items.js';
 import { loadTopics } from './topics.js';
 import { atomicWrite, safeUrl, hash, nowIso } from './util.js';
 import { importArchives, archiveManifestSignature } from './archives.js';
-import { reconcileSelection, selectionPolicy, selectionClause } from './selection.js';
+import { reconcileSelection, selectionPolicy } from './selection.js';
+import { publicationClause, publicationScope, publicationSignature, admitsPublication, recordPublications, type PublishedIdentity } from './publications.js';
 import { embedKind } from './media-embed.js';
 import { collectionTabs } from './collections.js';
 import { publication, recentPublication, activeRelations, recommendationManifest, relationRevision, type Publication } from './relations.js';
@@ -89,16 +90,26 @@ export function renderItem(record: AcceptedItem, locale: 'en' | 'zh-CN', topics 
   const description = descriptionChars.length > 240 ? descriptionChars.slice(0, 237).join('') + '...' : descriptionChars.join('');
   return frontmatter({ publish: true, content_type: 'post', title: translation.title, description, date: record.date, updated: record.updated, first_seen: record.firstSeen, date_basis: record.dateBasis, source_url: safeUrl(item.url), ...(item.repoUrl ? { repo_url: safeUrl(item.repoUrl) } : {}), ...(item.discussion ? { discussion_url: safeUrl(item.discussion.url) } : {}), tags: ['source/' + item.source, ...topics.map(id => 'topics/' + id)] }) + body + '\n';
 }
-interface ContentJournal { destination: string; staging: string; previous: string }
-export async function recoverContent(config: Config): Promise<void> {
+interface ContentJournal { destination: string; staging: string; previous: string; publications?: PublishedIdentity[] }
+export async function recoverContent(config: Config, store: Store): Promise<void> {
   const journalPath = resolve(config.storage.directory, 'content-journal.json');
   if (!existsSync(journalPath)) return;
   const journal = JSON.parse(await readFile(journalPath, 'utf8')) as ContentJournal;
   if (journal.destination !== resolve(config.feed.directory) || dirname(journal.staging) !== dirname(journal.destination) || dirname(journal.previous) !== dirname(journal.destination)) throw new Error('Content journal paths differ from the configured same-filesystem destination');
+  let installed = existsSync(journal.destination) && !existsSync(journal.staging);
   if (!existsSync(journal.destination)) {
-    if (existsSync(journal.staging)) await rename(journal.staging, journal.destination);
+    if (existsSync(journal.staging)) { await rename(journal.staging, journal.destination); installed = true; }
     else if (existsSync(journal.previous)) await rename(journal.previous, journal.destination);
     else throw new Error('Content journal cannot recover either tree');
+  }
+  // Journals predating publication tracking still own a recoverable content tree.
+  const publications = journal.publications ?? [];
+  if (installed) recordPublications(store, publications);
+  else if (publications.length) {
+    // If cleanup is interrupted, a later recovery must not mistake the old
+    // destination for a committed staging tree after staging has been removed.
+    journal.publications = [];
+    await atomicWrite(journalPath, JSON.stringify(journal));
   }
   await rm(journal.staging, { recursive: true, force: true });
   await rm(journal.previous, { recursive: true, force: true });
@@ -106,21 +117,23 @@ export async function recoverContent(config: Config): Promise<void> {
 }
 export async function writeSite(config: Config, store: Store, signal?: AbortSignal, force = false): Promise<boolean> {
   signal?.throwIfAborted();
-  await recoverContent(config);
+  await recoverContent(config, store);
   await importArchives(config, store, signal);
   for (const source of config.sources) if (store.meta('selection_policy:' + source.id) !== selectionPolicy(source)) reconcileSelection(config, store, { source: source.id, signal });
   const registry = await loadTopics(config.feed.topics);
   const timezones = new Map(config.sources.map(source => [source.id, source.timezone]));
   const destination = resolve(config.feed.directory);
   const manifests = await Promise.all(['en', 'zh-CN'].map(locale => readFile('config/locales/' + locale + '.json', 'utf8')));
-  const signature = hash({ contentVersion: store.meta('content_version'), registry, sources: config.sources.map(({ id, name, timezone, selection }) => ({ id, name, timezone, selection })), manifests, recommendations: relationRevision(store), renderRevision: 9 });
+  const scope = publicationScope(store);
+  const signature = () => hash({ contentVersion: store.meta('content_version'), admissions: publicationSignature(store, scope), registry, sources: config.sources.map(({ id, name, timezone, selection }) => ({ id, name, timezone, selection })), manifests, recommendations: relationRevision(store), renderRevision: 13 });
   const signatureKey = 'render_signature:' + destination;
-  if (!force && existsSync(destination) && existsSync(join(destination, 'index.md')) && existsSync(join(destination, '_translations/zh-CN/index.md')) && store.meta(signatureKey) === signature) return false;
+  if (!force && existsSync(destination) && existsSync(join(destination, 'index.md')) && existsSync(join(destination, '_translations/zh-CN/index.md')) && store.meta(signatureKey) === signature()) return false;
   const recommendationAt = nowIso(), relations = activeRelations(store, recommendationAt);
   const topicIds = new Map(registry.topics.map(topic => [topic.id, topic.replacedBy ?? topic.id]));
   await mkdir(dirname(destination), { recursive: true });
   const staging = await mkdtemp(join(dirname(destination), '.content-stage-'));
-  const paths = new Map<string, string>();
+  const paths = new Map<string, PublishedIdentity>();
+  const publications: PublishedIdentity[] = [];
   const directories = new Set<string>();
   const posts = new Map<string, Publication>();
   function trackPublication(path: string, body: string | Buffer): void {
@@ -162,6 +175,7 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
       const prefix = locale === 'zh-CN' ? '_translations/zh-CN/' : '';
       const manifest = JSON.parse(manifests[locale === 'en' ? 0 : 1]!);
       manifest.tag_labels = Object.fromEntries([...config.sources.map(source => ['source/' + source.id, manifest.tag_labels?.['source/' + source.id] ?? source.name]), ...registry.topics.map(topic => ['topics/' + topic.id, topic.name[locale]])]);
+      manifest.hidden_tags = registry.topics.filter(topic => topic.hidden).map(topic => 'topics/' + topic.id).sort();
       manifest.tag_aliases = Object.fromEntries(registry.topics.filter(topic => topic.replacedBy).map(topic => ['topics/' + topic.id, 'topics/' + topic.replacedBy]));
       if (!preserveManifest || !existsSync(join(staging, prefix + '_locale.yml'))) await write(prefix + '_locale.yml', JSON.stringify(manifest, null, 2));
       if (!existsSync(join(staging, prefix + 'index.md'))) await write(prefix + 'index.md', frontmatter({ publish: true, content_type: 'page', title: 'Feedgarden' }));
@@ -173,9 +187,11 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
         }) + '# ' + title + '\n');
       }
     }
-    const archived = store.db.prepare(`SELECT a.path,a.source,a.id,a.en,a.zh FROM feed_archives a LEFT JOIN feed_summaries f ON f.source=a.source AND f.id=a.id LEFT JOIN feed_excluded e ON e.source=a.source AND e.id=a.id WHERE f.id IS NULL AND e.id IS NULL AND ${selectionClause('a', true)} ORDER BY a.path`);
-    for (const row of archived.iterate() as Iterable<{ path: string; source: string; id: string; en: string; zh: string }>) {
-      paths.set(row.path, JSON.stringify([row.source, row.id]));
+    const archived = store.db.prepare(`SELECT a.path,a.source,a.id,a.item,i.first_seen,a.en,a.zh,p.id IS NOT NULL AS published FROM feed_archives a JOIN items i ON i.source=a.source AND i.id=a.id LEFT JOIN feed_summaries f ON f.source=a.source AND f.id=a.id LEFT JOIN feed_excluded e ON e.source=a.source AND e.id=a.id LEFT JOIN feed_publications p ON p.source=a.source AND p.id=a.id WHERE f.id IS NULL AND e.id IS NULL AND ${publicationClause('a', 'p')} ORDER BY a.path`);
+    for (const row of archived.iterate() as Iterable<{ path: string; source: string; id: string; item: string; first_seen: string; en: string; zh: string; published: number }>) {
+      if (!admitsPublication(JSON.parse(row.item), row.first_seen, row.published === 1, scope)) continue;
+      paths.set(row.path, [row.source, row.id]);
+      if (!row.published) publications.push([row.source, row.id]);
       await preserve(row.path, renderArchivedMedia(row.en, 'en')); await preserve('_translations/zh-CN/' + row.path, renderArchivedMedia(row.zh, 'zh-CN'));
     }
     for (const record of iterateAcceptedItems(store)) {
@@ -184,10 +200,11 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
         const day = DateTime.fromISO(record.date, { zone: timezones.get(source) ?? 'Asia/Shanghai' }).toISODate();
         if (!day) throw new Error('Invalid item date: ' + source + '/' + id);
         itemPath(source, day, 1); // Validate directory components before reserving a number.
-        const path = itemPath(source, day, store.itemNumber(source, id, day)), identity = JSON.stringify([source, id]);
+        const path = itemPath(source, day, store.itemNumber(source, id, day));
         const previous = paths.get(path);
-        if (previous && previous !== identity) throw new Error('Item path collision: ' + path);
-        paths.set(path, identity);
+        if (previous && (previous[0] !== source || previous[1] !== id)) throw new Error('Item path collision: ' + path);
+        paths.set(path, [source, id]);
+        if (!record.published) publications.push([source, id]);
         const topics = [...new Set(record.copy.topics.map(id => {
           const resolved = topicIds.get(id); if (!resolved) throw new Error('Unknown stored topic: ' + id); return resolved;
         }))];
@@ -198,14 +215,14 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
   } catch (error) { await rm(staging, { recursive: true, force: true }); throw error; }
   const previous = destination + '.previous-' + Date.now();
   store.assertLease();
-  await atomicWrite(resolve(config.storage.directory, 'content-journal.json'), JSON.stringify({ destination, staging, previous }), signal);
+  await atomicWrite(resolve(config.storage.directory, 'content-journal.json'), JSON.stringify({ destination, staging, previous, publications }), signal);
   signal?.throwIfAborted();
   store.assertLease();
   if (existsSync(destination)) await rename(destination, previous);
   signal?.throwIfAborted();
   await rename(staging, destination);
   signal?.throwIfAborted();
-  await recoverContent(config);
-  store.setMeta(signatureKey, signature);
+  await recoverContent(config, store);
+  store.setMeta(signatureKey, signature());
   return true;
 }

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { validateRegistry, normalizedName } from './topics-contract.mjs';
 import { atomicWrite, hash } from './util.js';
-export type Topic = { id: string; name: { en: string; 'zh-CN': string }; description: string; aliases: string[]; deprecated: boolean; replacedBy?: string };
+export type Topic = { id: string; name: { en: string; 'zh-CN': string }; description: string; aliases: string[]; deprecated: boolean; hidden?: boolean; replacedBy?: string };
 export type Registry = { version: 1; topics: Topic[] };
 export async function loadTopics(path: string): Promise<Registry> { return validateRegistry(JSON.parse(await readFile(path, 'utf8'))) as Registry; }
 export function assertTopicUpdate(previous: Registry, next: Registry): Registry {
@@ -24,7 +24,7 @@ export async function applyTopics(path: string, next: Registry, expectedHash?: s
   await atomicWrite(path, JSON.stringify(valid, null, 2) + '\n', signal);
 }
 export function mergeTopics(base: Registry, local: Registry, remote: Registry): Registry {
-  const indexed = [base, local, remote].map(registry => new Map(registry.topics.map(topic => [topic.id, topic])));
+  const indexed = [base, local, remote].map(registry => new Map(validateRegistry(registry).topics.map(topic => [topic.id, topic])));
   const ids = new Set([...base.topics, ...local.topics, ...remote.topics].map(topic => topic.id));
   const topics: Topic[] = [], conflicts: string[] = [];
   for (const id of ids) {

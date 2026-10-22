@@ -1,4 +1,5 @@
-import { mkdir, readdir, rm } from 'node:fs/promises';
+import { mkdir, readdir, rm, rename } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { DateTime } from 'luxon';
 import { Store } from './store.js';
@@ -11,7 +12,10 @@ export async function backup(store: Store, directory: string, at = new Date().to
     const root = join(directory, 'backups', kind);
     await mkdir(root, { recursive: true, mode: 0o700 });
     const path = join(root, stamp + '.sqlite');
-    if (!(await readdir(root)).includes(stamp + '.sqlite')) { await store.backup(path); created.push(path); }
+    // Keep the temporary file beside its destination for same-filesystem rename.
+    const temporary = join(root, stamp + '.' + randomUUID() + '.tmp');
+    try { await store.backup(temporary); await rename(temporary, path); created.push(path); }
+    finally { await rm(temporary, { force: true }); }
     const files = (await readdir(root)).filter(file => /^\d{4}-\d{2}-\d{2}\.sqlite$/.test(file)).sort().reverse();
     for (const file of files.slice(keep)) await rm(join(root, file));
   }

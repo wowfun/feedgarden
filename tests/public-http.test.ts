@@ -15,6 +15,18 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import type { AddressInfo } from 'node:net';
 
+test('signed public targets preserve query bytes through validation and discard only fragments', async () => {
+  const resolver = async () => [{ address: '8.8.8.8', family: 4 }];
+  const url = 'https://example.com/image?utm_token=a%2fb&sig=A+B&gclid=2&x=1&x=2';
+  assert.equal((await resolvePublicTarget(url + '#section', resolver, { preserveQuery: true })).url, url);
+  const ordinary = await resolvePublicTarget(url, resolver);
+  assert.equal(new URL(ordinary.url).searchParams.has('utm_token'), false);
+  assert.equal(new URL(ordinary.url).searchParams.has('gclid'), false);
+  for (const invalid of ['https://user:pass@example.com/a', 'file:///private/a', 'http://127.0.0.1/a']) {
+    await assert.rejects(resolvePublicTarget(invalid, resolver, { preserveQuery: true }));
+  }
+});
+
 test('public requests carry their validated connection dispatcher and original Host', async () => {
   const store = new Store(':memory:');
   try {
@@ -61,14 +73,14 @@ test('direct and NO_PROXY connections retain Host, SNI and CA verification witho
         connect: { ca: cert, lookup() { throw new Error('Destination DNS must not run again'); } },
       });
       try {
-        const response = await fetch(url, { headers: { Host: 'publisher.example:' + port }, dispatcher } as RequestInit);
+        const response = await fetch(url, { dispatcher } as RequestInit);
         assert.equal(await response.text(), 'Public article');
       } finally { await dispatcher.destroy(); }
     }
     assert.deepEqual(observed, Array.from({ length: 3 }, () => ({ host: 'publisher.example:' + port, servername: 'publisher.example' })));
     const dispatcher = publicDispatcher({ url: 'https://wrong.example:' + port, address: '127.0.0.1' }, { noProxy: '*', connect: { ca: cert } });
     try {
-      await assert.rejects(fetch('https://wrong.example:' + port, { headers: { Host: 'wrong.example:' + port }, dispatcher } as RequestInit),
+      await assert.rejects(fetch('https://wrong.example:' + port, { dispatcher } as RequestInit),
         error => (error as Error & { cause?: { code?: string } }).cause?.code === 'ERR_TLS_CERT_ALTNAME_INVALID');
     } finally { await dispatcher.destroy(); }
   } finally { origin.closeAllConnections(); origin.close(); await once(origin, 'close'); }

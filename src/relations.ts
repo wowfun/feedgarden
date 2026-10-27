@@ -1,3 +1,4 @@
+import { agentRuntime } from './storage-paths.js';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse } from 'yaml';
@@ -114,7 +115,7 @@ export async function relate(config: Config, store: Store, options: { signal?: A
   options.signal?.throwIfAborted(); store.assertLease();
   if (!candidates.length) return { candidates: 0, judged: 0, pending: 0, deferred: false };
   let agent: ResolvedAgent;
-  try { agent = await (options.resolveAgent ?? (options.generator ? configuredAgent : resolveAgent))(config.agent, options.signal); }
+  try { agent = await (options.resolveAgent ?? (options.generator ? configuredAgent : resolveAgent))(agentRuntime(config), options.signal); }
   catch (error) {
     options.signal?.throwIfAborted(); store.assertLease();
     return { candidates: candidates.length, judged: 0, pending: candidates.length, deferred: false, configurationError: errorText(error) };

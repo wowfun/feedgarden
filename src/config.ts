@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parse, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { z } from 'zod';
+import { defaultStorageRoot } from './storage-paths.js';
 
 const slug = z.string().regex(/^[a-z0-9][a-z0-9_-]*$/);
 const channelFields = {
@@ -17,7 +18,7 @@ export const channelSchema = z.discriminatedUnion('kind', [
   z.object({ ...channelFields, kind: z.enum(['hn-api', 'feed', 'sitemap', 'anthropic-html', 'github-trending', 'github-search', 'x-cli', 'follow-builders', 'arxiv-api', 'ph-html']), url: z.url().optional() }).strict(),
 ]);
 export const sourceSchema = z.object({
-  id: slug, name: z.string().min(1), enabled: z.boolean().default(true),
+  id: slug.regex(/^(?!clippings$)/, 'clippings is reserved for authored content'), name: z.string().min(1), enabled: z.boolean().default(true),
   timezone: z.string().default('Asia/Shanghai').refine(value => {
     try { new Intl.DateTimeFormat('en', { timeZone: value }); return true; } catch { return false; }
   }, 'Invalid IANA timezone'),
@@ -38,17 +39,21 @@ const agentFields = {
   version: z.string().min(1).optional(), timeoutSeconds: z.number().positive().max(300).default(300),
   maxBatchItems: z.number().int().min(1).max(10).default(10), maxInputChars: z.number().int().min(4000).max(24000).default(24000),
   maxItemChars: z.number().int().min(100).max(4000).default(4000), maxDailyCalls: z.number().int().positive().max(80).default(80),
-  runtimeDirectory: z.string().default('.local/agents'),
   workspaceRetentionDays: z.number().int().min(0).max(365).default(7),
   maxTranscriptChunks: z.number().int().min(1).max(1024).default(64),
 };
+const agentObjectError: z.core.$ZodErrorMap = issue => issue.code === 'unrecognized_keys' && issue.keys.includes('runtimeDirectory')
+  ? 'agent.runtimeDirectory was removed; agent workspaces are derived from storage.root' : undefined;
 export const agentSchema = z.union([
-  z.object({ ...agentFields, backend: z.literal('opencode').default('opencode'), model: z.string().trim().min(1).optional() }).strict(),
-  z.object({ ...agentFields, backend: z.literal('dsh'), model: z.string({ error: 'DSH requires an explicit model' }).trim().min(1) }).strict(),
+  z.object({ ...agentFields, backend: z.literal('opencode').default('opencode'), model: z.string().trim().min(1).optional() }, { error: agentObjectError }).strict(),
+  z.object({ ...agentFields, backend: z.literal('dsh'), model: z.string({ error: 'DSH requires an explicit model' }).trim().min(1) }, { error: agentObjectError }).strict(),
 ]);
 export const configSchema = z.object({
   $schema: z.string().optional(), version: z.literal(2),
-  storage: z.object({ database: z.string().default('.local/feedgarden.sqlite'), directory: z.string().default('.local') }).strict().default({ database: '.local/feedgarden.sqlite', directory: '.local' }),
+  storage: z.object({ root: z.string().trim().min(1).default(defaultStorageRoot) }, {
+    error: issue => issue.code === 'unrecognized_keys'
+      ? `Unsupported storage settings: ${issue.keys.map(key => 'storage.' + key).join(', ')}. Use storage.root; all private paths are derived from it` : undefined,
+  }).strict().default({ root: defaultStorageRoot }),
   feed: z.object({ directory: z.string().default('content'), topics: z.string().default('config/topics.json') }).strict().default({ directory: 'content', topics: 'config/topics.json' }),
   collection: z.object({ backfillDays: z.number().int().min(0).max(30).default(7), enrichmentRefreshDays: z.number().int().min(0).max(30).default(7) }).strict().default({ backfillDays: 7, enrichmentRefreshDays: 7 }),
   agent: agentSchema,

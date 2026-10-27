@@ -1,3 +1,4 @@
+import { agentRuntime, storagePaths } from '../src/storage-paths.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
@@ -17,9 +18,9 @@ const generator: Generator = async (_agent, input, _repair, directory) => ({ dir
 
 test('resolved backend, inherited selections and provider settings invalidate summary, transcript and relation caches', async () => {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-agent-identity-'));
-  const config = configSchema.parse({ version: 2, storage: { database: join(root, 'data.sqlite'), directory: root }, feed: { directory: join(root, 'content'), topics: join(root, 'topics.json') }, agent: { runtimeDirectory: join(root, 'tasks') }, sources: ['one', 'two'].map(id => ({ id, name: id, intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'feed', kind: 'feed' }] }] })) });
+  const config = configSchema.parse({ version: 2, storage: { root: root }, feed: { directory: join(root, 'content'), topics: join(root, 'topics.json') }, agent: {  }, sources: ['one', 'two'].map(id => ({ id, name: id, intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'feed', kind: 'feed' }] }] })) });
   await writeFile(config.feed.topics, JSON.stringify({ version: 1, topics: [{ id: 'coding', name: { en: 'Coding', 'zh-CN': '编程' }, description: 'Tools', aliases: [], deprecated: false }] }));
-  const store = new Store(config.storage.database);
+  const store = new Store(storagePaths(config.storage).database);
   let defaults = { model: 'fixture/one', effort: 'low', configurationHash: 'first', version: '2.0.31' }, resolves = 0;
   const resolver: AgentResolver = async requested => {
     resolves++;
@@ -61,7 +62,7 @@ test('resolved backend, inherited selections and provider settings invalidate su
     const body = 'Fixed transcript facts.';
     store.db.prepare('INSERT INTO podcast_transcripts VALUES (?,?,?,?,?,?)').run('podcast', 'episode', body, hash(body), 'https://example.test/transcript', at);
     const episode: Item = { id: 'episode', source: 'podcast', stream: 'show', channel: 'rss', title: 'Episode', text: '', url: 'https://example.test/episode', publishedAt: at, observedAt: at, basis: 'published', metrics: {}, metadata: { transcriptHash: hash(body) } };
-    const agent = await resolver(config.agent);
+    const agent = await resolver(agentRuntime(config));
     const reduce = async (_a: unknown, _kind: unknown, input: any, _repair: unknown, directory: string | undefined) => ({ output: { taskId: input.taskId, inputIds: input.parts.map((part: any) => part.id), facts: body }, directory: directory!, usage: [], events: [] });
     await transcriptStep(episode, store, agent, true, undefined, false, reduce);
     assert.equal((await transcriptStep(episode, store, agent, false)).ready, true);
@@ -70,7 +71,7 @@ test('resolved backend, inherited selections and provider settings invalidate su
 });
 
 test('resolver shares in-flight probes, evicts failures and retains successful resolutions', async () => {
-  const agent = configSchema.shape.agent.parse({ model: 'fixture/one' });
+  const agent = { ...configSchema.shape.agent.parse({ model: 'fixture/one' }), runtimeDirectory: tmpdir() };
   let probes = 0;
   const resolver = createAgentResolver(async config => {
     if (++probes === 1) throw new Error('Transient startup failure');
@@ -89,16 +90,16 @@ test('cache identity refuses unresolved models', () => {
 });
 
 test('injected generators preserve an already resolved native execution identity', async () => {
-  const resolved = await configuredAgent(configSchema.shape.agent.parse({ model: 'fixture/one' }));
+  const resolved = await configuredAgent({ ...configSchema.shape.agent.parse({ model: 'fixture/one' }), runtimeDirectory: tmpdir() });
   resolved.execution = { ...resolved.execution, version: '2.0.31', configurationHash: 'provider-route' };
   assert.equal(await configuredAgent(resolved), resolved);
 });
 
 async function planningFixture() {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-agent-planning-'));
-  const config = configSchema.parse({ version: 2, storage: { database: join(root, 'data.sqlite'), directory: root }, feed: { directory: join(root, 'content'), topics: join(root, 'topics.json') }, agent: { model: 'fixture/one', runtimeDirectory: join(root, 'tasks') }, sources: ['one', 'two'].map(id => ({ id, name: id, intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'feed', kind: 'feed' }] }] })) });
+  const config = configSchema.parse({ version: 2, storage: { root: root }, feed: { directory: join(root, 'content'), topics: join(root, 'topics.json') }, agent: { model: 'fixture/one' }, sources: ['one', 'two'].map(id => ({ id, name: id, intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'feed', kind: 'feed' }] }] })) });
   await writeFile(config.feed.topics, JSON.stringify({ version: 1, topics: [{ id: 'coding', name: { en: 'Coding', 'zh-CN': '编程' }, description: 'Tools', aliases: [], deprecated: false }] }));
-  const store = new Store(config.storage.database);
+  const store = new Store(storagePaths(config.storage).database);
   store.setMeta('cutoff', '1970-01-01T00:00:00.000Z');
   const seed = () => {
     for (const source of ['one', 'two']) {

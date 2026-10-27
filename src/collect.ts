@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon';
 import type { Config, Source } from './config.js';
+import { storagePaths } from './storage-paths.js';
 import { adapters, type Adapter } from './channels/index.js';
 import { Http, HttpError } from './http.js';
 import { Store } from './store.js';
@@ -37,7 +38,7 @@ export async function collect(config: Config, store: Store, selected?: string, d
         http.raw.length = 0;
         const since = sinceOverride ? iso(DateTime.fromISO(sinceOverride, { zone: source.timezone }).toUTC(), '--since') : iso(DateTime.fromISO(state?.last_success ?? now).minus({ days: state?.last_success ? 1 : config.collection.backfillDays }).toUTC(), 'collection checkpoint');
         try {
-          const result = await (registry[channel.kind] as Adapter)({ source, stream, channel, store, http, now, since, restartRange: !!sinceOverride });
+          const result = await (registry[channel.kind] as Adapter)({ source, stream, channel, store, http, now, since, restartRange: !!sinceOverride, twitterEnvironment: storagePaths(config.storage).twitterEnvironment });
           signal?.throwIfAborted();
           store.assertLease();
           const { newItems } = store.saveCollection(source.id, stream.id, channel.id, result, next(source, now), now);

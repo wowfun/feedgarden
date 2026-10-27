@@ -2,9 +2,60 @@
 
 Run all commands from the repository root.
 
+Verification commands accept `--config FILE`; their evidence defaults to `<storage.root>/validation/`. `FEEDGARDEN_VALIDATION_DIR` explicitly overrides that location. Database-backed fixtures select an independent storage root, including their Agent workspaces; they must never open the production database. `verify:clippings` and `verify:footer` use the same evidence resolver.
+
+`verify:collect` reuses the selected configuration's Twitter installation when checking X, while collection evidence and database state remain isolated.
+
 ## Pinned theme changes
 
 `verify:scale`, `site:build` and publication use the exact published gem in the root `Gemfile` and `Gemfile.lock`. Run `bundle install` after checkout. Implement reusable theme changes upstream, publish and verify the gem, then update the exact version and run `bundle update jekyll-obsidian-site`. Commit both dependency files with Windows and Linux platforms. Builds use frozen Bundler resolution and precompiled gem assets; they do not clone the theme or run its frontend toolchain.
+
+## Local Clippings validation
+
+Clippings uses shared-content and Web Clipper support from the pinned `jekyll-obsidian-site` 0.3.2 release, including `published`/`source`, directory tags, published Markdown image URLs and the footer API.
+
+Both verifiers default to the frozen published dependency in `Gemfile` and `Gemfile.lock`; they need no theme checkout or personal-site directory. CI runs them for every non-docs change and retains their screenshots, exports and result records with the visual-validation artifact.
+
+For future theme upgrades, publish and verify the upstream gem first, then update both dependency files. Validate a clean checkout without `.references/` or a local theme gem: run `npm run build`, `npm test`, `npm run site:build`, `npm run test:visual`, `npm run verify:scale`, both verifiers, and the fixture visual check below. Require the full PR CI job before merging.
+
+```sh
+npm run verify:clippings
+npm run verify:footer
+```
+
+For upstream development, explicitly select a local package:
+
+```powershell
+Push-Location .references/jekyll-obsidian/website
+npm run build
+bundle exec ruby scripts/package.rb --skip-assets
+Pop-Location
+npm run verify:clippings -- --gem .references/jekyll-obsidian/pkg/jekyll-obsidian-site-0.3.2.gem
+```
+
+The package filename uses the upstream checkout's version; adjust it if that version changes. The local artifact is identified by its SHA-256, not treated as a new published release. Published-mode results instead record the locked version and bundle SHA-256. The verifier installs it into a fresh gem home under `.local/feedgarden/validation/clippings/run-*/`, reusing installed runtime dependencies without downloading or replacing the normal theme. It builds a copy of the current content and a 52-clipping fixture, runs desktop/mobile checks in both languages, and saves screenshots, Markdown exports and `results.json`. Existing site browser checks run against the real-content copy as well. No production database is opened, no collected content is rendered, and nothing is published. The real-content check accepts an empty or populated Clippings tab; the synthetic fixture exercises pagination and content interactions.
+
+The fixture also covers local inline/reference images, Copy page clipboard content and absolute attachment URLs in exports. The current real article is checked for hosted image loading and absence of requests to its original image host. Run the manual image-fetch and preservation tests with `node --import tsx --test --test-concurrency=1 tests/fetch-clippings.test.ts tests/clippings.test.ts`; see [Clippings](clippings.md#fetch-and-host-images-manually) for usage. Image fetching is never part of the verifier or production build.
+
+## Footer navigation and two-site previews
+
+`website.footer.links` in `.github/jekyll-obsidian.yml` links to Sinputer's Site. The Chinese override is an explicit full URL. Contacts and navigation are rendered by the upstream theme on every page. The footer API is supported by the pinned 0.3.2 release.
+
+Without `--personal-site`, `verify:footer` validates Feedgarden alone. The optional second host uses its own configuration and content with the same selected theme package. Contact counts, language routes and base paths come from each host configuration; `--port` and `--personal-port` override the preview ports (58002 and 58000).
+
+For paired previews using the published dependency, run:
+
+```powershell
+npm run verify:footer -- --personal-site D:/Projects/wowfun.github.io
+$preview = Get-Content .local/feedgarden/validation/footer/current.json -Raw | ConvertFrom-Json
+# Run these in separate terminals; stop any older preview occupying the same port first.
+npm run site:serve -- --root $preview.builds.'personal-minimal' --baseurl / --port 58000
+npm run site:serve -- --root $preview.builds.'feedgarden-minimal' --baseurl /feedgarden --port 58002
+```
+
+Open `http://127.0.0.1:58000/` and `http://127.0.0.1:58002/feedgarden/`. The verifier uses the frozen published bundle by default, copies each site's configured content directory and any imported-document cache, and disables comments and analytics in the copies. An explicit `--gem` installs a local development package in an isolated gem home. It retains each site's configured theme, checks footer URLs on every rendered page before remapping, and saves 1440px/390px, English/Chinese, light/dark screenshots and browser results in `run-*/results.json`. Every generated HTML page must have a footer. Only raw HTML listed by the theme manifest and bare redirect documents are exempt, and the result record lists each exemption. Browser cases cover home, available article/archive pages and actual missing routes: missing routes must return HTTP 404 with the localized header, title and footer. Checks include keyboard focus, touch areas, overflow and toolbar clearance. Upstream compiler, integration and browser tests cover both Minimal and Docs. Feedgarden requires Minimal for favorites and archive visibility rules; forcing its configuration into Docs is unsupported.
+
+Only generated preview HTML maps configured host origins and base paths to the local ports; Jekyll Obsidian continues to link to the live documentation site. Repository configuration keeps production HTTPS URLs. The verifier never opens the production database, renders collected content, edits authored files, upgrades the pinned gem or deploys. These previews are static snapshots; rerun the verifier after source changes.
 
 ## Validation commands
 
@@ -18,7 +69,7 @@ npm run site:build
 npx playwright install --with-deps --only-shell chromium
 npm run test:visual
 npm run verify:scale
-FEEDGARDEN_VISUAL_ROOT=.local/validation/fixture/.jekyll-obsidian-cache/site FEEDGARDEN_VISUAL_FIXTURE=1 npm run test:visual
+FEEDGARDEN_VISUAL_ROOT=.local/feedgarden/validation/fixture/.jekyll-obsidian-cache/site FEEDGARDEN_VISUAL_FIXTURE=1 npm run test:visual
 ```
 
 `build` compiles and typechecks the same TypeScript project. Use `npm run typecheck` when you only need diagnostics without emitted files. The fixture browser command above uses POSIX environment syntax; in PowerShell, set `$env:FEEDGARDEN_VISUAL_ROOT` and `$env:FEEDGARDEN_VISUAL_FIXTURE` before running `npm run test:visual`, then remove both variables. `npm run verify:agent` is a separate paid live check, not part of CI.
@@ -42,7 +93,7 @@ The build job has read-only Actions access for this history lookup. Its summary 
 
 ## Fixtures and evidence
 
-The 101-item bilingual fixture exercises full static build and browser flows. `fixture-planning.json` records its summary/render planning checks before the theme build; `fixture-build.json` is written only after the complete pinned build passes. The upstream index/query tests cover 100,000 records without generating 100,000 full Jekyll pages. `verify:agent` uses real OpenAI RSS items and the configured ACP backend in an isolated database, registry and content tree. It performs no publication. `npm run verify:opencode` uses a temporary OpenCode profile, delayed MCP startup and a local simulated model to check inherited selections, tool readiness, probe-session cleanup, all three fixed task contracts and forbidden-tool rejection without paid calls. MCP startup is delayed by 7000 ms per task by default; pass `-- --mcp-delay-ms 250` for a shorter local check, or combine it with `--command PATH`. CI installs OpenCode 2.0.31 and runs this acceptance script against its local simulated provider. Reusable validation artifacts default to `.local/validation/`; set `FEEDGARDEN_VALIDATION_DIR` to choose an evidence directory. Historical refactor notes remain in `.local/notes/1009/`.
+The 101-item bilingual fixture exercises full static build and browser flows. `fixture-planning.json` records its summary/render planning checks before the theme build; `fixture-build.json` is written only after the complete pinned build passes. The upstream index/query tests cover 100,000 records without generating 100,000 full Jekyll pages. `verify:agent` uses real OpenAI RSS items and the configured ACP backend in an isolated database, registry and content tree. It performs no publication. `npm run verify:opencode` uses a temporary OpenCode profile, delayed MCP startup and a local simulated model to check inherited selections, tool readiness, probe-session cleanup, all three fixed task contracts and forbidden-tool rejection without paid calls. MCP startup is delayed by 7000 ms per task by default; pass `-- --mcp-delay-ms 250` for a shorter local check, or combine it with `--command PATH`. CI installs OpenCode 2.0.31 and runs this acceptance script against its local simulated provider. Reusable validation artifacts default to `.local/feedgarden/validation/`; set `FEEDGARDEN_VALIDATION_DIR` to choose an evidence directory. Historical refactor notes remain in `.local/notes/1009/`.
 
 ## Related documentation
 

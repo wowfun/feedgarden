@@ -4,6 +4,12 @@ import { atomicWrite, hash } from './util.js';
 export type Topic = { id: string; name: { en: string; 'zh-CN': string }; description: string; aliases: string[]; deprecated: boolean; hidden?: boolean; replacedBy?: string };
 export type Registry = { version: 1; topics: Topic[] };
 export async function loadTopics(path: string): Promise<Registry> { return validateRegistry(JSON.parse(await readFile(path, 'utf8'))) as Registry; }
+export function topicTagAliases(registry: Registry): Record<string, string> {
+  return Object.fromEntries(registry.topics.flatMap(topic => {
+    const target = 'topics/' + (topic.replacedBy ?? topic.id);
+    return [[topic.id, target], ...(topic.replacedBy ? [['topics/' + topic.id, target]] : [])];
+  }));
+}
 export function assertTopicUpdate(previous: Registry, next: Registry): Registry {
   const valid = validateRegistry(next) as Registry;
   for (const old of previous.topics) {

@@ -16,10 +16,11 @@ export function isoDate(value: DateTime, label = 'date'): string {
 export const hash = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const nowIso = (): string => new Date().toISOString();
 export const sleep = (ms: number, signal?: AbortSignal): Promise<void> => setTimeout(ms, undefined, { signal });
-export function safeUrl(value: string, base?: string): string {
+export function safeUrl(value: string, base?: string, options: { preserveQuery?: boolean } = {}): string {
   const url = new URL(value, base);
   if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('Invalid public URL');
-  for (const key of [...url.searchParams.keys()]) if (/^(utm_|fbclid|gclid)/i.test(key)) url.searchParams.delete(key);
+  // Image signatures may cover every query byte, including tracking-like keys.
+  if (!options.preserveQuery) for (const key of [...url.searchParams.keys()]) if (/^(utm_|fbclid|gclid)/i.test(key)) url.searchParams.delete(key);
   url.hash = '';
   return url.href;
 }

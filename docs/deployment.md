@@ -6,7 +6,7 @@ Publishing is disabled automatically by default. The remote `Gemfile` and `Gemfi
 
 ## Publication
 
-`publish` fetches the configured branch into an isolated worktree, merges topic registries with a three-way base, validates the site, commits only `content/` and `config/topics.json`, and pushes without force. Legacy `reports/` deletions are permitted only with the migration journal. Independent topic additions merge; conflicting IDs stop the entire publication and preserve local data, with `.local/publish-conflict.json` for resolution. Integrate the code/theme change into the publication branch before publishing item content.
+`publish` fetches the configured branch into an isolated worktree, merges topic registries with a three-way base, validates the site, commits only `content/` and `config/topics.json`, and pushes without force. Independent topic additions merge; conflicting IDs stop the entire publication and preserve local data, with `.local/feedgarden/state/publish-conflict.json` for resolution. Integrate the code/theme change into the publication branch before publishing item content.
 
 ## Topic conflicts
 

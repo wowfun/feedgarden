@@ -1,3 +1,4 @@
+import { agentRuntime, storagePaths } from '../src/storage-paths.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm, stat } from 'node:fs/promises';
@@ -55,8 +56,8 @@ test('minimum encoded transcript budgets terminate and retain escaped UTF-16 evi
 
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-new-'));
-  const config = configSchema.parse({ version: 2, storage: { database: join(root, 'data.sqlite'), directory: root }, feed: { directory: join(root, 'content') }, agent: { model: 'deepseek/deepseek-flash', runtimeDirectory: join(root, 'tasks') }, sources: [{ id: 'podcast', name: 'Podcasts', intervalHours: 6, streams: [{ id: 'show', channels: [{ id: 'rss', kind: 'podcast-rss', podcastName: 'Show', url: 'https://example.test/feed' }] }] }] });
-  const store = new Store(config.storage.database);
+  const config = configSchema.parse({ version: 2, storage: { root: root }, feed: { directory: join(root, 'content') }, agent: { model: 'deepseek/deepseek-flash' }, sources: [{ id: 'podcast', name: 'Podcasts', intervalHours: 6, streams: [{ id: 'show', channels: [{ id: 'rss', kind: 'podcast-rss', podcastName: 'Show', url: 'https://example.test/feed' }] }] }] });
+  const store = new Store(storagePaths(config.storage).database);
   return { config, store, root, cleanup: async () => { store.close(); await rm(root, { recursive: true, force: true }); } };
 }
 
@@ -65,7 +66,7 @@ test('auxiliary retention prunes owned accepted and failed tasks while preservin
   try {
     const rows: { key: string; workspace: string; state: string; input: string }[] = [];
     for (const state of ['accepted', 'failed', 'pending', 'running', 'unowned']) {
-      const key = state, workspace = join(f.config.agent.runtimeDirectory, 'task-' + randomUUID());
+      const key = state, workspace = join(storagePaths(f.config.storage).agents, 'task-' + randomUUID());
       await mkdir(workspace, { recursive: true });
       await writeFile(join(workspace, '.feedgarden-workspace.json'), JSON.stringify({ version: 1, task: state === 'unowned' ? 'different-owner' : key }));
       await writeFile(join(workspace, 'audit.json'), 'Retained evidence');
@@ -74,9 +75,9 @@ test('auxiliary retention prunes owned accepted and failed tasks while preservin
         .run(key, 'transcript', input, state === 'accepted' ? '{"facts":"Retained result"}' : null, workspace, state === 'unowned' ? 'failed' : state, state === 'failed' ? 5 : 1, 'retained diagnostic', '2026-10-01T00:00:00Z');
       rows.push({ key, workspace, state, input });
     }
-    await pruneWorkspaces({ ...f.config.agent, workspaceRetentionDays: 0 }, f.store, '2026-10-15T00:00:00Z');
+    await pruneWorkspaces({ ...agentRuntime(f.config), workspaceRetentionDays: 0 }, f.store, '2026-10-15T00:00:00Z');
     for (const row of rows) assert.ok(await stat(row.workspace));
-    await pruneWorkspaces(f.config.agent, f.store, '2026-10-15T00:00:00Z');
+    await pruneWorkspaces(agentRuntime(f.config), f.store, '2026-10-15T00:00:00Z');
     for (const row of rows) {
       const record = f.store.db.prepare('SELECT workspace,input,error,state,attempts FROM feed_tasks WHERE key=?').get(row.key) as { workspace: string; input: string; error: string; state: string; attempts: number };
       if (['accepted', 'failed'].includes(row.state)) {
@@ -96,14 +97,14 @@ test('retrying a pruned failed auxiliary task creates a new owned workspace and 
   const f = await fixture();
   try {
     const input = { taskId: 'pruned', parts: [{ id: 'part', text: 'Evidence' }], maxChars: 1500 };
-    const key = await taskKey(f.config.agent, 'transcript', input), created = '2026-10-01T00:00:00Z';
+    const key = await taskKey(agentRuntime(f.config), 'transcript', input), created = '2026-10-01T00:00:00Z';
     f.store.db.prepare("INSERT INTO feed_tasks(key,kind,input,workspace,state,attempts,error,created_at) VALUES (?,?,?,'','failed',5,?,?)")
       .run(key, 'transcript', JSON.stringify(input), 'Original failure', created);
-    const stopped = await fixedTask(f.store, f.config.agent, 'transcript', input, { generator: async () => { throw new Error('Retry flag is required'); } });
+    const stopped = await fixedTask(f.store, agentRuntime(f.config), 'transcript', input, { generator: async () => { throw new Error('Retry flag is required'); } });
     assert.equal(stopped.state, 'failed'); assert.equal(stopped.performed, false);
-    const result = await fixedTask(f.store, f.config.agent, 'transcript', input, { retryFailed: true, generator: async (_a, _k, value, _r, directory) => {
+    const result = await fixedTask(f.store, agentRuntime(f.config), 'transcript', input, { retryFailed: true, generator: async (_a, _k, value, _r, directory) => {
       assert.ok(directory, 'a pruned task must not write into the current working directory');
-      assert.equal(dirname(directory!), resolve(f.config.agent.runtimeDirectory));
+      assert.equal(dirname(directory!), resolve(storagePaths(f.config.storage).agents));
       assert.deepEqual(JSON.parse(await readFile(join(directory!, '.feedgarden-workspace.json'), 'utf8')), { version: 1, task: key });
       assert.deepEqual(value, input);
       return { output: { taskId: input.taskId, inputIds: ['part'], facts: 'Evidence' }, directory: directory!, usage: [], events: [] };
@@ -111,9 +112,9 @@ test('retrying a pruned failed auxiliary task creates a new owned workspace and 
     assert.equal(result.state, 'accepted');
     const row = f.store.db.prepare('SELECT workspace,created_at FROM feed_tasks WHERE key=?').get(key) as { workspace: string; created_at: string };
     assert.notEqual(row.workspace, ''); assert.equal(row.created_at, at);
-    await pruneWorkspaces(f.config.agent, f.store, at); assert.ok(await stat(row.workspace));
+    await pruneWorkspaces(agentRuntime(f.config), f.store, at); assert.ok(await stat(row.workspace));
     const calls = (f.store.db.prepare('SELECT count(*) n FROM agent_calls').get() as { n: number }).n;
-    const recovered = await fixedTask(f.store, f.config.agent, 'transcript', input, { generator: async () => { throw new Error('Accepted result must be reused'); } });
+    const recovered = await fixedTask(f.store, agentRuntime(f.config), 'transcript', input, { generator: async () => { throw new Error('Accepted result must be reused'); } });
     assert.equal(recovered.state, 'accepted');
     assert.equal((f.store.db.prepare('SELECT count(*) n FROM agent_calls').get() as { n: number }).n, calls);
   } finally { await f.cleanup(); }
@@ -126,7 +127,7 @@ test('a transcript above its explicit chunk budget is retained without spending 
   f.store.db.prepare('INSERT INTO podcast_transcripts VALUES (?,?,?,?,?,?)').run('podcast',item.id,body,hash(body),'https://example.test/transcript',at);
   item.metadata={...item.metadata,transcriptHash:hash(body)};
   let calls=0;
-  const step=await transcriptStep(item,f.store,f.config.agent,true,undefined,false,async()=>{calls++;throw new Error('Budget must be checked first');});
+  const step=await transcriptStep(item,f.store,agentRuntime(f.config),true,undefined,false,async()=>{calls++;throw new Error('Budget must be checked first');});
   assert.equal(calls,0);assert.equal(step.failed,true);assert.match(step.error!,/maxTranscriptChunks/);
   assert.equal((f.store.db.prepare('SELECT body FROM podcast_transcripts').get() as {body:string}).body,body);
   assert.equal((f.store.db.prepare('SELECT count(*) n FROM agent_calls').get() as {n:number}).n,0);
@@ -145,7 +146,7 @@ test('escaped transcripts fit a small JSON input budget and their reduction conv
    const input=value as {taskId:string;parts:{id:string;text:string}[];maxChars:number};calls++;
    return {output:{taskId:input.taskId,inputIds:input.parts.map(p=>p.id),facts:'\u0000'.repeat(input.maxChars)},directory:directory!,usage:[],events:[]};
   };
-  for(let i=0;i<40;i++){const step=await transcriptStep(item,f.store,f.config.agent,true,undefined,false,generator);if(step.ready){ready=true;break;}}
+  for(let i=0;i<40;i++){const step=await transcriptStep(item,f.store,agentRuntime(f.config),true,undefined,false,generator);if(step.ready){ready=true;break;}}
   assert.ok(ready,'every reduction level must shrink even for heavily escaped facts');assert.ok(calls>1&&calls<40);
  }finally{await f.cleanup();}
 });
@@ -178,14 +179,14 @@ test('full transcript reduction resumes accepted nodes and invalidates on tail c
     item.metadata = { ...item.metadata, transcriptHash: hash(body) };
     let ready = false;
     for (let i = 0; i < 30; i++) {
-      const step = await transcriptStep(item, f.store, f.config.agent, true, undefined, false, generator);
+      const step = await transcriptStep(item, f.store, agentRuntime(f.config), true, undefined, false, generator);
       if (step.ready) { ready = true; assert.match(step.item.text, /complete transcript/); break; }
     }
     assert.ok(ready); assert.ok(calls > 2);
     assert.equal(supplied.filter(text => text.includes('Speech with')).join(''), body);
-    const before = calls; assert.ok((await transcriptStep(item, f.store, f.config.agent, false)).ready); assert.equal(calls, before);
+    const before = calls; assert.ok((await transcriptStep(item, f.store, agentRuntime(f.config), false)).ready); assert.equal(calls, before);
     const changed = body + ' New ending'; f.store.db.prepare('UPDATE podcast_transcripts SET body=?,hash=?').run(changed, hash(changed));
-    assert.equal((await transcriptStep({ ...item, metadata: { ...item.metadata, transcriptHash: hash(changed) } }, f.store, f.config.agent, false)).ready, false);
+    assert.equal((await transcriptStep({ ...item, metadata: { ...item.metadata, transcriptHash: hash(changed) } }, f.store, agentRuntime(f.config), false)).ready, false);
   } finally { await f.cleanup(); }
 });
 
@@ -194,14 +195,14 @@ test('fixed task recovery and global quota do not pay again for a saved artifact
   try {
     const input = { taskId: 'one', parts: [{ id: 'part', text: 'Evidence' }], maxChars: 1500 };
     const generator: TaskGenerator = async (_a, _k, _i, _r, directory) => ({ output: { taskId: 'one', inputIds: ['part'], facts: 'Evidence' }, directory: directory!, usage: [], events: [] });
-    const task = await fixedTask(f.store, f.config.agent, 'transcript', input, { generator });
+    const task = await fixedTask(f.store, agentRuntime(f.config), 'transcript', input, { generator });
     f.store.db.prepare("UPDATE feed_tasks SET output=NULL,state='running' WHERE key=?").run(task.key);
-    const recovered = await fixedTask(f.store, { ...f.config.agent, maxDailyCalls: 1 }, 'transcript', input, { generator: async () => { throw new Error('must not call'); } });
+    const recovered = await fixedTask(f.store, { ...agentRuntime(f.config), maxDailyCalls: 1 }, 'transcript', input, { generator: async () => { throw new Error('must not call'); } });
     assert.equal(recovered.state, 'accepted'); assert.equal(recovered.performed, false);
     const before=f.store.db.prepare('SELECT total_changes() n').get();
-    await fixedTask(f.store,f.config.agent,'transcript',input,{generator});
+    await fixedTask(f.store,agentRuntime(f.config),'transcript',input,{generator});
     assert.deepEqual(f.store.db.prepare('SELECT total_changes() n').get(),before,'an accepted cache hit must not rewrite the task');
-    const deferred = await fixedTask(f.store, { ...f.config.agent, maxDailyCalls: 1 }, 'transcript', { ...input, taskId: 'two' }, { generator });
+    const deferred = await fixedTask(f.store, { ...agentRuntime(f.config), maxDailyCalls: 1 }, 'transcript', { ...input, taskId: 'two' }, { generator });
     assert.equal(deferred.state, 'deferred');
     assert.equal((f.store.db.prepare('SELECT count(*) n FROM agent_calls').get() as any).n, 1);
   } finally { await f.cleanup(); }
@@ -212,11 +213,11 @@ test('corrupt accepted task output recovers a valid saved artifact before quota 
   try {
     const input = { taskId: 'recovery', parts: [{ id: 'part', text: 'Evidence' }], maxChars: 1500 };
     const output = { taskId: input.taskId, inputIds: ['part'], facts: 'Evidence' };
-    const task = await fixedTask(f.store, f.config.agent, 'transcript', input, { generator: async (_a, _k, _i, _r, directory) => ({ output, directory: directory!, usage: [], events: [] }) });
+    const task = await fixedTask(f.store, agentRuntime(f.config), 'transcript', input, { generator: async (_a, _k, _i, _r, directory) => ({ output, directory: directory!, usage: [], events: [] }) });
     f.config.agent.maxDailyCalls = 1;
     for (const broken of ['{broken', JSON.stringify({ ...output, inputIds: ['wrong'] })]) {
       f.store.db.prepare("UPDATE feed_tasks SET output=?,attempts=5 WHERE key=?").run(broken, task.key);
-      const recovered = await fixedTask(f.store, f.config.agent, 'transcript', input, { generator: async () => { throw new Error('Saved artifact must recover without a model call'); } });
+      const recovered = await fixedTask(f.store, agentRuntime(f.config), 'transcript', input, { generator: async () => { throw new Error('Saved artifact must recover without a model call'); } });
       assert.deepEqual(recovered.output, output); assert.equal(recovered.performed, false);
       assert.deepEqual(f.store.db.prepare('SELECT state,attempts,error FROM feed_tasks WHERE key=?').get(task.key), { state: 'accepted', attempts: 5, error: null });
     }
@@ -232,23 +233,23 @@ test('rejected task caches defer under quota and regenerate within the paid atte
     const generator: TaskGenerator = async (_a, _k, _i, _r, directory) => {
       calls++; return { output: { taskId: input.taskId, inputIds: ['part'], facts: 'Evidence' }, directory: directory!, usage: [], events: [] };
     };
-    const task = await fixedTask(f.store, f.config.agent, 'transcript', input, { generator });
+    const task = await fixedTask(f.store, agentRuntime(f.config), 'transcript', input, { generator });
     const row = f.store.db.prepare('SELECT workspace FROM feed_tasks WHERE key=?').get(task.key) as { workspace: string };
     f.store.db.prepare('UPDATE feed_tasks SET output=? WHERE key=?').run('{broken', task.key);
     await writeFile(join(row.workspace, 'result.json'), '{broken');
     f.config.agent.maxDailyCalls = 1;
-    const deferred = await fixedTask(f.store, f.config.agent, 'transcript', input, { generator });
+    const deferred = await fixedTask(f.store, agentRuntime(f.config), 'transcript', input, { generator });
     assert.equal(deferred.state, 'deferred'); assert.equal(calls, 1);
     assert.deepEqual(f.store.db.prepare('SELECT output,state,attempts FROM feed_tasks WHERE key=?').get(task.key), { output: null, state: 'pending', attempts: 1 });
     f.config.agent.maxDailyCalls = 2;
-    assert.equal((await fixedTask(f.store, f.config.agent, 'transcript', input, { generator })).state, 'accepted');
+    assert.equal((await fixedTask(f.store, agentRuntime(f.config), 'transcript', input, { generator })).state, 'accepted');
     assert.equal(calls, 2);
     f.store.db.prepare("UPDATE feed_tasks SET output=?,attempts=5,state='accepted' WHERE key=?").run('{broken', task.key);
     await writeFile(join(row.workspace, 'result.json'), '{broken');
     f.config.agent.maxDailyCalls = 3;
-    assert.equal((await fixedTask(f.store, f.config.agent, 'transcript', input, { generator })).state, 'failed');
+    assert.equal((await fixedTask(f.store, agentRuntime(f.config), 'transcript', input, { generator })).state, 'failed');
     assert.equal(calls, 2);
-    assert.equal((await fixedTask(f.store, f.config.agent, 'transcript', input, { generator, retryFailed: true })).state, 'accepted');
+    assert.equal((await fixedTask(f.store, agentRuntime(f.config), 'transcript', input, { generator, retryFailed: true })).state, 'accepted');
     assert.equal(calls, 3);
   } finally { await f.cleanup(); }
 });
@@ -264,14 +265,14 @@ test('transcript planning treats rejected accepted nodes as misses and execution
       const input = value as { taskId: string; parts: { id: string }[] };
       calls++; return { output: { taskId: input.taskId, inputIds: input.parts.map(p => p.id), facts: body }, directory: directory!, usage: [], events: [] };
     };
-    await transcriptStep(item, f.store, f.config.agent, true, undefined, false, generator);
+    await transcriptStep(item, f.store, agentRuntime(f.config), true, undefined, false, generator);
     const row = f.store.db.prepare('SELECT key,workspace,output FROM feed_tasks').get() as { key: string; workspace: string; output: string };
     f.store.db.prepare('UPDATE feed_tasks SET output=? WHERE key=?').run(JSON.stringify({ ...JSON.parse(row.output), inputIds: ['wrong'] }), row.key);
     await writeFile(join(row.workspace, 'result.json'), '{broken');
-    const planned = await transcriptStep(item, f.store, f.config.agent, false);
+    const planned = await transcriptStep(item, f.store, agentRuntime(f.config), false);
     assert.equal(planned.ready, false); assert.equal(calls, 1);
-    assert.equal((await transcriptStep(item, f.store, f.config.agent, true, undefined, false, generator)).performed, true);
-    assert.equal((await transcriptStep(item, f.store, f.config.agent, false)).ready, true);
+    assert.equal((await transcriptStep(item, f.store, agentRuntime(f.config), true, undefined, false, generator)).performed, true);
+    assert.equal((await transcriptStep(item, f.store, agentRuntime(f.config), false)).ready, true);
     assert.equal(calls, 2);
   } finally { await f.cleanup(); }
 });
@@ -282,7 +283,7 @@ test('relate CLI preserves cached verdicts and publishes the recommendation mani
     // The CLI may probe defaults, but quota and the offline peer prevent model calls.
     f.config.agent.maxDailyCalls = 1;
     f.config.agent.command = resolve('tests/fixtures/acp-peer.mjs');
-    const agent = await resolveAgent(f.config.agent);
+    const agent = await resolveAgent(agentRuntime(f.config));
     const now = new Date().toISOString(), evidence = 'Atlas released Model One with open weights.';
     await mkdir(f.config.feed.directory);
     for (const name of ['a', 'b']) {
@@ -309,14 +310,14 @@ test('cancelled fixed tasks preserve call accounting and resume immediately with
   try {
     const input = { taskId: 'cancelled', parts: [{ id: 'part', text: 'Evidence' }], maxChars: 1500 };
     const cancellation = new AbortController();
-    await assert.rejects(fixedTask(f.store, f.config.agent, 'transcript', input, { signal: cancellation.signal, generator: async (_a, _k, _i, _r, directory) => {
+    await assert.rejects(fixedTask(f.store, agentRuntime(f.config), 'transcript', input, { signal: cancellation.signal, generator: async (_a, _k, _i, _r, directory) => {
       cancellation.abort();
       return { output: { taskId: input.taskId, inputIds: ['part'], facts: 'Evidence' }, directory: directory!, usage: [], events: [] };
     } }), { name: 'AbortError' });
     const row = f.store.db.prepare('SELECT attempts,next_at,error FROM feed_tasks').get() as { attempts: number; next_at: string; error: string | null };
     assert.equal(row.attempts, 1); assert.equal(row.next_at, ''); assert.equal(row.error, null);
     let calls = 0;
-    const recovered = await fixedTask(f.store, f.config.agent, 'transcript', input, { generator: async (_a, _k, _i, _r, directory) => {
+    const recovered = await fixedTask(f.store, agentRuntime(f.config), 'transcript', input, { generator: async (_a, _k, _i, _r, directory) => {
       calls++; return { output: { taskId: input.taskId, inputIds: ['part'], facts: 'Evidence' }, directory: directory!, usage: [], events: [] };
     } });
     assert.equal(recovered.state, 'accepted'); assert.equal(calls, 1);
@@ -330,7 +331,7 @@ test('fixed tasks propagate lease takeover before acceptance or retry mutation',
     try {
       const input = { taskId: 'lease', parts: [{ id: 'part', text: 'Evidence' }], maxChars: 1500 };
       f.store.acquireLease('runner');
-      await assert.rejects(fixedTask(f.store, f.config.agent, 'transcript', input, { generator: async (_a, _k, _i, _r, directory) => {
+      await assert.rejects(fixedTask(f.store, agentRuntime(f.config), 'transcript', input, { generator: async (_a, _k, _i, _r, directory) => {
         f.store.db.prepare("UPDATE job_lease SET owner='replacement'").run();
         if (transportFailure) throw new Error('Transport interrupted during takeover');
         return { output: { taskId: input.taskId, inputIds: ['part'], facts: 'Evidence' }, directory: directory!, usage: [], events: [] };
@@ -388,7 +389,7 @@ test('an unsatisfiable derived transcript note budget fails before model work',a
     const body='Complete evidence',item=parsePodcastFeed(rss,context,'Show')[0]!;
     item.metadata={...item.metadata,transcriptHash:hash(body)};
     f.store.db.prepare('INSERT INTO podcast_transcripts VALUES (?,?,?,?,?,?)').run('podcast',item.id,body,hash(body),'https://example.test/transcript',at);
-    await assert.rejects(transcriptStep(item,f.store,{...f.config.agent,maxItemChars:50},true),/prefix leaves no room/);
+    await assert.rejects(transcriptStep(item,f.store,{...agentRuntime(f.config),maxItemChars:50},true),/prefix leaves no room/);
     assert.equal((f.store.db.prepare('SELECT count(*) n FROM agent_calls').get() as {n:number}).n,0);
   }finally{await f.cleanup();}
 });

@@ -122,7 +122,7 @@ test('relations that expire during an earlier model call are no longer pending',
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-expiry-'));
   const store = new Store(join(root, 'data.sqlite'));
   try {
-    const config = configSchema.parse({ version: 2, feed: { directory: join(root, 'content') }, agent: { model: 'deepseek/deepseek-flash', runtimeDirectory: join(root, 'tasks'), maxBatchItems: 1 }, sources: [{ id: 'one', name: 'One', intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'feed', kind: 'feed' }] }] }] });
+    const config = configSchema.parse({ version: 2, storage: { root }, feed: { directory: join(root, 'content') }, agent: { model: 'deepseek/deepseek-flash', maxBatchItems: 1 }, sources: [{ id: 'one', name: 'One', intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'feed', kind: 'feed' }] }] }] });
     await mkdir(config.feed.directory);
     for (const name of ['a', 'b', 'c']) await writeFile(join(config.feed.directory, name + '.md'), `---\npublish: true\ncontent_type: post\ntitle: Atlas release ${name}\ndate: 2026-10-12T12:01:00Z\n---\nAtlas released Model One.`);
     let calls = 0;

@@ -11,18 +11,14 @@
     },
     "storage": {
       "default": {
-        "database": ".local/feedgarden.sqlite",
-        "directory": ".local"
+        "root": ".local/feedgarden"
       },
       "type": "object",
       "properties": {
-        "database": {
-          "default": ".local/feedgarden.sqlite",
-          "type": "string"
-        },
-        "directory": {
-          "default": ".local",
-          "type": "string"
+        "root": {
+          "default": ".local/feedgarden",
+          "type": "string",
+          "minLength": 1
         }
       },
       "additionalProperties": false
@@ -132,10 +128,6 @@
               "exclusiveMinimum": 0,
               "maximum": 80
             },
-            "runtimeDirectory": {
-              "default": ".local/agents",
-              "type": "string"
-            },
             "workspaceRetentionDays": {
               "default": 7,
               "type": "integer",
@@ -223,10 +215,6 @@
               "exclusiveMinimum": 0,
               "maximum": 80
             },
-            "runtimeDirectory": {
-              "default": ".local/agents",
-              "type": "string"
-            },
             "workspaceRetentionDays": {
               "default": 7,
               "type": "integer",
@@ -287,7 +275,14 @@
         "properties": {
           "id": {
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+            "allOf": [
+              {
+                "pattern": "^[a-z0-9][a-z0-9_-]*$"
+              },
+              {
+                "pattern": "^(?!clippings$)"
+              }
+            ]
           },
           "name": {
             "type": "string",

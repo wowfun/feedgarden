@@ -1,15 +1,18 @@
+import { loadConfig, resolveConfigFile } from '../src/config.js';
+import { storagePaths } from '../src/storage-paths.js';
 import { parseArgs } from 'node:util';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { userInfo } from 'node:os';
 
 // Generate reviewable files only. Activation is a separate user-controlled step.
-const { values } = parseArgs({ options: { distro: { type: 'string' }, output: { type: 'string', default: '.local/scheduler' } } });
-const root = process.cwd(), output = resolve(values.output!);
-if (/[\r\n]/.test(root + output) || root.trim() !== root) throw new Error('Scheduler paths must be single-line paths without surrounding whitespace');
-await mkdir(output, { recursive: true });
+const { values } = parseArgs({ options: { config: { type: 'string' }, distro: { type: 'string' }, output: { type: 'string' } } });
+const configFile = resolveConfigFile(values.config), paths = storagePaths(loadConfig(configFile).storage);
+const root = process.cwd(), output = resolve(values.output ?? paths.scheduler);
+if (/[\r\n]/.test(root + output + configFile + paths.runnerEnvironment) || root.trim() !== root) throw new Error('Scheduler paths must be single-line paths without surrounding whitespace');
+await mkdir(output, { recursive: true, mode: 0o700 });
 const quote = (value: string) => "'" + value.replace(/'/g, "'\\''") + "'";
-const script = '#!/bin/bash\nset -euo pipefail\ncd ' + quote(root) + '\nif [[ -f .local/runner.env ]]; then\n  set -a\n  source .local/runner.env\n  set +a\nfi\nexec ' + quote(process.execPath) + ' --import tsx src/cli.ts run --due\n';
+const script = '#!/bin/bash\nset -euo pipefail\ncd ' + quote(root) + '\nif [[ -f ' + quote(paths.runnerEnvironment) + ' ]]; then\n  set -a\n  source ' + quote(paths.runnerEnvironment) + '\n  set +a\nfi\nexec ' + quote(process.execPath) + ' --import tsx src/cli.ts run --due --config ' + quote(configFile) + '\n';
 await writeFile(join(output, 'run.sh'), script, { mode: 0o700 });
 const unitQuote = (value: string) => '"' + value.replace(/[%\\"]/g, char => char === '%' ? '%%' : '\\' + char) + '"';
 await writeFile(join(output, 'feedgarden.service'), '[Unit]\nDescription=Collect and publish Feedgarden items\nAfter=network-online.target\n\n[Service]\nType=oneshot\nWorkingDirectory=' + root.replace(/%/g, '%%') + '\nExecStart=/bin/bash ' + unitQuote(join(output, 'run.sh')) + '\nTimeoutStartSec=infinity\n');

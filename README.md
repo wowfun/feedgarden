@@ -6,6 +6,8 @@ Feedgarden collects developer and AI sources into local SQLite and publishes a b
 
 The site is built with [jekyll-obsidian](https://github.com/wowfun/jekyll-obsidian). Preview: [English](https://sinputer.top/feedgarden/) | [简体中文](https://sinputer.top/feedgarden/zh-CN/).
 
+[Clippings](docs/clippings.md) holds manually maintained Markdown. Its items appear both in a dedicated tab and on the homepage, with one original body shared by both language interfaces.
+
 Article lists support independent daily folding with localized dates, weekdays and page-local counts. Only the newest day opens by default; filters and pagination retain manual choices until reload. See [Site features](docs/site.md).
 
 ## Quick start
@@ -31,10 +33,9 @@ The preview is at `http://127.0.0.1:58002/feedgarden/` (Chinese: `/feedgarden/zh
 
 ## Run the pipeline
 
-Run commands from the repository root. For an existing schema 2 database, read [Migration and rollback](docs/migration.md) before the first run.
+Run commands from the repository root. Private data and state default to `.local/feedgarden/`, controlled by `storage.root`. Public articles remain in `content/`. A missing database is initialized on the first runner command. Old storage paths and the legacy `migrate` / `rollback` commands are unsupported; see [storage configuration](docs/configuration.md#storage-layout).
 
 ```sh
-npm run feedgarden -- migrate
 npm run feedgarden -- collect --source openai
 npm run feedgarden -- summarize --source openai
 npm run feedgarden -- render
@@ -59,5 +60,4 @@ npm run feedgarden -- run --due --no-publish
 | [Runner operations](docs/operations.md) | Scheduling, persistence, backups, limits and diagnostics |
 | [Daily task prompts](docs/daily-updates.md) | 06:00/18:00 Shanghai runs, yesterday's window and first observations |
 | [Deployment and publishing](docs/deployment.md) | Build environment, publication boundaries and conflicts |
-| [Migration and rollback](docs/migration.md) | Schema upgrades, migration archives and rollback |
 | [Development and validation](docs/development.md) | Theme ownership, checks and isolated fixtures |

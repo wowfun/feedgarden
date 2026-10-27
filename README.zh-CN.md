@@ -6,6 +6,8 @@ Feedgarden 将开发者和 AI 信息源采集到本地 SQLite，并发布按时�
 
 站点由 [jekyll-obsidian](https://github.com/wowfun/jekyll-obsidian) 构建。在线预览：[英文](https://sinputer.top/feedgarden/) | [简体中文](https://sinputer.top/feedgarden/zh-CN/)。
 
+[Clippings](docs/clippings.zh-CN.md) 用于手工维护 Markdown 摘录，条目同时显示在独立 tab 和首页，中英文界面共用一份正文。
+
 文章列表支持按日独立折叠，标题显示本地化日期、星期及当前页条数。默认只展开最新一天，筛选和翻页保留手动开合状态，刷新后重置。详见[站点功能](docs/site.md)。
 
 ## 快速开始
@@ -31,10 +33,9 @@ npm run site:serve
 
 ## 运行流程
 
-请从仓库根目录执行命令。已有 schema 2 数据库请在首次运行前阅读[迁移与回滚](docs/migration.md)。
+请从仓库根目录执行命令。私有数据和状态默认存放在 `.local/feedgarden/`，由 `storage.root` 控制；首次运行 Runner 命令时自动初始化数据库。旧存储配置及 `migrate` / `rollback` 命令不再支持。公开文章继续存放在 `content/`；详见[存储配置](docs/configuration.md#storage-layout)。
 
 ```sh
-npm run feedgarden -- migrate
 npm run feedgarden -- collect --source openai
 npm run feedgarden -- summarize --source openai
 npm run feedgarden -- render
@@ -61,5 +62,4 @@ npm run feedgarden -- run --due --no-publish
 | [运行维护](docs/operations.md) | 调度、持久化、备份、限制与诊断 |
 | [每日任务 prompt](docs/daily-updates.zh-CN.md) | 上海时间 06:00／18:00、昨天的日期窗口与首次观察日期 |
 | [部署与发布](docs/deployment.md) | 构建环境、发布边界与冲突处理 |
-| [迁移与回滚](docs/migration.md) | 数据库升级、迁移归档与回滚 |
 | [开发与验证](docs/development.md) | 主题归属、检查与隔离测试夹具 |

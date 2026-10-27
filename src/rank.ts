@@ -1,6 +1,7 @@
+import { storagePaths } from './storage-paths.js';
 import Database from 'better-sqlite3';
 import { existsSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import type { Config } from './config.js';
@@ -125,13 +126,15 @@ export async function previewRank(config: Config, options: { source?: string; hi
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-rank-preview-'));
   let store: Store | undefined;
   try {
-    const database = join(root, 'data.sqlite');
-    if (existsSync(config.storage.database)) {
-      const original = new Database(config.storage.database, { readonly: true, fileMustExist: true });
+    const isolated = { ...config, storage: { root } };
+    const database = storagePaths(isolated.storage).database;
+    await mkdir(dirname(database), { recursive: true, mode: 0o700 });
+    if (existsSync(storagePaths(config.storage).database)) {
+      const original = new Database(storagePaths(config.storage).database, { readonly: true, fileMustExist: true });
       try { await original.backup(database); } finally { original.close(); }
     }
     store = new Store(database);
-    return await rankItems({ ...config, storage: { database, directory: root } }, store, options);
+    return await rankItems(isolated, store, options);
   } finally {
     store?.close();
     if (dirname(resolve(root)) !== resolve(tmpdir())) throw new Error('Invalid temporary preview directory');

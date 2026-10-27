@@ -78,7 +78,7 @@ test('a repository update reaches both frontmatters without another summary call
   try {
     const topics = { version: 1, topics: [{ id: 'coding', name: { en: 'Coding', 'zh-CN': '编程' }, description: 'Tools', aliases: [], deprecated: false }] };
     await writeFile(join(directory, 'topics.json'), JSON.stringify(topics));
-    const config = configSchema.parse({ version: 2, storage: { directory }, feed: { directory: join(directory, 'content'), topics: join(directory, 'topics.json') }, agent: { model: 'deepseek/deepseek-flash', runtimeDirectory: join(directory, 'tasks') }, sources: [{ id: item.source, name: 'Product Hunt', timezone: 'America/Los_Angeles', intervalHours: 6, streams: [{ id: item.stream, channels: [{ id: item.channel, kind: 'ph-html' }] }] }] });
+    const config = configSchema.parse({ version: 2, storage: { root: directory }, feed: { directory: join(directory, 'content'), topics: join(directory, 'topics.json') }, agent: { model: 'deepseek/deepseek-flash' }, sources: [{ id: item.source, name: 'Product Hunt', timezone: 'America/Los_Angeles', intervalHours: 6, streams: [{ id: item.stream, channels: [{ id: item.channel, kind: 'ph-html' }] }] }] });
     store.setMeta('cutoff', '2026-10-09T00:00:00Z');
     store.saveCollection(item.source, item.stream, item.channel, { items: [item], raw: [], coverage: { status: 'complete', to: item.observedAt, notes: [] } }, '');
     const generator: Generator = async (_agent, input, _repair, workspace) => {

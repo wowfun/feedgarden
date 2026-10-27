@@ -2,7 +2,9 @@
   "name": "English",
   "hreflang": "en",
   "dir": "ltr",
+  "tag_labels": { "source/clippings": "Clippings" },
   "messages": {
+    "footer_sites": "Sites",
     "back_to_top": "Back to top",
     "show_hidden_topics": "Show hidden topics",
     "hide_hidden_topics": "Hide hidden topics",

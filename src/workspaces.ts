@@ -1,9 +1,9 @@
+import type { AgentRuntimeConfig } from './storage-paths.js';
 import { lstat, readFile, rm } from 'node:fs/promises';
 import { dirname, basename, resolve, join } from 'node:path';
-import type { Config } from './config.js';
 import type { Store } from './store.js';
 
-export async function pruneWorkspaces(agent: Config['agent'], store: Store, at: string): Promise<void> {
+export async function pruneWorkspaces(agent: AgentRuntimeConfig, store: Store, at: string): Promise<void> {
   if (!agent.workspaceRetentionDays) return;
   const root = resolve(agent.runtimeDirectory);
   const parent = await lstat(root).catch(error => { if (error.code === 'ENOENT') return; throw error; });

@@ -1,3 +1,4 @@
+import { agentRuntime, type AgentRuntimeConfig } from './storage-paths.js';
 import { readFile, mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -24,7 +25,7 @@ export interface AcceptedItem { item: Item; copy: ItemCopy; firstSeen: string; d
 interface Job { source: string; id: string; cache_key: string; data: string; state: string; attempts: number; next_at: string; error: string | null }
 interface FixedJob { source: string; id: string; key: string; item: Item; firstSeen: string }
 interface Batch { id: string; input: string; jobs: string; workspace: string; state: string }
-export type Generator = (agent: Config['agent'], input: SummaryInput, repair?: string, workspace?: string, signal?: AbortSignal) => Promise<AgentResult>;
+export type Generator = (agent: AgentRuntimeConfig, input: SummaryInput, repair?: string, workspace?: string, signal?: AbortSignal) => Promise<AgentResult>;
 export function summaryItem(item: Item, maxChars: number): SummaryInput['items'][number] {
   const normalize = (value: string) => value.normalize('NFKC').replace(/\s+/g, ' ').trim();
   const comments = item.discussion?.comments.slice(0, 10).map(comment => ({ ...comment, text: normalize(comment.text).slice(0, 600), author: normalize(comment.author) }));
@@ -153,7 +154,7 @@ export async function summarize(config: Config, store: Store, options: WindowOpt
     else store.statement("UPDATE feed_batches SET state='interrupted',error='Interrupted without valid artifact' WHERE id=?").run(batch.id);
   }
   store.statement("UPDATE feed_jobs SET state='failed',error=COALESCE(error,'Attempt limit reached after interruption') WHERE state='pending' AND attempts>=5 AND source IN (SELECT value FROM json_each(?))").run(JSON.stringify(sources.map(source => source.id)));
-  await pruneWorkspaces(config.agent, store, at);
+  await pruneWorkspaces(agentRuntime(config), store, at);
   // Probe only if potentially useful work exists. Keep selection/exclusion and
   // archived-without-summary rules aligned with the final per-row check below;
   // the policy INSERT intentionally also models refresh/unfinished-job state.
@@ -180,7 +181,7 @@ export async function summarize(config: Config, store: Store, options: WindowOpt
     if (!hasEligibleItems(source)) continue;
     const skillHash = skillHashes.get(source.id)!;
     let agent: ResolvedAgent;
-    try { agent = await resolver({ ...config.agent, ...source.agent }, options.signal); }
+    try { agent = await resolver({ ...agentRuntime(config), ...source.agent }, options.signal); }
     catch (error) {
       options.signal?.throwIfAborted(); store.assertLease();
       sourceErrors.push({ source: source.id, error: errorText(error) });

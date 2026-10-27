@@ -1,3 +1,4 @@
+import { storagePaths } from './storage-paths.js';
 import { cp, mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { chmodSync, existsSync } from 'node:fs';
 import Database from 'better-sqlite3';
@@ -11,6 +12,7 @@ import type { Item } from './types.js';
 import { hash, safeUrl, errorText, nowIso } from './util.js';
 import { selectionDay } from './selection.js';
 import { collectionTabs } from './collections.js';
+import { assertAuthoredContent, isAuthoredPath } from './authored-content.js';
 import { initializePublications, recordPublications } from './publications.js';
 
 export interface ArchivePost { path: string; source: string; id: string; day: string; number: number; item: Item; firstSeen: string; en: string; zh: string }
@@ -37,6 +39,7 @@ export function archiveNativeId(source: string, properties: Record<string, unkno
   throw new Error('Cannot recover native archive ID: ' + source + '/' + String(properties.source_url));
 }
 export async function scanArchives(config: Config, signal?: AbortSignal, onlyPaths?: ReadonlySet<string>): Promise<ArchiveScan> {
+  await assertAuthoredContent(config.feed.directory);
   const root = resolve(config.feed.directory), files = new Set<string>(), posts: ArchiveReference[] = [], issues: ArchiveIssue[] = [];
   const temporary = await mkdtemp(join(tmpdir(), 'feedgarden-archive-scan-'));
   const database = join(temporary, 'snapshot.sqlite');
@@ -59,6 +62,7 @@ export async function scanArchives(config: Config, signal?: AbortSignal, onlyPat
       for (const entry of await readdir(directory, { withFileTypes: true })) {
         signal?.throwIfAborted();
         const path = prefix + entry.name;
+        if (isAuthoredPath(path)) continue;
         if (path === '_recommendations.json') continue;
         if (onlyPaths && ![...onlyPaths].some(target => target === path || target.startsWith(path + '/'))) continue;
         if (entry.isSymbolicLink()) throw new Error('Archive snapshot does not follow symlinks: ' + path);
@@ -116,7 +120,7 @@ export async function scanArchives(config: Config, signal?: AbortSignal, onlyPat
 
 async function backupArchives(config: Config, store: Store, signal?: AbortSignal): Promise<string> {
   store.assertLease(); signal?.throwIfAborted();
-  const backup = resolve(config.storage.directory, 'ranking-backups', new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomUUID());
+  const backup = resolve(storagePaths(config.storage).archiveBackups, new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomUUID());
   await mkdir(backup, { recursive: true, mode: 0o700 });
   await store.backup(join(backup, 'data.sqlite'));
   store.assertLease(); signal?.throwIfAborted();
@@ -140,6 +144,7 @@ export async function archiveManifestSignature(config: Config): Promise<string> 
   return hash({ topics, manifests: [en, zh], sources: config.sources.map(({ id, name, timezone }) => ({ id, name, timezone })) });
 }
 export async function importArchives(config: Config, store: Store, signal?: AbortSignal): Promise<string | undefined> {
+  await assertAuthoredContent(config.feed.directory);
   await initializePublications(config, store, signal);
   if (!config.sources.some(source => source.selection)) return;
   // The database owns the snapshot after its first import. A new output path
@@ -209,6 +214,7 @@ export async function maintainArchive(config: Config, store: Store, action: 'upd
   const root = resolve(config.feed.directory), file = resolve(root, requestedPath), rel = relative(root, file);
   if (!requestedPath || /^[a-z]:/i.test(requestedPath) || requestedPath.includes('\\') || isAbsolute(requestedPath) || isAbsolute(rel) || rel === '..' || rel.startsWith('..' + sep) || !rel) throw new Error('Invalid archive path: ' + requestedPath);
   let path = rel.split(sep).join('/');
+  if (isAuthoredPath(path)) throw new Error('Clippings are maintained directly on disk, not through archive maintenance');
   const platformPair = /^(?:_translations\/zh-CN\/)?((?:reddit|hackernews)\/\d{4}-\d{2}\/\d{2}\/item-\d+\.md)$/.exec(path);
   let paired = !!platformPair;
   if (platformPair) path = platformPair[1]!;

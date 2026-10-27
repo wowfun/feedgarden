@@ -2,7 +2,43 @@
 
 ## Configuration discovery
 
-All commands, including `migrate` and `rollback`, discover `feedgarden.jsonc` or `feedgarden.json` in the working directory. If both exist, pass `--config FILE` explicitly.
+All commands discover `feedgarden.jsonc` or `feedgarden.json` in the working directory. If both exist, pass `--config FILE` explicitly.
+
+## Storage layout
+
+`storage.root` is the only private storage setting. It defaults to `.local/feedgarden`; relative paths resolve against the working directory, so run commands from the repository root even when selecting a config elsewhere. Absolute paths and paths containing spaces are supported.
+
+```json
+"storage": { "root": ".local/feedgarden" }
+```
+
+| Path below the root | Purpose |
+| --- | --- |
+| `data/feedgarden.sqlite` | Durable database, with SQLite WAL/SHM beside it |
+| `state/runner` | Shared filesystem lock target for runners and clipping image maintenance |
+| `state/content-journal.json` | Interrupted content replacement recovery |
+| `state/topic-remote-base.json`, `state/publish-conflict.json` | Topic merge baseline and publication conflict details |
+| `workspaces/agents/` | Agent task and configuration-probe workspaces |
+| `workspaces/publish-*/` | Temporary publication worktrees |
+| `backups/daily/`, `backups/weekly/` | Seven daily and four weekly SQLite backups |
+| `backups/archives/` | Database/content snapshots before archive import or maintenance |
+| `tools/twitter-cli/`, `tools/twitter-cli-source/` | Installed Twitter environment and pinned source |
+| `scheduler/` | Generated scheduler files and optional private `runner.env` |
+| `validation/` | Validation evidence, screenshots and isolated previews |
+
+The resolver only computes paths. Each operation creates its own directories as needed; help and rejected commands do not initialize storage. HTTP caches remain in SQLite. Public `feed.directory` and `feed.topics` stay independent of private storage. Keep private storage outside published content. The root is private local state, not a portable export: task and recovery records can contain absolute paths.
+
+`storage.database`, `storage.directory` and `agent.runtimeDirectory` are rejected. There is no old-path fallback, automatic relocation, or `migrate` / `rollback` command. Starting with a new root creates a fresh database on the first runner command; it does not inherit private candidates, jobs or history. Existing public content remains available to the static-site build and the normal archive-import workflow. Deleting old state is a separate, deliberate operation, never a startup action.
+
+`setup:twitter`, `schedule:prepare` and the verification scripts accept `--config FILE`. Generated scheduler scripts pass that exact config and load `<storage.root>/scheduler/runner.env` if present. `schedule:prepare --output DIR` overrides only the generated file destination. `FEEDGARDEN_VALIDATION_DIR` overrides the verification evidence directory; otherwise it follows the selected root. For example:
+
+```sh
+npm run setup:twitter -- --config feedgarden.jsonc
+npm run schedule:prepare -- --config feedgarden.jsonc
+npm run verify:opencode -- --config feedgarden.jsonc
+```
+
+Theme caches/build output remain in `.jekyll-obsidian-cache/`. Content and image atomic-write staging stays beside its destination. Short-lived HTTP files, rank previews and unit-test fixtures use isolated system temporary directories. OpenCode's own profile and provider credentials retain their native locations.
 
 ## Agent execution
 
@@ -12,8 +48,7 @@ All commands, including `migrate` and `rollback`, discover `feedgarden.jsonc` or
 "agent": {
   "backend": "opencode",
   "command": "opencode",
-  "args": ["acp"],
-  "runtimeDirectory": ".local/agents"
+  "args": ["acp"]
 }
 ```
 
@@ -55,9 +90,9 @@ DSH remains pinned by the local dependency and default version constraint:
 }
 ```
 
-DSH requires an explicit DeepSeek model and reads `FEEDGARDEN_AGENT_API_KEY`, then `DEEPSEEK_API_KEY`, then local DSH credentials. OpenCode uses its own provider authentication instead. Changing backends does not move or delete historical `.local/dsh` workspaces.
+DSH requires an explicit DeepSeek model and reads `FEEDGARDEN_AGENT_API_KEY`, then `DEEPSEEK_API_KEY`, then local DSH credentials. OpenCode uses its own provider authentication instead. Both backends use the agent workspace directory derived from `storage.root`.
 
-Shared budgets remain configurable: `timeoutSeconds` (default 300), `maxBatchItems` (10), `maxInputChars` (24000), `maxItemChars` (4000), `maxDailyCalls` (80), `workspaceRetentionDays` (7), and `maxTranscriptChunks` (64). New workspaces default to `.local/agents`. Model-call accounting excludes configuration probes. Execution audit records the backend, version, resolved model/effort and original usage updates. Cache and planning identities include the backend, actual agent version, resolved selection and a fingerprint of relevant OpenCode provider/model configuration; inherited configuration changes and backend upgrades cannot reuse stale entries. Existing historical content remains governed by the normal refresh/rebuild policy.
+Shared budgets remain configurable: `timeoutSeconds` (default 300), `maxBatchItems` (10), `maxInputChars` (24000), `maxItemChars` (4000), `maxDailyCalls` (80), `workspaceRetentionDays` (7), and `maxTranscriptChunks` (64). New workspaces default to `.local/feedgarden/workspaces/agents`. Model-call accounting excludes configuration probes. Execution audit records the backend, version, resolved model/effort and original usage updates. Cache and planning identities include the backend, actual agent version, resolved selection and a fingerprint of relevant OpenCode provider/model configuration; inherited configuration changes and backend upgrades cannot reuse stale entries. Existing historical content remains governed by the normal refresh/rebuild policy.
 
 `doctor` uses this same resolver and submits no generation prompt. `npm run verify:agent -- --config FILE` uses the selected configuration for a paid live run in isolated storage. `npm run verify:opencode` instead uses a temporary profile and local simulated provider, exercising the installed OpenCode without paid model calls. Pass `-- --command PATH` to test a specific OpenCode executable.
 

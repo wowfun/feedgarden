@@ -77,4 +77,4 @@ bundle exec ruby -Itest test/compiler/published_markdown_test.rb
 
 ## 本地主题验证
 
-共享内容需要上游的 `website.i18n.shared_directories` 实现。正式 Gemfile 继续固定已发布版本，待后续上游发布再升级。此前请按[开发说明](development.md#local-clippings-validation)使用隔离的本地主题包验证，不修改生产数据库、依赖锁文件或已部署站点。
+共享内容和 Web Clipper 元数据已由固定的 `jekyll-obsidian-site` 0.3.2 正式版本支持。运行 `npm run verify:clippings` 即可使用已发布依赖验证。开发上游功能时，可按[开发说明](development.md#local-clippings-validation)显式选择隔离的本地主题包；验证不修改生产数据库、依赖锁文件或已部署站点。

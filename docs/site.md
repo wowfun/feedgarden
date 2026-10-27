@@ -12,9 +12,9 @@ URLs in summary prose remain text, including browser setup addresses such as `ch
 
 ## Collections, filters and chronology
 
-[Clippings](clippings.md) appears after Home and before Podcasts. Its manually maintained posts also remain visible on Home. Both interfaces share the same authored body while keeping their own navigation and article URLs. This requires the upstream shared-content implementation; use [local package validation](development.md#local-clippings-validation) until the published theme dependency is upgraded.
+[Clippings](clippings.md) appears after Home and before Podcasts. Its manually maintained posts also remain visible on Home. Both interfaces share the same authored body while keeping their own navigation and article URLs. Shared content is supported by the pinned 0.3.2 release; see [validation commands](development.md#local-clippings-validation).
 
-The new configuration is not ready to merge into `main` while 0.3.1 is pinned. The [release follow-up](development.md#release-follow-up-open-blocks-merging-the-new-site-configuration) tracks the upstream release, exact dependency update, clean-checkout build and full CI acceptance. Source-filter labels for Clippings come from `tag_labels["source/clippings"]` in each `config/locales/*.json` catalog; collection-source configuration is not required.
+Source-filter labels for Clippings come from `tag_labels["source/clippings"]` in each `config/locales/*.json` catalog; collection-source configuration is not required.
 
 Obsidian Web Clipper frontmatter works directly: `published` supplies the date and `source` the original URL, while author wiki links remain intact. Directory policy publishes posts and adds their source tag at build time; bare maintained topic IDs map to filter tags. The Markdown is not rewritten. Set `publish: false` for drafts; omitted `lang` uses `und` and automatic text direction.
 
@@ -26,7 +26,7 @@ Home enables `website.home.hide_tab_sources: true`: sources belonging to actual 
 
 `include_tabs=1` and `show_hidden=topic` preserve disclosure state through links, pagination, reloads, language changes and browser history. Old links explicitly selecting a tab source automatically include it. Collapsing sources clears selected tab sources and resets the page, retaining other filters. Export inherits the page's state but keeps subsequent changes local to its dialog. Without JavaScript the default first page and counts remain correct, and tab/article links remain usable.
 
-The source and topic visibility settings are supported by the pinned `jekyll-obsidian-site` 0.3.1 release. Both themes also provide a Back to top button after scrolling beyond one viewport. [简体中文说明](site.zh-CN.md)
+The source and topic visibility settings are supported by the pinned `jekyll-obsidian-site` 0.3.2 release. Both themes also provide a Back to top button after scrolling beyond one viewport. [简体中文说明](site.zh-CN.md)
 
 The feed shows 50 cards per page. Sources and topics support multiple selection: OR within a group, AND across groups and chronology. Query parameters preserve selection, page, language switching and browser history. Unknown IDs produce an empty result. Facet and timeline counts describe the current homepage source scope; matching counts are shown separately. The theme writes a small generation manifest, lazy per-facet bitmaps and 50-card chunks. A Worker evaluates queries, network concurrency is capped at four, and resource caching at 20 entries. Failed loads retain the last successful page and offer retry. Search includes the latest 3,000 item titles/tags/summary excerpts; Atom includes 100 items. Full static builds still render every item page.
 

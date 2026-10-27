@@ -12,34 +12,25 @@ Verification commands accept `--config FILE`; their evidence defaults to `<stora
 
 ## Local Clippings validation
 
-Clippings uses upstream shared-content and Web Clipper metadata support that is not in the pinned 0.3.1 release. This includes `published`/`source`, directory tags, and bare topic aliases. Until the next theme release is published and the exact production dependency is upgraded, ordinary `site:build` and CI cannot build the new configuration. Do not point the production Gemfile at a checkout or replace the published gem in the normal gem home.
+Clippings uses shared-content and Web Clipper support from the pinned `jekyll-obsidian-site` 0.3.2 release, including `published`/`source`, directory tags, published Markdown image URLs and the footer API.
 
-### Release follow-up (open; blocks merging the new site configuration)
+Both verifiers default to the frozen published dependency in `Gemfile` and `Gemfile.lock`; they need no theme checkout or personal-site directory. CI runs them for every non-docs change and retains their screenshots, exports and result records with the visual-validation artifact.
 
-The local package checks below are development evidence, not a replacement for the pinned build or CI. Keep this candidate out of `main` until these tasks are complete:
-
-- [ ] Publish and verify an upstream theme release containing shared directories, Web Clipper fields, directory tags, published Markdown image URLs, and the footer API.
-- [ ] Pin that published version in `Gemfile`, run `bundle update jekyll-obsidian-site`, and retain Windows and Linux platforms in `Gemfile.lock`.
-- [ ] From a clean checkout without `.references/` or a local theme gem, pass `npm run build`, `npm test`, `npm run site:build`, `npm run test:visual`, `npm run verify:scale`, and the fixture visual check documented below; pass the full PR CI job.
-- [ ] Pass `npm run verify:clippings` and `npm run verify:footer` in CI using the published package, then remove the temporary release limitation from this page and the paired site docs. Keep `--gem` for future isolated upstream development.
-
-Close this follow-up only after the published dependency and full CI are verified together. This review does not publish the theme, upgrade the production dependency, or bypass the existing CI gate.
-
-Both verifiers default to the frozen published dependency in `Gemfile` and `Gemfile.lock`; they need no theme checkout or personal-site directory. CI runs them for every non-docs change and retains their screenshots, exports and result records with the visual-validation artifact. With the current 0.3.1 pin these commands fail on the unsupported site configuration, so the release checklist remains open.
+For future theme upgrades, publish and verify the upstream gem first, then update both dependency files. Validate a clean checkout without `.references/` or a local theme gem: run `npm run build`, `npm test`, `npm run site:build`, `npm run test:visual`, `npm run verify:scale`, both verifiers, and the fixture visual check below. Require the full PR CI job before merging.
 
 ```sh
 npm run verify:clippings
 npm run verify:footer
 ```
 
-For upstream development before that release, explicitly select a local package:
+For upstream development, explicitly select a local package:
 
 ```powershell
 Push-Location .references/jekyll-obsidian/website
 npm run build
 bundle exec ruby scripts/package.rb --skip-assets
 Pop-Location
-npm run verify:clippings -- --gem .references/jekyll-obsidian/pkg/jekyll-obsidian-site-0.3.1.gem
+npm run verify:clippings -- --gem .references/jekyll-obsidian/pkg/jekyll-obsidian-site-0.3.2.gem
 ```
 
 The package filename uses the upstream checkout's version; adjust it if that version changes. The local artifact is identified by its SHA-256, not treated as a new published release. Published-mode results instead record the locked version and bundle SHA-256. The verifier installs it into a fresh gem home under `.local/feedgarden/validation/clippings/run-*/`, reusing installed runtime dependencies without downloading or replacing the normal theme. It builds a copy of the current content and a 52-clipping fixture, runs desktop/mobile checks in both languages, and saves screenshots, Markdown exports and `results.json`. Existing site browser checks run against the real-content copy as well. No production database is opened, no collected content is rendered, and nothing is published. The real-content check accepts an empty or populated Clippings tab; the synthetic fixture exercises pagination and content interactions.
@@ -48,21 +39,21 @@ The fixture also covers local inline/reference images, Copy page clipboard conte
 
 ## Footer navigation and two-site previews
 
-`website.footer.links` in `.github/jekyll-obsidian.yml` links to Sinputer's Site. The Chinese override is an explicit full URL. Contacts and navigation are rendered by the upstream theme on every page. This footer API also needs the unpublished local theme until a later upstream release is published and the exact production dependency is upgraded.
+`website.footer.links` in `.github/jekyll-obsidian.yml` links to Sinputer's Site. The Chinese override is an explicit full URL. Contacts and navigation are rendered by the upstream theme on every page. The footer API is supported by the pinned 0.3.2 release.
 
 Without `--personal-site`, `verify:footer` validates Feedgarden alone. The optional second host uses its own configuration and content with the same selected theme package. Contact counts, language routes and base paths come from each host configuration; `--port` and `--personal-port` override the preview ports (58002 and 58000).
 
-For local paired previews, package the upstream theme using the commands above and run:
+For paired previews using the published dependency, run:
 
 ```powershell
-npm run verify:footer -- --gem .references/jekyll-obsidian/pkg/jekyll-obsidian-site-0.3.1.gem --personal-site D:/Projects/wowfun.github.io
+npm run verify:footer -- --personal-site D:/Projects/wowfun.github.io
 $preview = Get-Content .local/feedgarden/validation/footer/current.json -Raw | ConvertFrom-Json
 # Run these in separate terminals; stop any older preview occupying the same port first.
 npm run site:serve -- --root $preview.builds.'personal-minimal' --baseurl / --port 58000
 npm run site:serve -- --root $preview.builds.'feedgarden-minimal' --baseurl /feedgarden --port 58002
 ```
 
-Open `http://127.0.0.1:58000/` and `http://127.0.0.1:58002/feedgarden/`. The verifier installs the local gem in an isolated gem home, copies each site's configured content directory and any imported-document cache, and disables comments and analytics in the copies. It retains each site's configured theme, checks footer URLs on every rendered page before remapping, and saves 1440px/390px, English/Chinese, light/dark screenshots and browser results in `run-*/results.json`. Every generated HTML page must have a footer. Only raw HTML listed by the theme manifest and bare redirect documents are exempt, and the result record lists each exemption. Browser cases cover home, available article/archive pages and actual missing routes: missing routes must return HTTP 404 with the localized header, title and footer. Checks include keyboard focus, touch areas, overflow and toolbar clearance. Upstream compiler, integration and browser tests cover both Minimal and Docs. Feedgarden requires Minimal for favorites and archive visibility rules; forcing its configuration into Docs is unsupported.
+Open `http://127.0.0.1:58000/` and `http://127.0.0.1:58002/feedgarden/`. The verifier uses the frozen published bundle by default, copies each site's configured content directory and any imported-document cache, and disables comments and analytics in the copies. An explicit `--gem` installs a local development package in an isolated gem home. It retains each site's configured theme, checks footer URLs on every rendered page before remapping, and saves 1440px/390px, English/Chinese, light/dark screenshots and browser results in `run-*/results.json`. Every generated HTML page must have a footer. Only raw HTML listed by the theme manifest and bare redirect documents are exempt, and the result record lists each exemption. Browser cases cover home, available article/archive pages and actual missing routes: missing routes must return HTTP 404 with the localized header, title and footer. Checks include keyboard focus, touch areas, overflow and toolbar clearance. Upstream compiler, integration and browser tests cover both Minimal and Docs. Feedgarden requires Minimal for favorites and archive visibility rules; forcing its configuration into Docs is unsupported.
 
 Only generated preview HTML maps configured host origins and base paths to the local ports; Jekyll Obsidian continues to link to the live documentation site. Repository configuration keeps production HTTPS URLs. The verifier never opens the production database, renders collected content, edits authored files, upgrades the pinned gem or deploys. These previews are static snapshots; rerun the verifier after source changes.
 

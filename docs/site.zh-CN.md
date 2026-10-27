@@ -2,9 +2,9 @@
 
 导航栏提供播客、GitHub、arXiv 独立栏目。源仍在配置中时，禁用采集不会移除其历史栏目；删除来源配置后，不再生成或保护相应栏目索引。
 
-[Clippings](clippings.zh-CN.md) 位于首页和播客之间，手工维护的条目同时显示在首页，中英文界面共用一份正文。该能力需要上游新增的共享目录支持；正式主题依赖升级前，使用[本地包验证](development.md#local-clippings-validation)。
+[Clippings](clippings.zh-CN.md) 位于首页和播客之间，手工维护的条目同时显示在首页，中英文界面共用一份正文。该能力已由固定的 0.3.2 正式版本支持，验证方式见[开发说明](development.md#local-clippings-validation)。
 
-正式依赖仍固定为 0.3.1 时，新配置尚不能合入 `main`。[发布接入清单](development.md#release-follow-up-open-blocks-merging-the-new-site-configuration) 跟踪上游发布、精确版本升级、干净检出构建及完整 CI 验收。Clippings 的来源筛选标签取自各语言 `config/locales/*.json` 中的 `tag_labels["source/clippings"]`，无需增加采集来源配置。
+Clippings 的来源筛选标签取自各语言 `config/locales/*.json` 中的 `tag_labels["source/clippings"]`，无需增加采集来源配置。
 
 Clippings 可直接使用 Obsidian Web Clipper 的原始 frontmatter：`published` 作为文章日期，`source` 作为原文链接，作者双链保持原样。目录默认将条目发布为文章，并在构建时补充来源标签；`agents` 等已维护的主题 ID 自动映射到筛选标签，无需改写原稿。使用 `publish: false` 排除草稿。省略 `lang` 时正文语言为 `und`，文本方向自动判定。
 
@@ -16,6 +16,6 @@ Feedgarden 开启 `website.home.hide_tab_sources: true`，首页默认排除播�
 
 首页的“全部”、来源及主题计数、日期导航、分页、导出均使用当前来源范围。导出弹窗打开时继承页面状态，弹窗内调整不改变页面 URL。无 JavaScript 时，默认首页内容与计数仍正确，栏目及文章链接可正常访问。
 
-来源与主题筛选设置由已锁定的 `jekyll-obsidian-site` 0.3.1 正式版本支持。两套主题还会在滚动超过一屏后显示“回到顶部”按钮。
+来源与主题筛选设置由已锁定的 `jekyll-obsidian-site` 0.3.2 正式版本支持。两套主题还会在滚动超过一屏后显示“回到顶部”按钮。
 
 [English](site.md) · [主题治理](topics.zh-CN.md)

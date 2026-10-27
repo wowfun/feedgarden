@@ -77,4 +77,4 @@ bundle exec ruby -Itest test/compiler/published_markdown_test.rb
 
 ## Local theme validation
 
-Shared content requires the upstream `website.i18n.shared_directories` implementation. The production Gemfile remains pinned to the published theme until a later upstream release. Before that release, use the isolated local-package validation described in [Development](development.md#local-clippings-validation). It does not change the production database, dependency lock or deployed site.
+Shared content and Web Clipper metadata are supported by the pinned `jekyll-obsidian-site` 0.3.2 release. Run `npm run verify:clippings` with the published dependency. For upstream development, [Development](development.md#local-clippings-validation) describes the explicit local-package override. Validation does not change the production database, dependency lock or deployed site.

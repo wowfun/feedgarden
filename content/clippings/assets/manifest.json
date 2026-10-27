@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "images": {
+    "https://assets.claude.com/cd4b9c4417d5ba31776e8aa79e204966c08c6a43.png": {
+      "originalUrl": "https://assets.claude.com/cd4b9c4417d5ba31776e8aa79e204966c08c6a43.png",
+      "finalUrl": "https://assets.claude.com/cd4b9c4417d5ba31776e8aa79e204966c08c6a43.png",
+      "path": "assets/0be001f244a09ed7adedeac7cfe7d0e5bb943ec7ece71c93ae241f817c81cf48.png",
+      "mediaType": "image/png"
+    },
+    "https://assets.claude.com/ed6bd97496ffdab88763806d9e14f1ec61ed9255.gif": {
+      "originalUrl": "https://assets.claude.com/ed6bd97496ffdab88763806d9e14f1ec61ed9255.gif",
+      "finalUrl": "https://assets.claude.com/ed6bd97496ffdab88763806d9e14f1ec61ed9255.gif",
+      "path": "assets/5c679393316566043264f07839790628217d880a2f427cf7aa463a6fabe9d8b6.gif",
+      "mediaType": "image/gif"
+    },
+    "https://assets.claude.com/a7cb2cf08bfcef461166310c0c55f28b72c33b0d.gif": {
+      "originalUrl": "https://assets.claude.com/a7cb2cf08bfcef461166310c0c55f28b72c33b0d.gif",
+      "finalUrl": "https://assets.claude.com/a7cb2cf08bfcef461166310c0c55f28b72c33b0d.gif",
+      "path": "assets/f763118efed178629ae4672e83c2e2485367c3853f3a9de081d81c37cc1dd587.gif",
+      "mediaType": "image/gif"
+    }
+  }
+}

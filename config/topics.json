@@ -291,7 +291,8 @@
         "AI safety research",
         "AI 安全"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "education",
@@ -305,7 +306,8 @@
         "teaching",
         "learning"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "ethics-compute-access",
@@ -389,7 +391,8 @@
         "labor market",
         "AI and employment"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "digital-ownership",
@@ -430,7 +433,8 @@
         "image codecs",
         "image formats"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "accessibility",
@@ -579,7 +583,8 @@
         "AI debt",
         "AI capex"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": true
     },
     {
       "id": "personal-finance",
@@ -663,7 +668,7 @@
         "electric cars"
       ],
       "deprecated": false,
-      "hidden": false
+      "hidden": true
     }
   ]
 }

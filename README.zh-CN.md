@@ -6,6 +6,8 @@ Feedgarden 将开发者和 AI 信息源采集到本地 SQLite，并发布按时�
 
 站点由 [jekyll-obsidian](https://github.com/wowfun/jekyll-obsidian) 构建。在线预览：[英文](https://sinputer.top/feedgarden/) | [简体中文](https://sinputer.top/feedgarden/zh-CN/)。
 
+[Clippings](docs/clippings.zh-CN.md) 用于手工维护 Markdown 摘录，条目同时显示在独立 tab 和首页，中英文界面共用一份正文。
+
 文章列表支持按日独立折叠，标题显示本地化日期、星期及当前页条数。默认只展开最新一天，筛选和翻页保留手动开合状态，刷新后重置。详见[站点功能](docs/site.md)。
 
 ## 快速开始

@@ -6,6 +6,8 @@ Feedgarden collects developer and AI sources into local SQLite and publishes a b
 
 The site is built with [jekyll-obsidian](https://github.com/wowfun/jekyll-obsidian). Preview: [English](https://sinputer.top/feedgarden/) | [简体中文](https://sinputer.top/feedgarden/zh-CN/).
 
+[Clippings](docs/clippings.md) holds manually maintained Markdown. Its items appear both in a dedicated tab and on the homepage, with one original body shared by both language interfaces.
+
 Article lists support independent daily folding with localized dates, weekdays and page-local counts. Only the newest day opens by default; filters and pagination retain manual choices until reload. See [Site features](docs/site.md).
 
 ## Quick start

@@ -2,13 +2,46 @@
 
 Run all commands from the repository root.
 
-Verification commands accept `--config FILE`; their evidence defaults to `<storage.root>/validation/`. `FEEDGARDEN_VALIDATION_DIR` explicitly overrides that location. Database-backed fixtures select an independent storage root, including their Agent workspaces; they must never open the production database.
+Verification commands accept `--config FILE`; their evidence defaults to `<storage.root>/validation/`. `FEEDGARDEN_VALIDATION_DIR` explicitly overrides that location. Database-backed fixtures select an independent storage root, including their Agent workspaces; they must never open the production database. `verify:clippings` uses the same evidence resolver.
 
 `verify:collect` reuses the selected configuration's Twitter installation when checking X, while collection evidence and database state remain isolated.
 
 ## Pinned theme changes
 
 `verify:scale`, `site:build` and publication use the exact published gem in the root `Gemfile` and `Gemfile.lock`. Run `bundle install` after checkout. Implement reusable theme changes upstream, publish and verify the gem, then update the exact version and run `bundle update jekyll-obsidian-site`. Commit both dependency files with Windows and Linux platforms. Builds use frozen Bundler resolution and precompiled gem assets; they do not clone the theme or run its frontend toolchain.
+
+## Local Clippings validation
+
+Clippings uses upstream shared-content and Web Clipper metadata support that is not in the pinned 0.3.1 release. This includes `published`/`source`, directory tags, and bare topic aliases. Until the next theme release is published and the exact production dependency is upgraded, ordinary `site:build` and CI cannot build the new configuration. Do not point the production Gemfile at a checkout or replace the published gem in the normal gem home.
+
+### Release follow-up (open; blocks merging the new site configuration)
+
+The local package checks below are development evidence, not a replacement for the pinned build or CI. Keep this candidate out of `main` until these tasks are complete:
+
+- [ ] Publish and verify an upstream theme release containing shared directories, Web Clipper fields, directory tags, published Markdown image URLs.
+- [ ] Pin that published version in `Gemfile`, run `bundle update jekyll-obsidian-site`, and retain Windows and Linux platforms in `Gemfile.lock`.
+- [ ] From a clean checkout without `.references/` or a local theme gem, pass `npm run build`, `npm test`, `npm run site:build`, `npm run test:visual`, `npm run verify:scale`, and the fixture visual check documented below; pass the full PR CI job.
+- [ ] Pass `npm run verify:clippings` in CI using the published package, then remove the temporary release limitation from this page and the paired site docs. Keep `--gem` for future isolated upstream development.
+
+Close this follow-up only after the published dependency and full CI are verified together. This review does not publish the theme, upgrade the production dependency, or bypass the existing CI gate.
+
+The Clippings verifier defaults to the frozen published dependency in `Gemfile` and `Gemfile.lock`; it needs no theme checkout. CI runs it for every non-docs change and retains its screenshots, exports and result records with the visual-validation artifact. With the current 0.3.1 pin this command fails on the unsupported site configuration, so the release checklist remains open.
+
+```sh
+npm run verify:clippings
+```
+
+For upstream development before that release, explicitly select a local package:
+
+```powershell
+Push-Location .references/jekyll-obsidian/website
+npm run build
+bundle exec ruby scripts/package.rb --skip-assets
+Pop-Location
+npm run verify:clippings -- --gem .references/jekyll-obsidian/pkg/jekyll-obsidian-site-0.3.1.gem
+```
+
+The package filename uses the upstream checkout's version; adjust it if that version changes. The local artifact is identified by its SHA-256, not treated as a new published release. Published-mode results instead record the locked version and bundle SHA-256. The verifier installs it into a fresh gem home under `.local/feedgarden/validation/clippings/run-*/`, reusing installed runtime dependencies without downloading or replacing the normal theme. It builds a copy of the current content and a 52-clipping fixture, runs desktop/mobile checks in both languages, and saves screenshots, Markdown exports and `results.json`. Existing site browser checks run against the real-content copy as well. No production database is opened, no collected content is rendered, and nothing is published. The real-content check accepts an empty or populated Clippings tab; the synthetic fixture exercises pagination and content interactions.
 
 ## Validation commands
 

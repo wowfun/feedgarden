@@ -18,7 +18,7 @@ export const channelSchema = z.discriminatedUnion('kind', [
   z.object({ ...channelFields, kind: z.enum(['hn-api', 'feed', 'sitemap', 'anthropic-html', 'github-trending', 'github-search', 'x-cli', 'follow-builders', 'arxiv-api', 'ph-html']), url: z.url().optional() }).strict(),
 ]);
 export const sourceSchema = z.object({
-  id: slug, name: z.string().min(1), enabled: z.boolean().default(true),
+  id: slug.regex(/^(?!clippings$)/, 'clippings is reserved for authored content'), name: z.string().min(1), enabled: z.boolean().default(true),
   timezone: z.string().default('Asia/Shanghai').refine(value => {
     try { new Intl.DateTimeFormat('en', { timeZone: value }); return true; } catch { return false; }
   }, 'Invalid IANA timezone'),

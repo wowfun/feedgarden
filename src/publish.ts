@@ -11,6 +11,7 @@ import { validateRegistry } from './topics-contract.mjs';
 import { atomicWrite, hash } from './util.js';
 import { Store } from './store.js';
 import { writeSite } from './site.js';
+import { assertAuthoredContent } from './authored-content.js';
 export function assertManagedPaths(paths: string[]): void {
   if (paths.some(path => path.split('/').some(part => part === '..' || part === '') || !(path.startsWith('content/') || path === 'config/topics.json'))) throw new Error('Publication contains unmanaged paths');
 }
@@ -24,6 +25,7 @@ export function remoteTopics(revision: string): Registry {
 export async function publish(config: Config, store?: Store, validate: (root: string) => Promise<unknown> = buildSite, signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted();
   if (config.feed.directory !== 'content' || config.feed.topics !== 'config/topics.json') throw new Error('Publishing requires the managed content/ and config/topics.json paths');
+  await assertAuthoredContent(config.feed.directory);
   const root = process.cwd();
   const trustedBundle = await readSiteBundle(root);
   if (git(['remote', 'get-url', 'origin']) !== config.publish.repository) throw new Error('Origin differs from the configured publication repository');
@@ -51,7 +53,9 @@ export async function publish(config: Config, store?: Store, validate: (root: st
     const siteConfig = await readFile(join(worktree, '.github/jekyll-obsidian.yml'), 'utf8');
     if (!/source:\s*content\b/.test(siteConfig)) throw new Error('MANUAL_ACTION: integrate the item-feed implementation into the publication branch before publishing its content');
     await rm(join(worktree, 'content'), { recursive: true, force: true });
-    await cp(resolve('content'), join(worktree, 'content'), { recursive: true });
+    await cp(resolve('content'), join(worktree, 'content'), { recursive: true, dereference: false });
+    // Recheck the copied tree: authored files can change after render's handoff.
+    await assertAuthoredContent(join(worktree, 'content'));
     await cp(resolve('config/topics.json'), join(worktree, 'config/topics.json'));
     await run('git', ['add', '--', 'content', 'config/topics.json'], worktree);
     const paths = execFileSync('git', ['diff', '--cached', '--name-only', '-z'], { cwd: worktree, encoding: 'utf8' }).split('\0').filter(Boolean);

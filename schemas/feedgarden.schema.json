@@ -275,7 +275,14 @@
         "properties": {
           "id": {
             "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+            "allOf": [
+              {
+                "pattern": "^[a-z0-9][a-z0-9_-]*$"
+              },
+              {
+                "pattern": "^(?!clippings$)"
+              }
+            ]
           },
           "name": {
             "type": "string",

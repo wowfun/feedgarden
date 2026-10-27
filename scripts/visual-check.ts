@@ -1,13 +1,13 @@
 import { parseArgs } from 'node:util';
 import { loadConfig } from '../src/config.js';
 import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
-import { readFile, stat, mkdir, writeFile } from 'node:fs/promises';
-import { resolve, extname, join, sep } from 'node:path';
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
 import { chromium, expect, type Page } from '@playwright/test';
 import { z } from 'zod';
 import { validationDirectory as resolveValidationDirectory } from './validation-paths.js';
 import { checkArchiveExport } from './archive-export-check.js';
+import { staticServer } from './static-server.js';
 const { values } = parseArgs({ options: { config: { type: 'string' } } });
 const validationDirectory = resolveValidationDirectory(loadConfig(values.config));
 const root=resolve(process.env.FEEDGARDEN_VISUAL_ROOT??'.jekyll-obsidian-cache/site'),output=join(validationDirectory, 'visual');
@@ -37,8 +37,7 @@ async function checkDayGroups(page:Page,locale:keyof typeof ledgerMessages){
  }
  return days;
 }
-const mime:Record<string,string>={'.html':'text/html','.js':'application/javascript','.css':'text/css','.json':'application/json','.md':'text/plain; charset=utf-8','.svg':'image/svg+xml','.woff2':'font/woff2'};
-const server=createServer(async(request,response)=>{try{const url=new URL(request.url!,'http://localhost');if(!url.pathname.startsWith('/feedgarden/')){response.writeHead(404).end();return;}let path=resolve(root,'.'+decodeURIComponent(url.pathname.slice('/feedgarden'.length)));if(!path.startsWith(root+sep)&&path!==root)throw new Error('Invalid path');if((await stat(path)).isDirectory())path=join(path,'index.html');response.setHeader('Content-Type',mime[extname(path)]??'application/octet-stream');response.end(await readFile(path));}catch{response.writeHead(404).end();}});
+const server=staticServer(root,'/feedgarden');
 await new Promise<void>(done=>server.listen(0,'127.0.0.1',done));const address=server.address();assert.ok(address&&typeof address!=='string');
 const origin='http://127.0.0.1:'+address.port,browser=await chromium.launch({headless:true});const checks:unknown[]=[];
 const ready=async(page:Page)=>{await page.waitForFunction(()=>{const root=document.querySelector('[data-paged-archive]');return root&&!root.hasAttribute('aria-busy')&&document.querySelector('[data-archive-page-status]')?.textContent&&document.querySelector('[data-archive-status]')?.textContent==='';});};
@@ -76,7 +75,17 @@ try{
   }
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   if(count){
-   const footer=rows.first().locator('.archive-card-footer'),external=footer.locator('.archive-source-url');assert.equal(await external.count(),1);const href=await external.getAttribute('href');assert.ok(href?.startsWith('https://'));assert.equal(await external.textContent(),href);await external.click({trial:true});assert.ok(await footer.locator('[data-archive-facet="source"]').count());assert.ok(await footer.locator('[data-archive-facet="topic"]').count());
+   const manifestUrl=new URL((await page.locator('[data-paged-archive]').getAttribute('data-archive-url'))!,page.url());
+   const manifest=await (await page.request.get(manifestUrl.href)).json();
+   const firstUrl=new URL((await rows.first().locator('.blog-ledger__main').getAttribute('href'))!,origin).pathname;
+   let card:{source_url:string;source_title?:string}|undefined;
+   for(const chunk of manifest.chunks){
+    const resource=await (await page.request.get(new URL(chunk,manifestUrl).href)).json();
+    card=resource.cards.find((item:{url:string})=>new URL(item.url,origin).pathname===firstUrl);
+    if(card)break;
+   }
+   assert.ok(card,'Visible article must exist in its published archive');
+   const footer=rows.first().locator('.archive-card-footer'),external=footer.locator('.archive-source-url');assert.equal(await external.count(),1);const href=await external.getAttribute('href');assert.ok(href?.startsWith('https://'));assert.equal(href,card.source_url);assert.equal(await external.textContent(),card.source_title??href);await external.click({trial:true});assert.ok(await footer.locator('[data-archive-facet="source"]').count());assert.ok(await footer.locator('[data-archive-facet="topic"]').count());
    await page.screenshot({path:join(output,artifactPrefix+'feed-'+locale+'-'+size+'.png')});
    const reading=page.getByRole('switch',{name:locale==='en'?'Read in full':'平铺阅读'});await reading.click();
    await rows.first().scrollIntoViewIfNeeded();
@@ -117,8 +126,8 @@ try{
    await page.goto(origin+prefix+'?source=missing&source=missing&page=invalid');await ready(page);assert.equal(await rows.count(),0);assert.ok(page.url().endsWith('?source=missing'));await page.locator('[data-archive-clear]').click();await ready(page);assert.equal(await rows.count(),50);
    await page.screenshot({path:join(output,artifactPrefix+'filters-'+locale+'-'+size+'.png')});
   }
-  const collections=await page.locator('.site-header [data-navigation-id="podcasts"] > a, .site-header [data-navigation-id="github"] > a, .site-header [data-navigation-id="arxiv"] > a').evaluateAll(links=>links.map(link=>({id:link.parentElement!.getAttribute('data-navigation-id')!,href:link.getAttribute('href')!})));
-  if(!fixture)assert.deepEqual(collections.map(c=>c.id).sort(),['arxiv','github','podcasts']);
+  const collections=await page.locator('.site-header [data-navigation-id="clippings"] > a, .site-header [data-navigation-id="podcasts"] > a, .site-header [data-navigation-id="github"] > a, .site-header [data-navigation-id="arxiv"] > a').evaluateAll(links=>links.map(link=>({id:link.parentElement!.getAttribute('data-navigation-id')!,href:link.getAttribute('href')!})));
+  if(!fixture)assert.deepEqual(collections.map(c=>c.id).sort(),['arxiv','clippings','github','podcasts']);
   for(const collection of collections){
    const url=new URL(collection.href,origin);assert.equal(url.origin,origin);assert.equal((await page.goto(url.href))?.status(),200);await ready(page);
    assert.ok((await page.locator('[data-paged-archive]').getAttribute('data-archive-current-url'))?.includes('/tabs/'+collection.id+'/'));

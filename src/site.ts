@@ -7,13 +7,14 @@ import { parse } from 'yaml';
 import type { Config } from './config.js';
 import { Store } from './store.js';
 import { iterateAcceptedItems, itemPath, type AcceptedItem } from './items.js';
-import { loadTopics } from './topics.js';
+import { loadTopics, topicTagAliases } from './topics.js';
 import { atomicWrite, safeUrl, hash, nowIso } from './util.js';
 import { importArchives, archiveManifestSignature } from './archives.js';
 import { reconcileSelection, selectionPolicy } from './selection.js';
 import { publicationClause, publicationScope, publicationSignature, admitsPublication, recordPublications, type PublishedIdentity } from './publications.js';
 import { embedKind } from './media-embed.js';
 import { collectionTabs } from './collections.js';
+import { authoredDirectory, assertAuthoredContent, isAuthoredPath, transferAuthoredContent } from './authored-content.js';
 import { publication, recentPublication, activeRelations, recommendationManifest, relationRevision, type Publication } from './relations.js';
 
 function escapeMarkdown(value: string): string { return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\\`*_[\]{}()#!|$~]/g, char => `&#${char.charCodeAt(0)};`).replace(/\b([a-z][a-z0-9+.-]*):(?=\/\/)/gi, '$1&#58;').replace(/[\r\n]+/g, ' ').trim(); }
@@ -97,12 +98,18 @@ export async function recoverContent(config: Config, store: Store): Promise<void
   if (!existsSync(journalPath)) return;
   const journal = JSON.parse(await readFile(journalPath, 'utf8')) as ContentJournal;
   if (journal.destination !== resolve(config.feed.directory) || dirname(journal.staging) !== dirname(journal.destination) || dirname(journal.previous) !== dirname(journal.destination)) throw new Error('Content journal paths differ from the configured same-filesystem destination');
+  for (const tree of [journal.destination, journal.staging, journal.previous]) await assertAuthoredContent(tree);
+  if (existsSync(journal.destination) && existsSync(journal.staging) && existsSync(journal.previous)) throw new Error('Content changed during the directory handoff; all trees have been kept for recovery');
   let installed = existsSync(journal.destination) && !existsSync(journal.staging);
   if (!existsSync(journal.destination)) {
-    if (existsSync(journal.staging)) { await rename(journal.staging, journal.destination); installed = true; }
+    if (existsSync(journal.staging)) {
+      await transferAuthoredContent(journal.previous, journal.staging);
+      await rename(journal.staging, journal.destination); installed = true;
+    }
     else if (existsSync(journal.previous)) await rename(journal.previous, journal.destination);
     else throw new Error('Content journal cannot recover either tree');
   }
+  if (installed && existsSync(join(journal.previous, authoredDirectory))) throw new Error('Content recovery found untransferred clippings; the previous tree has been kept');
   // Journals predating publication tracking still own a recoverable content tree.
   const publications = journal.publications ?? [];
   if (installed) recordPublications(store, publications);
@@ -126,7 +133,7 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
   const destination = resolve(config.feed.directory);
   const manifests = await Promise.all(['en', 'zh-CN'].map(locale => readFile('config/locales/' + locale + '.json', 'utf8')));
   const scope = publicationScope(store);
-  const signature = () => hash({ contentVersion: store.meta('content_version'), admissions: publicationSignature(store, scope), registry, sources: config.sources.map(({ id, name, timezone, selection }) => ({ id, name, timezone, selection })), manifests, recommendations: relationRevision(store), renderRevision: 13 });
+  const signature = () => hash({ contentVersion: store.meta('content_version'), admissions: publicationSignature(store, scope), registry, sources: config.sources.map(({ id, name, timezone, selection }) => ({ id, name, timezone, selection })), manifests, recommendations: relationRevision(store), renderRevision: 17 });
   const signatureKey = 'render_signature:' + destination;
   if (!force && existsSync(destination) && existsSync(join(destination, 'index.md')) && existsSync(join(destination, '_translations/zh-CN/index.md')) && store.meta(signatureKey) === signature()) return false;
   const recommendationAt = nowIso(), relations = activeRelations(store, recommendationAt);
@@ -163,7 +170,7 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
       await writeFile(file, body); trackPublication(path, body);
     }
     for (const row of store.db.prepare('SELECT path,body FROM feed_archive_files ORDER BY path').iterate() as Iterable<{ path: string; body: Buffer }>) {
-      if (row.path === '_recommendations.json') continue;
+      if (row.path === '_recommendations.json' || isAuthoredPath(row.path)) continue;
       if (!preserveManifest && (row.path === '_locale.yml' || row.path === '_translations/zh-CN/_locale.yml')) continue;
       let body: string | Buffer = row.body;
       if (row.path.endsWith('.md')) {
@@ -175,10 +182,22 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
     for (const locale of ['en', 'zh-CN'] as const) {
       const prefix = locale === 'zh-CN' ? '_translations/zh-CN/' : '';
       const manifest = JSON.parse(manifests[locale === 'en' ? 0 : 1]!);
-      manifest.tag_labels = Object.fromEntries([...config.sources.map(source => ['source/' + source.id, manifest.tag_labels?.['source/' + source.id] ?? source.name]), ...registry.topics.map(topic => ['topics/' + topic.id, topic.name[locale]])]);
+      manifest.tag_labels = Object.fromEntries([['source/clippings', manifest.tag_labels?.['source/clippings'] ?? 'Clippings'], ...config.sources.map(source => ['source/' + source.id, manifest.tag_labels?.['source/' + source.id] ?? source.name]), ...registry.topics.map(topic => ['topics/' + topic.id, topic.name[locale]])]);
       manifest.hidden_tags = registry.topics.filter(topic => topic.hidden).map(topic => 'topics/' + topic.id).sort();
-      manifest.tag_aliases = Object.fromEntries(registry.topics.filter(topic => topic.replacedBy).map(topic => ['topics/' + topic.id, 'topics/' + topic.replacedBy]));
-      if (!preserveManifest || !existsSync(join(staging, prefix + '_locale.yml'))) await write(prefix + '_locale.yml', JSON.stringify(manifest, null, 2));
+      manifest.tag_aliases = topicTagAliases(registry);
+      const manifestPath = prefix + '_locale.yml';
+      if (!preserveManifest || !existsSync(join(staging, manifestPath))) await write(manifestPath, JSON.stringify(manifest, null, 2));
+      else {
+        // Keep custom messages and tags, but configuration owns source/topic
+        // labels and topic visibility even when a fresh DB imports stale output.
+        const preserved = parse(await readFile(join(staging, manifestPath), 'utf8'));
+        const reconciled = { ...preserved,
+          tag_labels: { ...preserved.tag_labels, ...manifest.tag_labels },
+          hidden_tags: [...new Set([...(preserved.hidden_tags ?? []).filter((tag: string) => !tag.startsWith('topics/')), ...manifest.hidden_tags])].sort(),
+          tag_aliases: { ...preserved.tag_aliases, ...manifest.tag_aliases }
+        };
+        if (JSON.stringify(reconciled) !== JSON.stringify(preserved)) await write(manifestPath, JSON.stringify(reconciled, null, 2));
+      }
       if (!existsSync(join(staging, prefix + 'index.md'))) await write(prefix + 'index.md', frontmatter({ publish: true, content_type: 'page', title: 'Feedgarden' }));
       for (const tab of collectionTabs(config.sources)) {
         const title = tab.title[locale];
@@ -190,6 +209,7 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
     }
     const archived = store.db.prepare(`SELECT a.path,a.source,a.id,a.item,i.first_seen,a.en,a.zh,p.id IS NOT NULL AS published FROM feed_archives a JOIN items i ON i.source=a.source AND i.id=a.id LEFT JOIN feed_summaries f ON f.source=a.source AND f.id=a.id LEFT JOIN feed_excluded e ON e.source=a.source AND e.id=a.id LEFT JOIN feed_publications p ON p.source=a.source AND p.id=a.id WHERE f.id IS NULL AND e.id IS NULL AND ${publicationClause('a', 'p')} ORDER BY a.path`);
     for (const row of archived.iterate() as Iterable<{ path: string; source: string; id: string; item: string; first_seen: string; en: string; zh: string; published: number }>) {
+      if (isAuthoredPath(row.path)) throw new Error('Generated archive occupies the authored clippings directory');
       if (!admitsPublication(JSON.parse(row.item), row.first_seen, row.published === 1, scope)) continue;
       paths.set(row.path, [row.source, row.id]);
       if (!row.published) publications.push([row.source, row.id]);
@@ -198,6 +218,7 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
     for (const record of iterateAcceptedItems(store)) {
         signal?.throwIfAborted();
         const { source, id } = record.item;
+        if (source === authoredDirectory) throw new Error('Generated item occupies the authored clippings directory');
         const day = DateTime.fromISO(record.date, { zone: timezones.get(source) ?? 'Asia/Shanghai' }).toISODate();
         if (!day) throw new Error('Invalid item date: ' + source + '/' + id);
         itemPath(source, day, 1); // Validate directory components before reserving a number.
@@ -220,6 +241,8 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
   signal?.throwIfAborted();
   store.assertLease();
   if (existsSync(destination)) await rename(destination, previous);
+  signal?.throwIfAborted();
+  await transferAuthoredContent(previous, staging);
   signal?.throwIfAborted();
   await rename(staging, destination);
   signal?.throwIfAborted();

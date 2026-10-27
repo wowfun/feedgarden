@@ -2,7 +2,7 @@ import { storagePaths } from '../src/storage-paths.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, cp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, cp, mkdir, writeFile, readFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { configSchema } from '../src/config.js';
@@ -11,6 +11,22 @@ import { publish } from '../src/publish.js';
 import { writeSite } from '../src/site.js';
 import { loadTopics } from '../src/topics.js';
 const git=(cwd:string,...args:string[])=>execFileSync('git',args,{cwd,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
+
+test('publication rejects authored links before Git, database or topic changes', async () => {
+ const cwd=process.cwd(),root=await mkdtemp(join(tmpdir(),'feedgarden-publish-links-'));
+ try {
+  const outside=join(root,'outside'),clippings=join(root,'content/clippings');
+  await mkdir(outside);await mkdir(clippings,{recursive:true});
+  await writeFile(join(outside,'private.md'),'Private content');
+  await symlink(outside,join(clippings,'external'),process.platform==='win32'?'junction':'dir');
+  const config=configSchema.parse({version:2,agent:{},sources:[{id:'one',name:'One',intervalHours:1,streams:[{id:'main',channels:[{id:'rss',kind:'feed'}]}]}]});
+  process.chdir(root);
+  // No Git repository or bundle exists here: the authored-tree guard must run first.
+  await assert.rejects(publish(config,undefined,async()=>assert.fail('Unsafe publication reached validation')),/Authored clippings.*symlink/);
+  assert.equal(await readFile(join(outside,'private.md'),'utf8'),'Private content');
+  await assert.rejects(readFile(storagePaths(config.storage).database),{code:'ENOENT'});
+ } finally {process.chdir(cwd);await rm(root,{recursive:true,force:true});}
+});
 test('local bare-Git publication isolates managed paths, merges additions, refuses conflicts and rejects races without force',async()=>{
  const project=process.cwd(),temporary=await mkdtemp(join(tmpdir(),'feedgarden-publish-')),root=join(temporary,'local'),remote=join(temporary,'remote.git'),other=join(temporary,'other');await mkdir(root);
  let store:Store|undefined;
@@ -24,7 +40,9 @@ test('local bare-Git publication isolates managed paths, merges additions, refus
   const local=await loadTopics('config/topics.json');local.topics.push(add('local-topic'));await writeFile('config/topics.json',JSON.stringify(local));
   const remoteRegistry=JSON.parse(await readFile(join(other,'config/topics.json'),'utf8'));remoteRegistry.topics.push(add('remote-topic'));await writeFile(join(other,'config/topics.json'),JSON.stringify(remoteRegistry));git(other,'add','config/topics.json');git(other,'commit','-qm','Remote topic');git(other,'push','-q');
   await writeFile('README.md','Uncommitted local code');let validated=0;
-  await publish(config,store,async(worktree)=>{validated++;assert.equal(await readFile(join(worktree,'README.md'),'utf8'),'Original code');assert.ok(JSON.parse(await readFile(join(worktree,'config/topics.json'),'utf8')).topics.some((t:any)=>t.id==='remote-topic'));});assert.equal(validated,1);assert.equal(await readFile('README.md','utf8'),'Uncommitted local code');
+  const note='---\ntitle: Authored note\n---\nOriginal bytes.\r\n',asset=Buffer.from([0,1,2,255]);
+  await mkdir('content/clippings/assets',{recursive:true});await writeFile('content/clippings/note.md',note);await writeFile('content/clippings/assets/clip.bin',asset);
+  await publish(config,store,async(worktree)=>{validated++;assert.equal(await readFile(join(worktree,'README.md'),'utf8'),'Original code');assert.ok(JSON.parse(await readFile(join(worktree,'config/topics.json'),'utf8')).topics.some((t:any)=>t.id==='remote-topic'));assert.equal(await readFile(join(worktree,'content/clippings/note.md'),'utf8'),note);assert.deepEqual(await readFile(join(worktree,'content/clippings/assets/clip.bin')),asset);});assert.equal(validated,1);assert.equal(await readFile('README.md','utf8'),'Uncommitted local code');
   const published=git(root,'rev-parse','FETCH_HEAD');git(other,'pull','-q','--ff-only');assert.ok(JSON.parse(await readFile(join(other,'config/topics.json'),'utf8')).topics.some((t:any)=>t.id==='local-topic'));
   const topicsBefore=await readFile('config/topics.json','utf8'),contentBefore=await readFile('content/index.md','utf8'),changesBefore=(store.db.prepare('SELECT total_changes() n').get() as {n:number}).n;
   for (const file of ['Gemfile', 'Gemfile.lock']) {

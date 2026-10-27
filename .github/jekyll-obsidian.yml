@@ -8,11 +8,19 @@ website:
   theme: minimal
   repository: wowfun/feedgarden
   edit_branch: main
+  content:
+    publish_by_default: [clippings]
+    directories:
+      post: [blog, clippings]
+      doc: [docs]
+    directory_tags:
+      clippings: [source/clippings]
   properties:
     hidden: [first_seen, date_basis]
   i18n:
     enabled: true
     locales: [en, zh-CN]
+    shared_directories: [clippings]
   features:
     search: true
     feed: true

@@ -64,6 +64,9 @@ for(const archive of [false,true]) test(`first bounded summary excludes ${archiv
     const store=new Store(storagePaths(config.storage).database);
     try{assert.equal((store.db.prepare('SELECT count(*) n FROM feed_publications').get() as {n:number}).n,2);}finally{store.close();}
     await lstat(join(config.feed.directory,oldPath));await lstat(join(config.feed.directory,'_translations/zh-CN',oldPath));
+    const locale=JSON.parse(await readFile(join(config.feed.directory,'_translations/zh-CN/_locale.yml'),'utf8'));
+    assert.equal(locale.tag_labels['topics/coding'],'编程');
+    if(!archive) assert.match(await readFile(join(config.feed.directory,'_translations/zh-CN',oldPath),'utf8'),/title: "历史"/);
   }finally{await rm(root,{recursive:true,force:true});}
 });
 

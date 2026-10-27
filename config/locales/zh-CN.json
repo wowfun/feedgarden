@@ -2,7 +2,7 @@
   "name": "简体中文",
   "hreflang": "zh-Hans",
   "dir": "ltr",
-  "tag_labels": { "source/podcast": "播客" },
+  "tag_labels": { "source/podcast": "播客", "source/clippings": "Clippings" },
   "messages": {
     "back_to_top": "回到顶部",
     "show_hidden_topics": "显示隐藏主题",

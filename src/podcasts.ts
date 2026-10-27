@@ -1,8 +1,8 @@
+import type { AgentRuntimeConfig } from './storage-paths.js';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { array, date, plain, text, type ParseContext } from './channels/parsers.js';
 import type { Item } from './types.js';
 import { agentIdentity } from './agent.js';
-import type { Config } from './config.js';
 import { mediaForUrl } from './source-content.js';
 import { Http } from './http.js';
 import { Store } from './store.js';
@@ -126,7 +126,7 @@ export function transcriptChunks(body: string, limit: number, encodedLimit = Inf
 }
 
 /** Advance at most one model node, permitting the source scheduler to stay fair. */
-export async function transcriptStep(item: Item, store: Store, agent: Config['agent'], execute: boolean, signal?: AbortSignal, retryFailed = false, generator?: TaskGenerator): Promise<{ item: Item; ready: boolean; performed: boolean; deferred?: boolean; failed?: boolean; error?: string }> {
+export async function transcriptStep(item: Item, store: Store, agent: AgentRuntimeConfig, execute: boolean, signal?: AbortSignal, retryFailed = false, generator?: TaskGenerator): Promise<{ item: Item; ready: boolean; performed: boolean; deferred?: boolean; failed?: boolean; error?: string }> {
   if (!item.metadata?.transcriptHash) return { item, ready: true, performed: false };
   const snapshot = store.statement('SELECT hash,length(body) chars FROM podcast_transcripts WHERE source=? AND id=?').get(item.source, item.id) as { chars: number; hash: string } | undefined;
   if (!snapshot || snapshot.hash !== item.metadata.transcriptHash) throw new Error('Transcript snapshot differs from queued item');

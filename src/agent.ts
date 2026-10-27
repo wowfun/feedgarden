@@ -1,3 +1,4 @@
+import type { AgentRuntimeConfig } from './storage-paths.js';
 import { spawn } from 'node:child_process';
 import { closeAgentProcess, stopAgentProcess } from './agent-process.js';
 import { Readable, Writable } from 'node:stream';
@@ -18,9 +19,9 @@ function optionValues(option: SessionConfigOption | undefined): { value: string;
   return option.options.flatMap(entry => 'options' in entry ? entry.options : [entry]);
 }
 export interface SummaryInput { contractVersion: 2; topics: Registry; items: (Pick<Item, 'source' | 'id' | 'title' | 'text' | 'author' | 'media' | 'articleQuote'> & { discussion?: Pick<NonNullable<Item['discussion']>, 'comments'> })[] }
-export interface AgentIdentity { backend: Config['agent']['backend']; version: string; model: string; effort?: string; configurationHash?: string }
-export type ResolvedAgent = Config['agent'] & { model: string; execution: AgentIdentity };
-export type AgentResolver = (config: Config['agent'], signal?: AbortSignal) => Promise<ResolvedAgent>;
+export interface AgentIdentity { backend: AgentRuntimeConfig['backend']; version: string; model: string; effort?: string; configurationHash?: string }
+export type ResolvedAgent = AgentRuntimeConfig & { model: string; execution: AgentIdentity };
+export type AgentResolver = (config: AgentRuntimeConfig, signal?: AbortSignal) => Promise<ResolvedAgent>;
 export interface TaskResult { output: unknown; usage: unknown[]; directory: string; events: unknown[]; execution?: AgentIdentity; omittedNotifications?: { usage: number; events: number } }
 export interface AgentResult extends TaskResult { output: ReturnType<typeof validateArtifact>['output'] }
 export type AuxiliaryTask = ReportTask;
@@ -55,10 +56,10 @@ export const resolveAgent: AgentResolver = async (config, signal) => {
   if ('execution' in config) return config as ResolvedAgent;
   return runSession(config, { kind: 'probe' }, signal);
 };
-export async function generateBatch(config: Config['agent'], input: SummaryInput, repair?: string, workspace?: string, signal?: AbortSignal): Promise<AgentResult> {
+export async function generateBatch(config: AgentRuntimeConfig, input: SummaryInput, repair?: string, workspace?: string, signal?: AbortSignal): Promise<AgentResult> {
   return runSession(config, { kind: 'summary', input, repair, workspace }, signal);
 }
-export async function generateTask(config: Config['agent'], task: AuxiliaryTask, input: unknown, repair?: string, workspace?: string, signal?: AbortSignal): Promise<TaskResult> {
+export async function generateTask(config: AgentRuntimeConfig, task: AuxiliaryTask, input: unknown, repair?: string, workspace?: string, signal?: AbortSignal): Promise<TaskResult> {
   return runSession(config, { kind: 'task', task, input, repair, workspace }, signal);
 }
 export function artifactRepairFeedback(error: string): string {
@@ -85,10 +86,10 @@ interface GenerationOptions { repair?: string; workspace?: string }
 type SummaryRequest = GenerationOptions & { kind: 'summary'; input: SummaryInput };
 type TaskRequest = GenerationOptions & { kind: 'task'; task: AuxiliaryTask; input: unknown };
 type ProbeRequest = { kind: 'probe' };
-async function runSession(config: Config['agent'], request: ProbeRequest, signal?: AbortSignal): Promise<ResolvedAgent>;
-async function runSession(config: Config['agent'], request: SummaryRequest, signal?: AbortSignal): Promise<AgentResult>;
-async function runSession(config: Config['agent'], request: TaskRequest, signal?: AbortSignal): Promise<TaskResult>;
-async function runSession(config: Config['agent'], request: ProbeRequest | SummaryRequest | TaskRequest, signal?: AbortSignal): Promise<TaskResult | ResolvedAgent> {
+async function runSession(config: AgentRuntimeConfig, request: ProbeRequest, signal?: AbortSignal): Promise<ResolvedAgent>;
+async function runSession(config: AgentRuntimeConfig, request: SummaryRequest, signal?: AbortSignal): Promise<AgentResult>;
+async function runSession(config: AgentRuntimeConfig, request: TaskRequest, signal?: AbortSignal): Promise<TaskResult>;
+async function runSession(config: AgentRuntimeConfig, request: ProbeRequest | SummaryRequest | TaskRequest, signal?: AbortSignal): Promise<TaskResult | ResolvedAgent> {
   signal?.throwIfAborted();
   const probe = request.kind === 'probe';
   const input = 'input' in request ? request.input : undefined;

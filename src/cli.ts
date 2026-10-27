@@ -1,16 +1,16 @@
+import { agentRuntime, storagePaths } from './storage-paths.js';
 import { parseArgs } from 'node:util';
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import lockfile from 'proper-lockfile';
-import { loadConfig, readConfig, resolveConfigFile, type Config } from './config.js';
+import { runnerLock } from './runner-lock.js';
+import { loadConfig, resolveConfigFile, type Config } from './config.js';
 import { Store } from './store.js';
 import { collect, type CollectionResult } from './collect.js';
 import { summarize } from './items.js';
 import { writeSite, recoverContent } from './site.js';
 import { applyTopics } from './topics.js';
-import { migrate, rollback, convertConfig } from './migrate.js';
 import { backup } from './backup.js';
 import { atomicWrite, errorText } from './util.js';
 import { reportSkill } from './report-skill.js';
@@ -26,10 +26,13 @@ const { values, positionals } = parseArgs({ allowPositionals: true, options: {
 } });
 const command = positionals[0];
 const windowOptions = { since: values.since, until: values.until, observedDays: values['observed-days'] === undefined ? undefined : Number(values['observed-days']) };
-if (values.help || !command) console.log('Feedgarden: migrate | rollback ARCHIVE | collect [--since ISO] | rank [--history] [--source ID] [--dry-run] | archives update|remove PATH | summarize [--source ID] [--refresh] [--rebuild] [--retry-failed] | relate [--retry-failed] | topics apply FILE | run --due | doctor [--live] | render | backup | publish\nOptions: --config FILE --no-publish\nrun/summarize: --since ISO [--until ISO] [--observed-days N] (exclusive until; observed days use first observation)');
+if (values.help || !command) console.log('Feedgarden: collect [--since ISO] | rank [--history] [--source ID] [--dry-run] | archives update|remove PATH | summarize [--source ID] [--refresh] [--rebuild] [--retry-failed] | relate [--retry-failed] | topics apply FILE | run --due | doctor [--live] | render | backup | publish\nOptions: --config FILE --no-publish\nrun/summarize: --since ISO [--until ISO] [--observed-days N] (exclusive until; observed days use first observation)');
+else if (!['collect', 'rank', 'archives', 'summarize', 'relate', 'topics', 'run', 'doctor', 'render', 'backup', 'publish'].includes(command)) {
+  console.error('Unknown command: ' + command); process.exitCode = 1;
+}
 else {
   const configFile = resolveConfigFile(values.config);
-  const config = command === 'migrate' || command === 'rollback' ? convertConfig(readConfig(configFile)) : loadConfig(configFile);
+  const config = loadConfig(configFile);
   try {
     if ((values.until !== undefined || values['observed-days'] !== undefined) && !['run', 'summarize'].includes(command)) throw new Error('--until and --observed-days are supported only by run and summarize');
     if (['run', 'summarize'].includes(command)) {
@@ -42,18 +45,14 @@ else {
       const reports = await previewRank(config, { source: values.source, history: values.history });
       console.log(JSON.stringify(reports, null, 2));
       if (reports.some(report => report.status === 'deferred')) process.exitCode = 1;
-    } else await runWithRunner(command, config, configFile);
+    } else await runWithRunner(command, config);
   } catch (error) { console.error(errorText(error)); process.exitCode = 1; }
 }
 
-async function runWithRunner(command: string, config: Config, configFile: string): Promise<void> {
-  await mkdir(config.storage.directory, { recursive: true, mode: 0o700 });
-  const target = resolve(config.storage.directory, 'runner');
-  await writeFile(target, '', { flag: 'a', mode: 0o600 });
+async function runWithRunner(command: string, config: Config): Promise<void> {
   const cancellation = new AbortController(), signal = cancellation.signal;
   const agentResolver = createAgentResolver();
-  let lockCompromised = false;
-  const release = await lockfile.lock(target, { stale: 120_000, update: 10_000, retries: 0, onCompromised: error => { lockCompromised = true; cancellation.abort(error); } });
+  const release = await runnerLock(storagePaths(config.storage).runner, cancellation);
   const owner = randomUUID();
   let store: Store | undefined, run: number | undefined, heartbeat: NodeJS.Timeout | undefined;
   const failures: { kind: string; key: string; error: string }[] = [];
@@ -67,88 +66,83 @@ async function runWithRunner(command: string, config: Config, configFile: string
     for (const result of results) if (result.status === 'unavailable') failures.push({ kind: 'collection', key: `${result.source}/${result.stream}`, error: 'All enabled channels unavailable; see channel_state and gaps' });
   };
   try {
-    if (command === 'migrate') console.log('Migration archive: ' + await migrate(configFile, undefined, signal));
-    else if (command === 'rollback') { if (!positionals[1]) throw new Error('rollback requires an archive path'); await rollback(positionals[1], signal); }
-    else {
-      store = new Store(config.storage.database); store.acquireLease(owner);
-      heartbeat = store.watchLease(owner, cancellation);
-      if (command === 'summarize' || command === 'run') resolveItemWindow(windowOptions, store.meta('cutoff')!, new Date().toISOString());
-      run = store.run(command); await recoverContent(config, store);
-      // Adoption/import describes previously installed output, not new publications.
-      if (command === 'summarize' || (command === 'run' && values.due)) await importArchives(config, store, signal);
-      publishedBefore = (store.statement('SELECT COUNT(*) n FROM feed_publications').get() as { n: number }).n;
-      async function summaries() {
-        const result = await summarize(config, store!, { source: values.source, ...windowOptions, rebuild: values.rebuild, refresh: values.refresh, retryFailed: values['retry-failed'], signal, resolveAgent: agentResolver });
-        summary = result;
-        for (const error of result.sourceErrors) failures.push({ kind: 'summary-config', key: error.source, error: error.error });
-        for (const error of result.jobErrors) failures.push({ kind: 'summary', key: error.source + '/' + error.id, error: error.error });
+    store = new Store(storagePaths(config.storage).database); store.acquireLease(owner);
+    heartbeat = store.watchLease(owner, cancellation);
+    if (command === 'summarize' || command === 'run') resolveItemWindow(windowOptions, store.meta('cutoff')!, new Date().toISOString());
+    run = store.run(command); await recoverContent(config, store);
+    // Adoption/import describes previously installed output, not new publications.
+    if (command === 'summarize' || (command === 'run' && values.due)) await importArchives(config, store, signal);
+    publishedBefore = (store.statement('SELECT COUNT(*) n FROM feed_publications').get() as { n: number }).n;
+    async function summaries() {
+      const result = await summarize(config, store!, { source: values.source, ...windowOptions, rebuild: values.rebuild, refresh: values.refresh, retryFailed: values['retry-failed'], signal, resolveAgent: agentResolver });
+      summary = result;
+      for (const error of result.sourceErrors) failures.push({ kind: 'summary-config', key: error.source, error: error.error });
+      for (const error of result.jobErrors) failures.push({ kind: 'summary', key: error.source + '/' + error.id, error: error.error });
+    }
+    async function relations() {
+      const result = await relate(config, store!, { signal, retryFailed: values['retry-failed'], resolveAgent: agentResolver });
+      console.log(JSON.stringify({ relations: result }));
+      if (result.configurationError) failures.push({ kind: 'relations', key: 'config', error: result.configurationError });
+      else if (result.pending && !result.deferred) failures.push({ kind: 'relations', key: 'recent', error: `${result.pending} pairs remain pending; inspect feed_tasks for retry details` });
+    }
+    if (command === 'collect') recordCollection(await collect(config, store, values.source, values.due, undefined, values.since, signal));
+    else if (command === 'rank') {
+      const reports = await rankItems(config, store, { source: values.source, history: values.history, signal });
+      console.log(JSON.stringify(reports, null, 2));
+      for (const report of reports.filter(report => report.status === 'deferred')) failures.push({ kind: 'ranking', key: report.source + '/' + report.day, error: report.notes.join('; ') });
+      await writeSite(config, store, signal);
+    }
+    else if (command === 'summarize') { await summaries(); await writeSite(config, store, signal); }
+    else if (command === 'relate') {
+      await writeSite(config, store, signal);
+      await relations();
+      await writeSite(config, store, signal);
+    }
+    else if (command === 'archives') {
+      const action = positionals[1], path = positionals[2];
+      if ((action !== 'update' && action !== 'remove') || !path) throw new Error('archives requires update|remove PATH relative to the content directory');
+      console.log('Archive maintenance backup: ' + await maintainArchive(config, store, action, path, signal));
+      await writeSite(config, store, signal, true);
+    }
+    else if (command === 'render') await writeSite(config, store, signal, true);
+    else if (command === 'topics') { if (positionals[1] !== 'apply' || !positionals[2]) throw new Error('topics apply requires a JSON registry file');
+      if (values['remote-base']) {
+        if (!/^[a-f0-9]{40}$/.test(values['remote-base'])) throw new Error('Remote base requires a full commit SHA');
+        if (execFileSync('git', ['rev-parse', 'FETCH_HEAD'], {encoding:'utf8'}).trim() !== values['remote-base']) throw new Error('Remote base must equal the fetched remote commit');
       }
-      async function relations() {
-        const result = await relate(config, store!, { signal, retryFailed: values['retry-failed'], resolveAgent: agentResolver });
-        console.log(JSON.stringify({ relations: result }));
-        if (result.configurationError) failures.push({ kind: 'relations', key: 'config', error: result.configurationError });
-        else if (result.pending && !result.deferred) failures.push({ kind: 'relations', key: 'recent', error: `${result.pending} pairs remain pending; inspect feed_tasks for retry details` });
+      await applyTopics(config.feed.topics, JSON.parse(await readFile(positionals[2], 'utf8')), undefined, signal);
+      if (values['remote-base']) {
+        const { remoteTopics } = await import('./publish.js');
+        await atomicWrite(storagePaths(config.storage).topicRemoteBase, JSON.stringify({ commit: values['remote-base'], registry: remoteTopics(values['remote-base']) }));
       }
-      if (command === 'collect') recordCollection(await collect(config, store, values.source, values.due, undefined, values.since, signal));
-      else if (command === 'rank') {
-        const reports = await rankItems(config, store, { source: values.source, history: values.history, signal });
+      await writeSite(config, store, signal);
+    }
+    else if (command === 'backup') console.log(JSON.stringify(await backup(store, storagePaths(config.storage).backups)));
+    else if (command === 'doctor') {
+      await reportSkill(config.sources.filter(source => source.enabled).map(source => source.id));
+      const resolved = await agentResolver(agentRuntime(config), signal);
+      console.log(JSON.stringify({ node: process.version, database: store.db.pragma('quick_check'), agent: resolved.execution, channels: store.states(), tasks: store.db.prepare("SELECT kind,state,count(*) n FROM feed_tasks GROUP BY kind,state").all(), items: store.db.prepare('SELECT count(*) n FROM feed_summaries').get(), queue: store.db.prepare('SELECT state,count(*) n FROM feed_jobs GROUP BY state').all() }, null, 2));
+      if (values.live) recordCollection(await collect(config, store, values.source, false, undefined, undefined, signal));
+    } else if (command === 'run') {
+      if (!values.due) throw new Error('Scheduled runs require --due');
+      recordCollection(await collect(config, store, values.source, true, undefined, values.since, signal));
+      if (config.sources.some(source => source.enabled && source.selection && (!values.source || source.id === values.source))) {
+        const reports = await rankItems(config, store, { source: values.source, signal });
         console.log(JSON.stringify(reports, null, 2));
         for (const report of reports.filter(report => report.status === 'deferred')) failures.push({ kind: 'ranking', key: report.source + '/' + report.day, error: report.notes.join('; ') });
-        await writeSite(config, store, signal);
       }
-      else if (command === 'summarize') { await summaries(); await writeSite(config, store, signal); }
-      else if (command === 'relate') {
-        await writeSite(config, store, signal);
-        await relations();
-        await writeSite(config, store, signal);
-      }
-      else if (command === 'archives') {
-        const action = positionals[1], path = positionals[2];
-        if ((action !== 'update' && action !== 'remove') || !path) throw new Error('archives requires update|remove PATH relative to the content directory');
-        console.log('Archive maintenance backup: ' + await maintainArchive(config, store, action, path, signal));
-        await writeSite(config, store, signal, true);
-      }
-      else if (command === 'render') await writeSite(config, store, signal, true);
-      else if (command === 'topics') { if (positionals[1] !== 'apply' || !positionals[2]) throw new Error('topics apply requires a JSON registry file');
-        if (values['remote-base']) {
-          if (!/^[a-f0-9]{40}$/.test(values['remote-base'])) throw new Error('Remote base requires a full commit SHA');
-          if (execFileSync('git', ['rev-parse', 'FETCH_HEAD'], {encoding:'utf8'}).trim() !== values['remote-base']) throw new Error('Remote base must equal the fetched remote commit');
-        }
-        await applyTopics(config.feed.topics, JSON.parse(await readFile(positionals[2], 'utf8')), undefined, signal);
-        if (values['remote-base']) {
-          const { remoteTopics } = await import('./publish.js');
-          await atomicWrite(resolve(config.storage.directory, 'topic-remote-base.json'), JSON.stringify({ commit: values['remote-base'], registry: remoteTopics(values['remote-base']) }));
-        }
-        await writeSite(config, store, signal);
-      }
-      else if (command === 'backup') console.log(JSON.stringify(await backup(store, config.storage.directory)));
-      else if (command === 'doctor') {
-        await reportSkill(config.sources.filter(source => source.enabled).map(source => source.id));
-        const resolved = await agentResolver(config.agent, signal);
-        console.log(JSON.stringify({ node: process.version, database: store.db.pragma('quick_check'), agent: resolved.execution, channels: store.states(), tasks: store.db.prepare("SELECT kind,state,count(*) n FROM feed_tasks GROUP BY kind,state").all(), items: store.db.prepare('SELECT count(*) n FROM feed_summaries').get(), queue: store.db.prepare('SELECT state,count(*) n FROM feed_jobs GROUP BY state').all() }, null, 2));
-        if (values.live) recordCollection(await collect(config, store, values.source, false, undefined, undefined, signal));
-      } else if (command === 'run') {
-        if (!values.due) throw new Error('Scheduled runs require --due');
-        recordCollection(await collect(config, store, values.source, true, undefined, values.since, signal));
-        if (config.sources.some(source => source.enabled && source.selection && (!values.source || source.id === values.source))) {
-          const reports = await rankItems(config, store, { source: values.source, signal });
-          console.log(JSON.stringify(reports, null, 2));
-          for (const report of reports.filter(report => report.status === 'deferred')) failures.push({ kind: 'ranking', key: report.source + '/' + report.day, error: report.notes.join('; ') });
-        }
-        await summaries();
-        await writeSite(config, store, signal);
-        await relations();
-        await writeSite(config, store, signal); await backup(store, config.storage.directory);
-        signal.throwIfAborted();
-        if (config.publish.auto && !values['no-publish']) { const { publish } = await import('./publish.js'); await publish(config, store, undefined, signal); }
-      } else if (command === 'publish') { const { publish } = await import('./publish.js'); await publish(config, store, undefined, signal); }
-      else throw new Error('Unknown command: ' + command);
+      await summaries();
+      await writeSite(config, store, signal);
+      await relations();
+      await writeSite(config, store, signal); await backup(store, storagePaths(config.storage).backups);
       signal.throwIfAborted();
-      const details = report();
-      if (details.summary) console.log(JSON.stringify(details.summary));
-      store.finishRun(run, failures.length ? 'partial' : 'succeeded', details);
-      if (failures.length) { console.error(`Run incomplete: ${failures.length} task(s) failed; successful work retained.`); process.exitCode = 1; }
-    }
+      if (config.publish.auto && !values['no-publish']) { const { publish } = await import('./publish.js'); await publish(config, store, undefined, signal); }
+    } else if (command === 'publish') { const { publish } = await import('./publish.js'); await publish(config, store, undefined, signal); }
+    signal.throwIfAborted();
+    const details = report();
+    if (details.summary) console.log(JSON.stringify(details.summary));
+    store.finishRun(run, failures.length ? 'partial' : 'succeeded', details);
+    if (failures.length) { console.error(`Run incomplete: ${failures.length} task(s) failed; successful work retained.`); process.exitCode = 1; }
   } catch (error) {
     if (summary) console.log(JSON.stringify(report().summary));
     if (run) store?.finishRun(run, 'failed', { error: errorText(error), ...report() });
@@ -156,7 +150,6 @@ async function runWithRunner(command: string, config: Config, configFile: string
   } finally {
     if (heartbeat) clearInterval(heartbeat);
     store?.releaseLease(owner); store?.close();
-    try { await release(); }
-    catch (error) { if (!lockCompromised || (error as NodeJS.ErrnoException).code !== 'ERELEASED') throw error; }
+    await release();
   }
 }

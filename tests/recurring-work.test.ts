@@ -20,7 +20,7 @@ const generator: Generator = async (_agent, input, _repair, directory) => ({ out
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-recurring-'));
   await writeFile(join(root, 'topics.json'), JSON.stringify(topics));
-  const config = configSchema.parse({ version: 2, storage: { directory: root }, feed: { directory: join(root, 'content'), topics: join(root, 'topics.json') }, agent: { model: 'deepseek/deepseek-flash', runtimeDirectory: join(root, 'tasks') }, sources: [{ id: 'one', name: 'One', intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'feed', kind: 'feed' }] }] }] });
+  const config = configSchema.parse({ version: 2, storage: { root: root }, feed: { directory: join(root, 'content'), topics: join(root, 'topics.json') }, agent: { model: 'deepseek/deepseek-flash' }, sources: [{ id: 'one', name: 'One', intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'feed', kind: 'feed' }] }] }] });
   const store = new Store(':memory:'); store.setMeta('cutoff', '1970-01-01T00:00:00.000Z');
   const save = (rows: Item[]) => store.saveCollection('one', 'main', 'feed', { items: rows, raw: [], coverage: { status: 'complete', to: at, notes: [] } }, '');
   return { root, config, store, save, cleanup: async () => { store.close(); await rm(root, { recursive: true, force: true }); } };

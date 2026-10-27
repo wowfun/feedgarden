@@ -2,8 +2,7 @@
   "$schema": "./schemas/feedgarden.schema.json",
   "version": 2,
   "storage": {
-    "database": ".local/feedgarden.sqlite",
-    "directory": ".local"
+    "root": ".local/feedgarden"
   },
   "feed": {
     "directory": "content",
@@ -20,8 +19,7 @@
     "maxBatchItems": 10,
     "maxInputChars": 24000,
     "maxItemChars": 4000,
-    "maxDailyCalls": 80,
-    "runtimeDirectory": ".local/agents"
+    "maxDailyCalls": 80
   },
   "publish": {
     "repository": "https://github.com/wowfun/feedgarden.git",

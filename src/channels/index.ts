@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { DateTime } from 'luxon';
 import { load } from 'cheerio';
 import type { Source, Stream, Channel } from '../config.js';
+import type { StoragePaths } from '../storage-paths.js';
 import type { Collection, Item, RankingWindow } from '../types.js';
 import { Http } from '../http.js';
 import { Store } from '../store.js';
@@ -15,7 +16,7 @@ import { hash, mapLimit, safeUrl, errorText, iso, isoDate } from '../util.js';
 import { array, date, parseFeed, parseXTimeline, parseFollowBuilders, parseProductHunt, parseTrending, plain, text, xml, type ParseContext } from './parsers.js';
 
 const exec = promisify(execFile);
-export interface ChannelContext { source: Source; stream: Stream; channel: Channel; store: Store; http: Http; now: string; since: string; restartRange?: boolean }
+export interface ChannelContext { source: Source; stream: Stream; channel: Channel; store: Store; http: Http; now: string; since: string; restartRange?: boolean; twitterEnvironment?: StoragePaths['twitterEnvironment'] }
 export type Adapter = (context: ChannelContext) => Promise<Collection>;
 function base(c: ChannelContext): ParseContext { return { source: c.source.id, stream: c.stream.id, channel: c.channel.id, observedAt: c.now, timezone: c.source.timezone }; }
 function collected(c: ChannelContext, items: Item[], notes: string[] = [], cursor?: string): Collection {
@@ -86,14 +87,15 @@ async function followBuilders(c: ChannelContext): Promise<Collection> {
 async function xCli(c: ChannelContext): Promise<Collection> {
   const auth = process.env[c.channel.authTokenEnv], csrf = process.env[c.channel.csrfTokenEnv];
   if (!auth || !csrf) throw new Error('X explicit cookies unavailable; use limited feed fallback');
-  const executable = pythonExecutable('.local/twitter-cli', 'twitter');
-  const marker = resolve('.local/twitter-cli/feedgarden-env-only.json');
-  if (!existsSync(executable) || !existsSync(marker)) throw new Error('X CLI is not installed with the verified env-only authentication patch');
+  if (!c.twitterEnvironment) throw new Error('Twitter CLI requires a resolved tool directory');
+  const executable = pythonExecutable(c.twitterEnvironment, 'twitter');
+  const marker = resolve(c.twitterEnvironment, 'feedgarden-env-only.json');
+  if (!existsSync(executable) || !existsSync(marker)) throw new Error('X CLI is not installed with the verified env-only authentication patch: ' + c.twitterEnvironment);
   const manifest = JSON.parse(readFileSync(marker, 'utf8'));
   if (hash(readFileSync(resolve(manifest.authFile), 'utf8')) !== manifest.authHash) throw new Error('X CLI authentication patch integrity check failed');
   const run = async (limit: number) => {
     const result = await exec(executable, ['user-posts', c.stream.id, '--max', String(limit), '--json'], { timeout: 90000, maxBuffer: 8_000_000, signal: c.http.signal,
-      env: { ...validationEnvironment(), LANG: 'C.UTF-8', TWITTER_AUTH_TOKEN: auth, TWITTER_CT0: csrf, TWITTER_PROXY: process.env.TWITTER_PROXY, FEEDGARDEN_AUTH_ENV_ONLY: '1' }, cwd: resolve('.local/twitter-cli') });
+      env: { ...validationEnvironment(), LANG: 'C.UTF-8', TWITTER_AUTH_TOKEN: auth, TWITTER_CT0: csrf, TWITTER_PROXY: process.env.TWITTER_PROXY, FEEDGARDEN_AUTH_ENV_ONLY: '1' }, cwd: c.twitterEnvironment });
     c.http.raw.push({ url: `cli:twitter/user-posts/${c.stream.id}`, status: 200, body: result.stdout, fetchedAt: c.now, headers: {} });
     const parsed = JSON.parse(result.stdout); if (!parsed.ok || !Array.isArray(parsed.data)) throw new Error('Invalid X CLI output');
     return parsed.data as any[];

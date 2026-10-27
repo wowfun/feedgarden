@@ -1,3 +1,4 @@
+import { storagePaths } from '../src/storage-paths.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm, readdir } from 'node:fs/promises';
@@ -15,7 +16,7 @@ import { pathToFileURL } from 'node:url';
 
 const peer = resolve('tests/fixtures/acp-peer.mjs');
 const input: SummaryInput = { contractVersion: 2, topics: { version: 1, topics: [{ id: 'coding', name: { en: 'Coding', 'zh-CN': '编程' }, description: 'Tools', aliases: [], deprecated: false }] }, items: [{ source: 'one', id: 'fixed', title: 'Only a title', text: '' }] };
-const config = (runtimeDirectory: string, overrides = {}) => configSchema.shape.agent.parse({ command: peer, runtimeDirectory, timeoutSeconds: 10, inheritEnvironment: ['FEEDGARDEN_PEER_LOG', 'FEEDGARDEN_PEER_CONFIG'], ...overrides });
+const config = (runtimeDirectory: string, overrides = {}) => ({ ...configSchema.shape.agent.parse({ command: peer, timeoutSeconds: 10, inheritEnvironment: ['FEEDGARDEN_PEER_LOG', 'FEEDGARDEN_PEER_CONFIG'], ...overrides }), runtimeDirectory });
 
 test('OpenCode children receive only base settings and explicitly inherited provider variables', async () => {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-agent-env-'));
@@ -51,7 +52,8 @@ test('agent configuration defaults to OpenCode and keeps source overrides narrow
   const agent = configSchema.shape.agent.parse({});
   assert.equal(agent.backend, 'opencode'); assert.equal(agent.command, undefined);
   assert.deepEqual(agent.args, ['acp']); assert.equal(agent.model, undefined); assert.equal(agent.effort, undefined);
-  assert.equal(agent.runtimeDirectory, '.local/agents');
+  assert.equal('runtimeDirectory' in agent, false);
+  assert.equal(configSchema.shape.agent.safeParse({ runtimeDirectory: '.local/agents' }).success, false);
   assert.throws(() => configSchema.shape.agent.parse({ backend: 'dsh' }), /explicit model/);
   assert.ok(configSchema.shape.agent.parse({ backend: 'dsh', model: 'deepseek/deepseek-flash' }));
   for (const value of [{ backend: 'other' }, { model: '' }, { effort: ' ' }, { args: 'acp' }, { mode: 'build' }]) assert.equal(configSchema.shape.agent.safeParse(value).success, false);
@@ -249,13 +251,14 @@ test('doctor reports the resolved backend without generation prompts or model-ca
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-doctor-agent-'));
   const file = join(root, 'config.json');
   try {
-    const configuration = { version: 2, storage: { directory: root, database: join(root, 'data.sqlite') }, feed: { directory: join(root, 'content'), topics: resolve('config/topics.json') },
-      agent: config(root), sources: [{ id: 'one', name: 'One', intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'feed', kind: 'feed' }] }] }] };
+    const { runtimeDirectory: _runtimeDirectory, ...agent } = config(root);
+    const configuration = { version: 2, storage: { root: root }, feed: { directory: join(root, 'content'), topics: resolve('config/topics.json') },
+      agent, sources: [{ id: 'one', name: 'One', intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'feed', kind: 'feed' }] }] }] };
     await writeFile(file, JSON.stringify(configuration));
     const { stdout } = await promisify(execFile)(process.execPath, ['--import', 'tsx', resolve('src/cli.ts'), 'doctor', '--config', file], { timeout: 30000 });
     const output = JSON.parse(stdout);
     assert.deepEqual(output.agent, { backend: 'opencode', version: '2.0.31', model: 'deepseek/deepseek-flash', effort: 'high' });
-    const store = new Store(configuration.storage.database);
+    const store = new Store(storagePaths(configuration.storage).database);
     try { assert.equal((store.db.prepare('SELECT count(*) n FROM agent_calls').get() as { n: number }).n, 0); }
     finally { store.close(); }
   } finally { await rm(root, { recursive: true, force: true }); }

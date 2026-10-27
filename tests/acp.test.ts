@@ -153,7 +153,7 @@ test('DSH ACP validates transcript and relation artifacts through the shared tas
   const previous = process.env.FEEDGARDEN_AGENT_API_KEY; process.env.FEEDGARDEN_AGENT_API_KEY = 'fixture-key';
   try {
     const command = join(root, 'success.mjs'); await writeFile(command, peer, { mode: 0o700 });
-    const config = configSchema.shape.agent.parse({ backend: 'dsh', command, model: 'deepseek/deepseek-flash', effort: 'off', runtimeDirectory: root });
+    const config = { ...configSchema.shape.agent.parse({ backend: 'dsh', command, model: 'deepseek/deepseek-flash', effort: 'off'}), runtimeDirectory: root };
     assert.deepEqual((await generateTask(config, 'transcript', { taskId: 'task', parts: [{ id: 'part', text: 'Fixed facts.' }], maxChars: 100 })).output, { taskId: 'task', inputIds: ['part'], facts: 'Fixed facts.' });
     assert.deepEqual((await generateTask(config, 'relations', { pairs: [{ id: 'pair', texts: ['one', 'two'] }] })).output, { pairs: [{ id: 'pair', verdict: 'unrelated', reason: '', evidence: ['', ''] }] });
   } finally {

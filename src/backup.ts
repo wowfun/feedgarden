@@ -5,11 +5,11 @@ import { DateTime } from 'luxon';
 import { Store } from './store.js';
 import { isoDate } from './util.js';
 
-export async function backup(store: Store, directory: string, at = new Date().toISOString()): Promise<string[]> {
+export async function backup(store: Store, backupsRoot: string, at = new Date().toISOString()): Promise<string[]> {
   const day = DateTime.fromISO(at, { zone: 'utc' });
   const created: string[] = [];
   for (const [kind, stamp, keep] of [['daily', isoDate(day, 'backup day'), 7], ['weekly', isoDate(day.startOf('week'), 'backup week'), 4]] as const) {
-    const root = join(directory, 'backups', kind);
+    const root = join(backupsRoot, kind);
     await mkdir(root, { recursive: true, mode: 0o700 });
     const path = join(root, stamp + '.sqlite');
     // Keep the temporary file beside its destination for same-filesystem rename.

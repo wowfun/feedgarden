@@ -29,4 +29,3 @@ Archive maintenance scans only the requested file or bilingual pair once initial
 
 - [Daily ranking](ranking.md)
 - [Runner operations](operations.md)
-- [Migration and rollback](migration.md)

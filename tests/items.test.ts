@@ -1,3 +1,4 @@
+import { agentRuntime, storagePaths } from '../src/storage-paths.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm, cp, mkdir, stat, symlink } from 'node:fs/promises';
@@ -5,13 +6,12 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { configSchema } from '../src/config.js';
-import { Store, initializeFeedSchema } from '../src/store.js';
+import { Store } from '../src/store.js';
 import { summarize, acceptedItems, iterateAcceptedItems, itemPath, eligible, type Generator } from '../src/items.js';
 import { writeSite, recoverContent, renderItem } from '../src/site.js';
 import { loadTopics, applyTopics, mergeTopics, type Registry } from '../src/topics.js';
 import { validateArtifact, validateRegistry } from '../src/topics-contract.mjs';
 import { date, parseFollowBuilders } from '../src/channels/parsers.js';
-import { convertConfig, migrate, rollback } from '../src/migrate.js';
 import { assertManagedPaths } from '../src/publish.js';
 import { hash } from '../src/util.js';
 import { artifactRepairFeedback } from '../src/agent.js';
@@ -30,8 +30,8 @@ function save(store:Store,items:Item[]) {for(const i of items) store.saveCollect
 const generator:Generator=async(_config,input,_repair,directory)=>({output:{contractVersion:2,newTopics:[],items:input.items.map(i=>({source:i.source,id:i.id,topics:['coding'],en:{title:i.title,summary:i.text},'zh-CN':{title:'中文 '+i.title,summary:i.text?'提供的事实。':''}}))},directory:directory!,events:[],usage:[]});
 async function fixture() {
  const root=await mkdtemp(join(tmpdir(),'feedgarden-items-'));await writeFile(join(root,'topics.json'),JSON.stringify(registry));
- const config=configSchema.parse({version:2,storage:{directory:root,database:join(root,'data.sqlite')},feed:{directory:join(root,'content'),topics:join(root,'topics.json')},agent:{model:'deepseek/deepseek-flash',runtimeDirectory:join(root,'tasks')},sources:['one','two'].map(id=>({id,name:id,intervalHours:1,streams:[{id:'main',channels:[{id:'rss',kind:'feed',url:'https://example.test/rss'}]}]}))});
- const store=new Store(config.storage.database);store.setMeta('cutoff','1970-01-01T00:00:00.000Z');
+ const config=configSchema.parse({version:2,storage:{ root: root },feed:{directory:join(root,'content'),topics:join(root,'topics.json')},agent:{ model:'deepseek/deepseek-flash' },sources:['one','two'].map(id=>({id,name:id,intervalHours:1,streams:[{id:'main',channels:[{id:'rss',kind:'feed',url:'https://example.test/rss'}]}]}))});
+ const store=new Store(storagePaths(config.storage).database);store.setMeta('cutoff','1970-01-01T00:00:00.000Z');
  return {root,config,store,cleanup:async()=>{store.close();await rm(root,{recursive:true,force:true});}};
 }
 
@@ -288,7 +288,7 @@ test('a later render cannot publish out-of-window cached summaries or private ar
   await writeSite(f.config,f.store,undefined,true);
   assert.deepEqual(acceptedItems(f.store).map(r=>r.item.id),['other']);assert.equal((f.store.db.prepare('SELECT COUNT(*) n FROM feed_publications').get() as {n:number}).n,1);
   await assert.rejects(stat(join(f.config.feed.directory,'one/2026-10/09/item-30.md')),{code:'ENOENT'});
-  const reopened=new Store(f.config.storage.database);try{assert.deepEqual(acceptedItems(reopened).map(r=>r.item.id),['other']);assert.equal(await writeSite(f.config,reopened),false);}finally{reopened.close();}
+  const reopened=new Store(storagePaths(f.config.storage).database);try{assert.deepEqual(acceptedItems(reopened).map(r=>r.item.id),['other']);assert.equal(await writeSite(f.config,reopened),false);}finally{reopened.close();}
  }finally{await f.cleanup();}
 });
 
@@ -402,7 +402,7 @@ test('a since-scoped podcast rebuild preserves other episodes reduction caches',
   };
   for(const episode of episodes){
    f.store.db.prepare('INSERT INTO podcast_transcripts VALUES (?,?,?,?,?,?)').run('podcast',episode.id,body,hash(body),'https://example.test/transcript',at);
-   for(let i=0;i<3;i++) if((await transcriptStep(episode,f.store,f.config.agent,true,undefined,false,reduce)).ready) break;
+   for(let i=0;i<3;i++) if((await transcriptStep(episode,f.store,agentRuntime(f.config),true,undefined,false,reduce)).ready) break;
   }
   save(f.store,episodes);await summarize(f.config,f.store,{},generator,at,async i=>i);
   const before=episodes.map(episode=>f.store.db.prepare('SELECT data FROM feed_jobs WHERE id=?').get(episode.id) as {data:string});
@@ -412,8 +412,8 @@ test('a since-scoped podcast rebuild preserves other episodes reduction caches',
   assert.deepEqual(f.store.db.prepare('SELECT data FROM feed_jobs WHERE id=?').get('old'),before[0]);
   const recent=JSON.parse((f.store.db.prepare('SELECT data FROM feed_jobs WHERE id=?').get('recent') as {data:string}).data).item as Item;
   assert.notEqual(recent.metadata?.transcriptRecipe,JSON.parse(before[1]!.data).item.metadata.transcriptRecipe);
-  assert.equal((await transcriptStep(episodes[0]!,f.store,f.config.agent,false)).ready,true);
-  assert.equal((await transcriptStep(episodes[1]!,f.store,f.config.agent,false)).ready,false);
+  assert.equal((await transcriptStep(episodes[0]!,f.store,agentRuntime(f.config),false)).ready,true);
+  assert.equal((await transcriptStep(episodes[1]!,f.store,agentRuntime(f.config),false)).ready,false);
  }finally{await f.cleanup();}
 });
 
@@ -623,12 +623,12 @@ test('retention prunes only expired runner-owned terminal workspaces and preserv
  try {
   save(f.store,[item('retention')]);await summarize(f.config,f.store,{},generator,at);
   const batch=f.store.db.prepare('SELECT id,workspace FROM feed_batches').get() as {id:string;workspace:string};
-  const legacy=join(f.config.agent.runtimeDirectory,'task-legacy');await mkdir(legacy);await writeFile(join(legacy,'audit.json'),'historical evidence');
+  const legacy=join(storagePaths(f.config.storage).agents,'task-legacy');await mkdir(legacy);await writeFile(join(legacy,'audit.json'),'historical evidence');
   const external=join(f.root,'external-evidence');await mkdir(external);await writeFile(join(external,'keep'),'evidence');
-  const linked=join(f.config.agent.runtimeDirectory,'task-00000000-0000-0000-0000-000000000000');await symlink(external,linked,process.platform==='win32'?'junction':'dir');
+  const linked=join(storagePaths(f.config.storage).agents,'task-00000000-0000-0000-0000-000000000000');await symlink(external,linked,process.platform==='win32'?'junction':'dir');
   f.store.db.prepare('INSERT INTO feed_batches VALUES (?,?,?,?,?,?,NULL)').run('linked','{}','[]',linked,'accepted',at);
   f.store.db.prepare("UPDATE feed_batches SET state='running' WHERE id=?").run(batch.id);
-  const later='2026-11-01T00:00:00.000Z';await pruneWorkspaces(f.config.agent,f.store,later);
+  const later='2026-11-01T00:00:00.000Z';await pruneWorkspaces(agentRuntime(f.config),f.store,later);
   assert.ok(await stat(batch.workspace));
   f.store.db.prepare("UPDATE feed_batches SET state='accepted' WHERE id=?").run(batch.id);
   await summarize(f.config,f.store,{},generator,later);
@@ -646,8 +646,8 @@ test('expired deferred workspaces can be pruned without deleting queued jobs or 
   assert.equal((await summarize(f.config,f.store,{},()=>{throw new Error('Quota should defer');},at)).deferred,true);
   const batch=f.store.db.prepare('SELECT * FROM feed_batches').get() as {id:string;workspace:string;input:string;jobs:string};
   const jobs=f.store.db.prepare('SELECT * FROM feed_jobs').all();
-  await pruneWorkspaces(f.config.agent,f.store,at);assert.ok(await stat(batch.workspace));
-  await pruneWorkspaces(f.config.agent,f.store,'2026-11-01T00:00:00.000Z');
+  await pruneWorkspaces(agentRuntime(f.config),f.store,at);assert.ok(await stat(batch.workspace));
+  await pruneWorkspaces(agentRuntime(f.config),f.store,'2026-11-01T00:00:00.000Z');
   await assert.rejects(stat(batch.workspace),{code:'ENOENT'});
   assert.deepEqual(f.store.db.prepare('SELECT * FROM feed_jobs').all(),jobs);
   assert.deepEqual(f.store.db.prepare('SELECT state,workspace,input,jobs FROM feed_batches WHERE id=?').get(batch.id),{state:'deferred',workspace:'',input:batch.input,jobs:batch.jobs});
@@ -681,7 +681,7 @@ test('lease takeover immediately before acceptance retains the artifact without 
    const result=await generator(...args);
    result.output.newTopics=[{...topic,id:'new-topic',name:{en:'New topic','zh-CN':'新主题'}}];
    f.store.db.prepare('UPDATE job_lease SET expires=?').run('1970-01-01T00:00:00.000Z');
-   successor=new Store(f.config.storage.database);successor.acquireLease('successor');
+   successor=new Store(storagePaths(f.config.storage).database);successor.acquireLease('successor');
    return result;
   },at),/Lost database job lease/);
   assert.equal(acceptedItems(f.store).length,0);assert.equal((await loadTopics(f.config.feed.topics)).topics.length,1);
@@ -725,7 +725,7 @@ test('legacy stale date indexes reconcile once without changing first observatio
   f.store.db.prepare('UPDATE items SET published_at=? WHERE id=?').run('2026-01-01T00:00:00.000Z','date');
   f.store.db.prepare('DELETE FROM feed_meta WHERE key=?').run('items_date_revision');
   const first=f.store.db.prepare('SELECT first_seen,data FROM items').get(),versions=f.store.db.prepare('SELECT * FROM item_versions').all();
-  const reopened=new Store(f.config.storage.database);
+  const reopened=new Store(storagePaths(f.config.storage).database);
   try {
    assert.equal(reopened.items('one',at,'2026-10-10T00:00:00.000Z').length,1);
    assert.deepEqual(reopened.db.prepare('SELECT first_seen,data FROM items').get(),first);
@@ -741,12 +741,13 @@ for(const legacy of [false,true]) test(legacy?'legacy content journals recover e
    if(phase==='prepared'||phase==='installed') {await mkdir(f.config.feed.directory,{recursive:true});await writeFile(join(f.config.feed.directory,'index.md'),phase==='installed'?'new':'old');}
    if(phase==='prepared'||phase==='between-renames') {await mkdir(staging);await writeFile(join(staging,'index.md'),'new');}
    if(phase!=='prepared') {await mkdir(previous);await writeFile(join(previous,'index.md'),'old');}
-   await writeFile(join(f.root,'content-journal.json'),JSON.stringify({destination:f.config.feed.directory,staging,previous,...(legacy?{}:{publications:[['one','a']]})}));
+   await mkdir(storagePaths(f.config.storage).state, { recursive: true });
+   await writeFile(storagePaths(f.config.storage).contentJournal,JSON.stringify({destination:f.config.feed.directory,staging,previous,...(legacy?{}:{publications:[['one','a']]})}));
    await recoverContent(f.config,f.store);
    const installed=phase==='between-renames'||phase==='installed';
    assert.equal(await readFile(join(f.config.feed.directory,'index.md'),'utf8'),installed?'new':'old');
    assert.equal(!!f.store.db.prepare("SELECT 1 FROM feed_publications WHERE source='one' AND id='a'").get(),!legacy&&installed);
-   await assert.rejects(readFile(join(f.root,'content-journal.json')));
+   await assert.rejects(readFile(storagePaths(f.config.storage).contentJournal));
    await recoverContent(f.config,f.store);
   }finally{await f.cleanup();}
  }
@@ -754,16 +755,11 @@ for(const legacy of [false,true]) test(legacy?'legacy content journals recover e
 test('three-way topic merge admits independent additions and rejects same-ID conflicts and unmanaged publication paths',()=>{
  const b=registry,l={version:1 as const,topics:[topic,{...topic,id:'models',name:{en:'Models','zh-CN':'模型'}}]},r={version:1 as const,topics:[topic,{...topic,id:'research',name:{en:'Research','zh-CN':'研究'}}]};assert.equal(mergeTopics(b,l,r).topics.length,3);
  assert.throws(()=>mergeTopics(b,{...b,topics:[{...topic,description:'Local'}]},{...b,topics:[{...topic,description:'Remote'}]}),/coding/);
- assertManagedPaths(['content/one/2026-10/09/item-1.md','config/topics.json']);assert.throws(()=>assertManagedPaths(['README.md']));assert.throws(()=>assertManagedPaths(['reports/old.md']));assertManagedPaths(['reports/old.md'],['reports/old.md']);
+ assertManagedPaths(['content/one/2026-10/09/item-1.md','config/topics.json']);assert.throws(()=>assertManagedPaths(['README.md']));assert.throws(()=>assertManagedPaths(['reports/old.md']));
 });
-test('legacy schema is refused before upgrading; migration baseline excludes existing identities',async()=>{
- const f=await fixture();try{const legacy=join(f.root,'legacy.sqlite');await f.store.backup(legacy);const db=new Database(legacy);db.exec('DROP TABLE feed_meta; DROP TABLE feed_excluded; DROP TABLE feed_jobs; DROP TABLE feed_summaries; DROP TABLE feed_cache; DROP TABLE feed_batches; PRAGMA user_version=2;');db.close();assert.throws(()=>new Store(legacy),/Migration required/);const raw=new Database(legacy);assert.equal(raw.pragma('user_version',{simple:true}),2);raw.prepare('INSERT INTO items VALUES (?,?,?,?,?,?,?)').run('one','old',at,at,at,JSON.stringify(item('old')),'hash');initializeFeedSchema(raw,'2026-10-08T16:00:00.000Z');raw.close();const upgraded=new Store(legacy);try{assert.equal(upgraded.meta('cutoff'),'2026-10-08T16:00:00.000Z');assert.deepEqual(upgraded.db.prepare('SELECT * FROM feed_excluded').all(),[{source:'one',id:'old'}]);}finally{upgraded.close();}
+test('legacy schema is refused without changing its contents',async()=>{
+ const f=await fixture();try{const legacy=join(f.root,'legacy.sqlite');await f.store.backup(legacy);const db=new Database(legacy);db.exec('DROP TABLE feed_meta; DROP TABLE feed_excluded; DROP TABLE feed_jobs; DROP TABLE feed_summaries; DROP TABLE feed_cache; DROP TABLE feed_batches; PRAGMA user_version=2;');db.close();assert.throws(()=>new Store(legacy),/Unsupported legacy database schema/);const raw=new Database(legacy);assert.equal(raw.pragma('user_version',{simple:true}),2);raw.close();
  }finally{await f.cleanup();}
-});
-test('config migration preserves keyword arrays and refuses ambiguous frequency overrides',()=>{
- const old={version:1,agent:{model:'deepseek/deepseek-flash'},reports:{backfillDays:3},sources:[{id:'arxiv',name:'arXiv',intervalHours:6,topics:['LLM','coding agent'],frequencies:['weekly'],streams:[{id:'cs.AI',channels:[{id:'api',kind:'arxiv-api'}]}]}]};assert.deepEqual(convertConfig(old).sources[0]?.includeKeywords,old.sources[0]!.topics);assert.equal(convertConfig(old).collection.backfillDays,3);
- assert.equal(convertConfig({...old,agent:{...old.agent,effort:'off'},sources:[{...old.sources[0],frequencies:['daily','weekly'],reportAgent:{daily:{effort:'off'}}}]}).sources[0]?.agent?.effort,'off');
- assert.throws(()=>convertConfig({...old,sources:[{...old.sources[0],frequencies:['daily','weekly'],reportAgent:{daily:{model:'a'},weekly:{model:'b'}}}]}),/incompatible/);
 });
 test('three consecutive runtime failures stop a run while preserving every queued job',async()=>{
  const f=await fixture();try{save(f.store,Array.from({length:30},(_,i)=>item(String(i))));let calls=0;

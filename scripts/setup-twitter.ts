@@ -1,13 +1,19 @@
+import { parseArgs } from 'node:util';
+import { loadConfig } from '../src/config.js';
+import { storagePaths } from '../src/storage-paths.js';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { resolve, join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { run } from '../src/build-site.js';
 import { hash } from '../src/util.js';
 import { pythonExecutable } from '../src/process-command.js';
 
 const commit = '7c634e0d396b1e7af9f63315b414925fe4f29ae7';
-const source = resolve('.local/twitter-cli-source'), environment = resolve('.local/twitter-cli');
+const { values } = parseArgs({ options: { config: { type: 'string' } } });
+const paths = storagePaths(loadConfig(values.config).storage);
+const source = paths.twitterSource, environment = paths.twitterEnvironment;
+await mkdir(dirname(source), { recursive: true, mode: 0o700 });
 if (!existsSync(source)) await run('git', ['clone', '--no-checkout', 'https://github.com/public-clis/twitter-cli.git', source], process.cwd());
 const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: source, encoding: 'utf8' }).trim();
 if (revision !== commit || !existsSync(join(source, 'pyproject.toml'))) await run('git', ['checkout', '--detach', commit], source);

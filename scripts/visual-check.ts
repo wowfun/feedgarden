@@ -1,11 +1,15 @@
+import { parseArgs } from 'node:util';
+import { loadConfig } from '../src/config.js';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile, stat, mkdir, writeFile } from 'node:fs/promises';
 import { resolve, extname, join, sep } from 'node:path';
 import { chromium, expect, type Page } from '@playwright/test';
 import { z } from 'zod';
-import { validationDirectory } from './validation-paths.js';
+import { validationDirectory as resolveValidationDirectory } from './validation-paths.js';
 import { checkArchiveExport } from './archive-export-check.js';
+const { values } = parseArgs({ options: { config: { type: 'string' } } });
+const validationDirectory = resolveValidationDirectory(loadConfig(values.config));
 const root=resolve(process.env.FEEDGARDEN_VISUAL_ROOT??'.jekyll-obsidian-cache/site'),output=join(validationDirectory, 'visual');
 const fixture=process.env.FEEDGARDEN_VISUAL_FIXTURE==='1';const artifactPrefix=fixture?'fixture-':'production-';await mkdir(output,{recursive:true});
 const daySelector='[data-filter-list] > section > details[data-ledger-day]';

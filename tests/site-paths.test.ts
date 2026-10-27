@@ -1,3 +1,4 @@
+import { storagePaths } from '../src/storage-paths.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, lstat, rm } from 'node:fs/promises';
@@ -27,9 +28,9 @@ async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-paths-'));
   const topics = join(root, 'topics.json');
   await writeFile(topics, JSON.stringify({ version: 1, topics: [{ id: 'coding', name: { en: 'Coding', 'zh-CN': '编程' }, description: 'Developer tools', aliases: [], deprecated: false }] }));
-  const config = configSchema.parse({ version: 2, storage: { directory: root, database: join(root, 'data.sqlite') }, feed: { directory: join(root, 'content'), topics },
-    agent: { model: 'deepseek/deepseek-flash', runtimeDirectory: join(root, 'tasks') }, sources: ['one', 'two'].map(id => ({ id, name: id, timezone: id === 'two' ? 'America/Los_Angeles' : 'Asia/Shanghai', intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'rss', kind: 'feed' }] }] })) });
-  const store = new Store(config.storage.database); store.setMeta('cutoff', '1970-01-01T00:00:00.000Z');
+  const config = configSchema.parse({ version: 2, storage: { root: root }, feed: { directory: join(root, 'content'), topics },
+    agent: { model: 'deepseek/deepseek-flash' }, sources: ['one', 'two'].map(id => ({ id, name: id, timezone: id === 'two' ? 'America/Los_Angeles' : 'Asia/Shanghai', intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'rss', kind: 'feed' }] }] })) });
+  const store = new Store(storagePaths(config.storage).database); store.setMeta('cutoff', '1970-01-01T00:00:00.000Z');
   return { config, store, cleanup: async () => { store.close(); await rm(root, { recursive: true, force: true }); } };
 }
 
@@ -54,7 +55,7 @@ test('source/day numbers survive later arrivals, locale rendering and database r
     }
     const reservations = f.store.db.prepare('SELECT * FROM feed_item_paths ORDER BY source,day,number').all();
     assert.equal(reservations.length, 6);
-    const reopened = new Store(f.config.storage.database);
+    const reopened = new Store(storagePaths(f.config.storage).database);
     try { await writeSite(f.config, reopened); assert.deepEqual(reopened.db.prepare('SELECT * FROM feed_item_paths ORDER BY source,day,number').all(), reservations); }
     finally { reopened.close(); }
     assert.equal(await readFile(join(f.config.feed.directory, 'one/2026-10/09/item-1.md'), 'utf8'), original);

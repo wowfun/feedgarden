@@ -1,3 +1,4 @@
+import { storagePaths } from './storage-paths.js';
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rename, rm, writeFile, readFile } from 'node:fs/promises';
 import { join, resolve, dirname, relative, isAbsolute } from 'node:path';
@@ -92,7 +93,7 @@ export function renderItem(record: AcceptedItem, locale: 'en' | 'zh-CN', topics 
 }
 interface ContentJournal { destination: string; staging: string; previous: string; publications?: PublishedIdentity[] }
 export async function recoverContent(config: Config, store: Store): Promise<void> {
-  const journalPath = resolve(config.storage.directory, 'content-journal.json');
+  const journalPath = storagePaths(config.storage).contentJournal;
   if (!existsSync(journalPath)) return;
   const journal = JSON.parse(await readFile(journalPath, 'utf8')) as ContentJournal;
   if (journal.destination !== resolve(config.feed.directory) || dirname(journal.staging) !== dirname(journal.destination) || dirname(journal.previous) !== dirname(journal.destination)) throw new Error('Content journal paths differ from the configured same-filesystem destination');
@@ -215,7 +216,7 @@ export async function writeSite(config: Config, store: Store, signal?: AbortSign
   } catch (error) { await rm(staging, { recursive: true, force: true }); throw error; }
   const previous = destination + '.previous-' + Date.now();
   store.assertLease();
-  await atomicWrite(resolve(config.storage.directory, 'content-journal.json'), JSON.stringify({ destination, staging, previous, publications }), signal);
+  await atomicWrite(storagePaths(config.storage).contentJournal, JSON.stringify({ destination, staging, previous, publications }), signal);
   signal?.throwIfAborted();
   store.assertLease();
   if (existsSync(destination)) await rename(destination, previous);

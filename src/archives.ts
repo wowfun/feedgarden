@@ -1,3 +1,4 @@
+import { storagePaths } from './storage-paths.js';
 import { cp, mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { chmodSync, existsSync } from 'node:fs';
 import Database from 'better-sqlite3';
@@ -116,7 +117,7 @@ export async function scanArchives(config: Config, signal?: AbortSignal, onlyPat
 
 async function backupArchives(config: Config, store: Store, signal?: AbortSignal): Promise<string> {
   store.assertLease(); signal?.throwIfAborted();
-  const backup = resolve(config.storage.directory, 'ranking-backups', new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomUUID());
+  const backup = resolve(storagePaths(config.storage).archiveBackups, new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomUUID());
   await mkdir(backup, { recursive: true, mode: 0o700 });
   await store.backup(join(backup, 'data.sqlite'));
   store.assertLease(); signal?.throwIfAborted();

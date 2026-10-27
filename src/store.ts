@@ -17,7 +17,7 @@ export class Store {
     return statement;
   }
   constructor(readonly path: string) {
-    if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
+    if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     this.db = new Database(path);
     try { this.initialize(); }
     catch (error) { this.db.close(); throw error; }
@@ -26,7 +26,7 @@ export class Store {
     const path = this.path;
     if (path !== ':memory:') chmodSync(path, 0o600);
     const version = this.db.pragma('user_version', { simple: true }) as number;
-    if (version === 1 || version === 2) throw new Error('Migration required: run feedgarden migrate before opening the legacy database');
+    if (version === 1 || version === 2) throw new Error('Unsupported legacy database schema; configure a new storage.root to start fresh');
     if (version > 3) throw new Error('Database schema is newer than this application');
     this.db.pragma('journal_mode = WAL'); this.db.pragma('foreign_keys = ON'); this.db.pragma('busy_timeout = 5000');
     if (version < 1) this.db.transaction(() => {
@@ -50,7 +50,7 @@ export class Store {
     if (version < 2) this.db.transaction(() => {
       this.db.exec('CREATE TABLE job_lease(id INTEGER PRIMARY KEY CHECK(id=1),owner TEXT NOT NULL,expires TEXT NOT NULL); PRAGMA user_version=2;');
     })();
-    if (version < 3) initializeFeedSchema(this.db, iso(DateTime.now().setZone('Asia/Shanghai').startOf('day').toUTC()), false);
+    if (version < 3) initializeFeedSchema(this.db, iso(DateTime.now().setZone('Asia/Shanghai').startOf('day').toUTC()));
     // Bump this revision when the additive schema below changes. Current stores
     // need only a read here, including when another connection holds a write lock.
     if (this.meta('runtime_schema_revision') !== '6' || this.meta('items_date_revision') !== '1') this.db.transaction(() => {
@@ -294,10 +294,10 @@ export class Store {
   finishCall(id: number, status: string, usage: unknown): void { this.statement('UPDATE agent_calls SET status=?,usage=? WHERE id=?').run(status, JSON.stringify(usage ?? null), id); }
   run(kind: string): number { return Number(this.statement('INSERT INTO runs(kind,started_at,status) VALUES (?,?,?)').run(kind, nowIso(), 'running').lastInsertRowid); }
   finishRun(id: number, status: string, details: unknown): void { this.statement('UPDATE runs SET finished_at=?,status=?,details=? WHERE id=?').run(nowIso(), status, JSON.stringify(details), id); }
-  async backup(path: string): Promise<void> { mkdirSync(dirname(path), { recursive: true }); await this.db.backup(path); chmodSync(path, 0o600); }
+  async backup(path: string): Promise<void> { mkdirSync(dirname(path), { recursive: true, mode: 0o700 }); await this.db.backup(path); chmodSync(path, 0o600); }
 }
 export class QuotaDeferred extends Error {}
-export function initializeFeedSchema(db: Database.Database, cutoff: string, excludeExisting = true): void {
+function initializeFeedSchema(db: Database.Database, cutoff: string): void {
   db.transaction(() => {
     db.exec(`
       CREATE TABLE feed_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -311,6 +311,5 @@ export function initializeFeedSchema(db: Database.Database, cutoff: string, excl
     `);
     db.prepare('INSERT INTO feed_meta VALUES (?,?)').run('cutoff', cutoff);
     db.prepare('INSERT INTO feed_meta VALUES (?,?)').run('round_robin', '');
-    if (excludeExisting) db.exec('INSERT INTO feed_excluded SELECT source,id FROM items; DELETE FROM channel_state;');
   })();
 }

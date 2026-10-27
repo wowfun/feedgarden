@@ -1,3 +1,4 @@
+import { storagePaths } from '../src/storage-paths.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, readdir, rename, rm } from 'node:fs/promises';
@@ -33,12 +34,12 @@ async function fixture(limit = 50) {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-selection-'));
   const topics = join(root, 'topics.json');
   await writeFile(topics, JSON.stringify({ version: 1, topics: [{ id: 'coding', name: { en: 'Coding', 'zh-CN': '编程' }, description: 'Developer tools', aliases: [], deprecated: false }] }));
-  const config = configSchema.parse({ version: 2, storage: { directory: root, database: join(root, 'data.sqlite') }, feed: { directory: join(root, 'content'), topics },
-    agent: { model: 'fixture', runtimeDirectory: join(root, 'tasks') }, sources: [
+  const config = configSchema.parse({ version: 2, storage: { root: root }, feed: { directory: join(root, 'content'), topics },
+    agent: { model: 'fixture' }, sources: [
       { id: 'hackernews', name: 'HN', intervalHours: 1, selection: { method: 'hn-engagement', dailyLimit: limit }, streams: [{ id: 'frontpage', channels: [{ id: 'primary', kind: 'hn-api' }] }] },
       { id: 'reddit', name: 'Reddit', intervalHours: 12, selection: { method: 'reddit-rss-percentile', dailyLimit: limit }, streams: ['large', 'small'].map(id => ({ id, channels: [{ id: 'primary', kind: 'feed', url: `https://www.reddit.com/r/${id}/top.rss?t=week&limit=100` }] })) },
     ] });
-  const store = new Store(config.storage.database); store.setMeta('cutoff', '1970-01-01T00:00:00.000Z');
+  const store = new Store(storagePaths(config.storage).database); store.setMeta('cutoff', '1970-01-01T00:00:00.000Z');
   return { root, config, store, cleanup: async () => { store.close(); await rm(root, { recursive: true, force: true }); } };
 }
 const generator: Generator = async (_agent, input, _repair, directory) => ({ directory: directory!, events: [], usage: [], output: { contractVersion: 2, newTopics: [], items: input.items.map(row => ({ source: row.source, id: row.id, topics: ['coding'], en: { title: row.title, summary: row.text }, 'zh-CN': { title: '中文 ' + row.title, summary: row.text ? '提供的事实。' : '' } })) } });
@@ -431,7 +432,7 @@ test('history caps candidate processing and preserves every published archive in
     const count = calls.length, version = f.store.meta('content_version');
     await rankItems(f.config, f.store, { history: true, at }, http); assert.equal(calls.length, count); assert.equal(f.store.meta('content_version'), version);
     assert.equal(await writeSite(f.config, f.store), false);
-    const reopened = new Store(f.config.storage.database); try { await writeSite(f.config, reopened, undefined, true); assert.equal(reopened.meta('selection_archive_backup'), backup); } finally { reopened.close(); }
+    const reopened = new Store(storagePaths(f.config.storage).database); try { await writeSite(f.config, reopened, undefined, true); assert.equal(reopened.meta('selection_archive_backup'), backup); } finally { reopened.close(); }
     assert.deepEqual(await readFile(join(f.config.feed.directory, 'other/keep.md')), unrelated);
   } finally { await f.cleanup(); }
 });
@@ -465,7 +466,7 @@ test('publication adoption retains current output across restarts without exposi
     f.store.db.exec("DELETE FROM feed_publications; DELETE FROM feed_meta WHERE key='publications_initialized'");
     await writeSite(f.config, f.store);
     assert.ok(!f.store.isSelected('hackernews', '1002'));
-    const reopened = new Store(f.config.storage.database);
+    const reopened = new Store(storagePaths(f.config.storage).database);
     try {
       f.config.feed.directory = join(f.root, 'new-output');
       await writeSite(f.config, reopened);
@@ -485,7 +486,7 @@ test('an interrupted import resumes from the intact tree and keeps its original 
     await archive(f, 'hackernews', 3);
     f.store.db.prepare("INSERT INTO feed_item_paths VALUES ('hackernews','1001','2026-10-09',9)").run();
     await assert.rejects(importArchives(f.config, f.store), /conflicts/);
-    await assert.rejects(readdir(join(f.root, 'ranking-backups')), { code: 'ENOENT' });
+    await assert.rejects(readdir(storagePaths(f.config.storage).archiveBackups), { code: 'ENOENT' });
     assert.equal((f.store.db.prepare('SELECT count(*) n FROM feed_archives').get() as { n: number }).n, 0);
     assert.equal((await readdir(join(f.config.feed.directory, 'hackernews/2026-10/09'))).length, 3);
     f.store.db.prepare('DELETE FROM feed_item_paths').run();
@@ -653,7 +654,7 @@ test('an archive path reserved by a different identity fails before backup or im
     const originals = await archive(f, 'hackernews', 1);
     f.store.db.prepare("INSERT INTO feed_item_paths VALUES ('hackernews','other-id','2026-10-09',1)").run();
     await assert.rejects(importArchives(f.config, f.store), /conflicts/);
-    await assert.rejects(readdir(join(f.root, 'ranking-backups')), { code: 'ENOENT' });
+    await assert.rejects(readdir(storagePaths(f.config.storage).archiveBackups), { code: 'ENOENT' });
     assert.equal((f.store.db.prepare('SELECT count(*) n FROM feed_archives').get() as { n: number }).n, 0);
     for (const [path, body] of originals) assert.equal(await readFile(join(f.config.feed.directory, path), 'utf8'), body);
   } finally { await f.cleanup(); }
@@ -739,6 +740,6 @@ test('rank --dry-run has no persistent database, archive, queue or runner change
     assert.equal(JSON.parse(result.stdout)[0].kept.length, 2);
     assert.equal(createHash('sha256').update(f.store.db.serialize()).digest('hex'), createHash('sha256').update(before).digest('hex'));
     assert.deepEqual(await readFile(join(f.config.feed.directory, 'hackernews/2026-10/09/item-1.md')), content);
-    assert.ok(!(await readdir(f.root)).includes('runner'));
+    await assert.rejects(readFile(storagePaths(f.config.storage).runner), { code: 'ENOENT' });
   } finally { await f.cleanup(); }
 });

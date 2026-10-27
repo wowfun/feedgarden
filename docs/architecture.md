@@ -94,9 +94,9 @@ The CLI combines a filesystem lock with a renewable database lease. The lease is
 
 External requests and model calls stay outside database write transactions. The runner commits bounded groups of evidence or accepted results after checking ownership. HTTP work shares host pacing within a collector or preparation run. Item enrichment remains sequential around the shared response buffer so evidence is assigned to the correct item.
 
-Markdown rendering writes a complete staging directory beside the destination. A content journal records the destination, staging and previous directory before the rename sequence. Recovery completes an interrupted replacement and removes leftover staging or previous trees. Topic updates, archive import, migration and publication have their own persistence and recovery boundaries; there is no transaction spanning every file, database write and remote push.
+Markdown rendering writes a complete staging directory beside the destination. A content journal records the destination, staging and previous directory before the rename sequence. Recovery completes an interrupted replacement and removes leftover staging or previous trees. Topic updates, archive import and publication have their own persistence and recovery boundaries; there is no transaction spanning every file, database write and remote push.
 
-Evidence and private archive history are retained. Workspace cleanup only removes eligible runner-owned directories after checking ownership and location. Database backups and migration archives have separate retention rules. See [Runner operations](operations.md) and [Archive maintenance](archives.md).
+Evidence and private archive history are retained. Workspace cleanup only removes eligible runner-owned directories after checking ownership and location. Daily/weekly database backups and archive-maintenance backups have separate retention rules. See [Runner operations](operations.md) and [Archive maintenance](archives.md).
 
 ## Public content and the theme
 
@@ -108,7 +108,7 @@ The render skip signature reads the persisted recommendation revision without sc
 
 The theme owns HTML templates, search and archive assets, pagination, language switching, continuous reading, media display, export and browser-local favorites. Changes to reusable theme behavior belong in the upstream Jekyll Obsidian checkout first; integrate its published commit through the lock file afterward. Feedgarden owns source acquisition, selection, model contracts and generated content. The files in `docs/` are repository documentation, separate from the configured public content tree.
 
-Publication fetches the configured branch into an isolated worktree, merges topic registries, copies the managed content, validates the pinned build, and pushes without force. Its normal commit scope is `content/` and `config/topics.json`; legacy report deletions require the migration journal. Code and theme changes must already be integrated into the publication branch.
+Publication fetches the configured branch into an isolated worktree, merges topic registries, copies the managed content, validates the pinned build, and pushes without force. Its commit scope is `content/` and `config/topics.json`. Code and theme changes must already be integrated into the publication branch.
 
 ## Trust boundaries
 

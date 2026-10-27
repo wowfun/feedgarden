@@ -8,7 +8,7 @@ import { generateBatch } from '../src/agent.js';
 
 test('cancellation terminates the OpenCode peer and its live MCP subprocess', async () => {
   const root = await mkdtemp(join(tmpdir(), 'feedgarden-mcp-cancel-'));
-  const agent = configSchema.shape.agent.parse({ command: resolve('tests/fixtures/acp-peer.mjs'), args: ['acp', '--hold-mcp'], runtimeDirectory: root, timeoutSeconds: 10 });
+  const agent = { ...configSchema.shape.agent.parse({ command: resolve('tests/fixtures/acp-peer.mjs'), args: ['acp', '--hold-mcp'],  timeoutSeconds: 10 }), runtimeDirectory: root };
   const cancellation = new AbortController(), reason = new Error('Lost lease with a live MCP tool server');
   let pid: number | undefined;
   const pending = generateBatch(agent, { contractVersion: 2, topics: { version: 1, topics: [] }, items: [] }, undefined, root, cancellation.signal).catch(error => error);

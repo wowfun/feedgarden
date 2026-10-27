@@ -187,7 +187,7 @@ test('HN guidance preserves other sources skill identity and comment revisions u
   const directory = await mkdtemp(join(tmpdir(), 'feedgarden-hn-')), store = new Store(':memory:'); let calls = 0;
   try {
     await writeFile(join(directory, 'topics.json'), JSON.stringify(topics));
-    const config = configSchema.parse({ version: 2, storage: { directory }, feed: { directory: join(directory, 'content'), topics: join(directory, 'topics.json') }, agent: { model: 'deepseek/deepseek-flash', runtimeDirectory: join(directory, 'tasks') }, sources: [{ id: 'hackernews', name: 'HN', intervalHours: 1, streams: [{ id: 'frontpage', channels: [{ id: 'firebase', kind: 'hn-api' }] }] }] });
+    const config = configSchema.parse({ version: 2, storage: { root: directory }, feed: { directory: join(directory, 'content'), topics: join(directory, 'topics.json') }, agent: { model: 'deepseek/deepseek-flash' }, sources: [{ id: 'hackernews', name: 'HN', intervalHours: 1, streams: [{ id: 'frontpage', channels: [{ id: 'firebase', kind: 'hn-api' }] }] }] });
     store.setMeta('cutoff', '1970-01-01T00:00:00Z'); seed(store);
     store.saveCollection(item.source, item.stream, item.channel, { items: [item], raw: [], coverage: { status: 'complete', to: item.observedAt, notes: [] } }, '');
     const generator: Generator = async (_agent, input, _repair, workspace) => {
@@ -210,7 +210,7 @@ test('HN output budgeting preserves FIFO items and resumes quota-deferred work w
   const directory = await mkdtemp(join(tmpdir(), 'feedgarden-hn-batches-')), store = new Store(':memory:'), batches: string[][] = [];
   try {
     await writeFile(join(directory, 'topics.json'), JSON.stringify(topics));
-    const config = configSchema.parse({ version: 2, storage: { directory }, feed: { directory: join(directory, 'content'), topics: join(directory, 'topics.json') }, agent: { model: 'deepseek/deepseek-flash', maxDailyCalls: 2, runtimeDirectory: join(directory, 'tasks') }, sources: [{ id: 'hackernews', name: 'HN', intervalHours: 1, streams: [{ id: 'frontpage', channels: [{ id: 'firebase', kind: 'hn-api' }] }] }] });
+    const config = configSchema.parse({ version: 2, storage: { root: directory }, feed: { directory: join(directory, 'content'), topics: join(directory, 'topics.json') }, agent: { model: 'deepseek/deepseek-flash', maxDailyCalls: 2 }, sources: [{ id: 'hackernews', name: 'HN', intervalHours: 1, streams: [{ id: 'frontpage', channels: [{ id: 'firebase', kind: 'hn-api' }] }] }] });
     store.setMeta('cutoff', '1970-01-01T00:00:00Z');
     const items = Array.from({ length: 6 }, (_, index) => ({ ...item, id: String(200 + index), text: 'The article describes a bounded system.', discussion: { url: 'https://news.ycombinator.com/item?id=' + (200 + index), comments: [{ id: String(1000 + index), parent: String(200 + index), author: 'reader', text: 'A commenter discusses practical limits.' }], totalComments: 1, partial: false } }));
     store.saveCollection('hackernews', 'frontpage', 'firebase', { items, raw: [], coverage: { status: 'complete', to: item.observedAt, notes: [] } }, '');

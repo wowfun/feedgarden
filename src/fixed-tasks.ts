@@ -1,3 +1,4 @@
+import type { AgentRuntimeConfig } from './storage-paths.js';
 import { lstat, mkdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -18,7 +19,7 @@ export async function taskKey(agent: Config['agent'], kind: AuxiliaryTask, input
     skill: await reportTaskSkill(kind) });
 }
 
-async function createTaskWorkspace(agent: Config['agent'], key: string): Promise<string> {
+async function createTaskWorkspace(agent: AgentRuntimeConfig, key: string): Promise<string> {
   const workspace = resolve(agent.runtimeDirectory, 'task-' + randomUUID());
   await mkdir(workspace, { recursive: true, mode: 0o700 });
   await atomicWrite(join(workspace, '.feedgarden-workspace.json'), JSON.stringify({ version: 1, task: key }));
@@ -26,7 +27,7 @@ async function createTaskWorkspace(agent: Config['agent'], key: string): Promise
 }
 
 /** One durable task visit. Recovery precedes quota spending; deferred work is resumable. */
-export async function fixedTask(store: Store, agent: Config['agent'], kind: AuxiliaryTask, input: unknown, options: { signal?: AbortSignal; retryFailed?: boolean; generator?: TaskGenerator; resolveAgent?: AgentResolver } = {}): Promise<{ output?: unknown; key: string; state: string; performed: boolean }> {
+export async function fixedTask(store: Store, agent: AgentRuntimeConfig, kind: AuxiliaryTask, input: unknown, options: { signal?: AbortSignal; retryFailed?: boolean; generator?: TaskGenerator; resolveAgent?: AgentResolver } = {}): Promise<{ output?: unknown; key: string; state: string; performed: boolean }> {
   options.signal?.throwIfAborted(); store.assertLease();
   const json = JSON.stringify(input);
   if (json.length > agent.maxInputChars) throw new Error('Fixed task exceeds agent.maxInputChars; split the input');

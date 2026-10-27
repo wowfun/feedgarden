@@ -58,13 +58,13 @@ jobs:
         if: steps.changes.outputs.mode != 'docs'
       - run: npm run verify:scale
         if: steps.changes.outputs.mode == 'full'
-      - run: FEEDGARDEN_VISUAL_ROOT=.local/validation/fixture/.jekyll-obsidian-cache/site FEEDGARDEN_VISUAL_FIXTURE=1 npm run test:visual
+      - run: FEEDGARDEN_VISUAL_ROOT=.local/feedgarden/validation/fixture/.jekyll-obsidian-cache/site FEEDGARDEN_VISUAL_FIXTURE=1 npm run test:visual
         if: steps.changes.outputs.mode == 'full'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always() && steps.changes.outputs.mode != 'docs'
         with:
           name: visual-validation
-          path: .local/validation/visual
+          path: .local/feedgarden/validation/visual
           retention-days: 7
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
         id: pages

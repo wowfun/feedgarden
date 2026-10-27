@@ -41,6 +41,40 @@ description: 归档卡片中显示的简短介绍。
 
 内容树交换期间若进程中断，恢复流程会根据日志完成目录移交。如果另一个进程在交换期间重新创建目标目录，渲染会停止，保留所有内容树和日志。请先合并冲突修改再重试；删除保留的内容树之前，应检查其中的 Clippings 文件。
 
+## 手动抓取并托管图片
+
+```powershell
+npm run fetch:clippings -- "content/clippings/Building agents_ When to fold subagents into your main agent loop.md"
+npm run fetch:clippings -- content/clippings/folder content/clippings/another.md
+npm run fetch:clippings -- --all --dry-run
+npm run fetch:clippings -- --all --max-mib 64 --config feedgarden.jsonc
+```
+
+指定的文件或目录必须位于配置中的 `feed.directory/clippings/` 内，且不能位于保留的 `assets/` 子目录中。显式路径未选中任何 Markdown 文件时，命令报错并以非零状态退出；`--all` 会跳过 `assets/`，允许空板块。路径相对于当前工作目录，与其他命令一致。不传参数时显示帮助。`--dry-run` 列出外部 Markdown 图片地址，不检查附件缓存；列出的 URL 在实际执行时可能复用缓存图片，已本地化的引用不会列出。预演不创建锁、不下载、不写文件。只有主动调用命令才会抓取图片；采集、渲染、构建、CI 和定时任务均不执行抓取。
+
+支持内联和引用式 Markdown 图片。代码、注释、普通链接、frontmatter（包括 `source_title`）、HTML 图片及 Obsidian 嵌入保持不变。内联图片保留替代文本、标题、空格和换行。引用定义同时被普通链接使用时，仅将图片转换为内联形式，普通链接及其定义仍指向原 URL。
+
+根据文件签名识别 PNG、JPEG、GIF、WebP、AVIF、APNG 和 BMP，按原始字节保存，保留动画。不支持 SVG 和非图片响应。下载保留签名查询参数，复用公网地址校验和连接固定机制，并在每次重定向时重新校验。默认并发为 3，单次请求超时 30 秒，最多重定向 3 次，临时错误重试 2 次，单张图片上限 32 MiB。可通过 `--max-mib` 调整上限。
+
+系统 DNS 必须返回真实公网地址。代理返回的 `198.18.x.x` 等 Fake-IP 会被公网地址规则拒绝；在此环境中，应先为图片域名配置真实 DNS。命令不会绕过校验或修改代理设置。
+
+附件位于 Clippings 内的 `assets/<SHA-256>.<扩展名>`，相同字节共用文件，嵌套文章使用对应的相对路径。`assets/manifest.json` 仅记录原 URL、最终 URL、路径和媒体类型。清单保留含签名参数的完整 URL，随附件提交。主题只发布被引用的图片，清单本身不作为页面或附件发布。
+
+一篇文章的所有图片都成功后，才会修改正文。失败文章保留原始字节，其他文章继续处理，命令最终以非零状态退出并列出原因。重复 URL 和已有本地图片会复用。清单不记录或校验 `size`、`sha256`；复用时检查本地路径、普通文件类型、配置的字节上限及图片类型。新下载仍以 SHA-256 命名以便去重。已经本地化的引用不会自动刷新，无人引用的附件也不会自动删除。对未修改的文章重复执行，不会重新下载或改写文件。
+
+命令与渲染共用 runner 文件锁，不打开 SQLite。如果存在尚未完成的内容交换日志，应先运行 `npm run feedgarden -- render` 恢复。下载先写入暂存目录，完整附件安装后，再原子更新清单和文章。替换前会重新检查文章身份和原始字节；检测到编辑、重命名或删除时，放弃该篇提交。命令退出前请避免编辑选中的笔记：最后一次内容检查与文件替换是两个独立的文件系统操作。中断可能留下完整但未被引用的附件、清单条目或 `.fetch-*` 暂存目录，重新执行是安全的。确认没有 runner 运行后，可检查并手工移除保留的暂存目录。
+
+请将改写后的 Markdown、附件和清单一起提交。本地主题修复会在“复制页面”和归档导出中，将图片引用映射为实际发布地址：配置了站点 URL 时使用绝对地址，否则使用含 `baseurl` 的根相对地址。两种语言界面共用附件，磁盘原稿仍保留相对路径。
+
+验证命令：
+
+```powershell
+npm run typecheck
+node --import tsx --test --test-concurrency=1 tests/fetch-clippings.test.ts tests/clippings.test.ts
+# 在 .references/jekyll-obsidian/website 中运行：
+bundle exec ruby -Itest test/compiler/published_markdown_test.rb
+```
+
 ## 本地主题验证
 
 共享内容需要上游的 `website.i18n.shared_directories` 实现。正式 Gemfile 继续固定已发布版本，待后续上游发布再升级。此前请按[开发说明](development.md#local-clippings-validation)使用隔离的本地主题包验证，不修改生产数据库、依赖锁文件或已部署站点。

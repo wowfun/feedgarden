@@ -14,9 +14,9 @@ export function publicAddress(address: string): boolean {
   return family === 4 ? !blocked4.check(address, 'ipv4') : family === 6 && global6.check(address, 'ipv6') && !blocked6.check(address, 'ipv6');
 }
 export type PublicResolver = (hostname: string) => Promise<LookupAddress[]>;
-export interface PublicTarget { url: string; address: string }
-export async function resolvePublicTarget(value: string, resolve: PublicResolver = hostname => lookup(hostname, { all: true })): Promise<PublicTarget> {
-  const normalized = safeUrl(value), url = new URL(normalized), hostname = url.hostname.replace(/^\[|\]$/g, '');
+export interface PublicTarget { readonly url: string; readonly address: string }
+export async function resolvePublicTarget(value: string, resolve: PublicResolver = hostname => lookup(hostname, { all: true }), options: { preserveQuery?: boolean } = {}): Promise<PublicTarget> {
+  const normalized = safeUrl(value, undefined, options), url = new URL(normalized), hostname = url.hostname.replace(/^\[|\]$/g, '');
   if (url.port || !hostname.includes('.') && !isIP(hostname) || /(?:^|\.)(localhost|local|internal|test|invalid)$/.test(hostname)) throw new Error('Article URL is not a public web endpoint');
   const addresses = isIP(hostname) ? [{ address: hostname, family: isIP(hostname) }] : await resolve(hostname);
   if (!addresses.length || addresses.some(row => !publicAddress(row.address))) throw new Error('Article URL resolves to a non-public address');

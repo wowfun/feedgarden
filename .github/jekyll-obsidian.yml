@@ -8,6 +8,12 @@ website:
   theme: minimal
   repository: wowfun/feedgarden
   edit_branch: main
+  footer:
+    links:
+      - label: Sinputer's Site
+        url: https://sinputer.top/
+        locale_urls:
+          zh-CN: https://sinputer.top/zh-CN/
   content:
     publish_by_default: [clippings]
     directories:

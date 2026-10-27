@@ -22,7 +22,8 @@
     "verify:opencode": "tsx scripts/verify-opencode.ts",
     "verify:collect": "tsx scripts/live-collect.ts",
     "verify:scale": "tsx scripts/scale-check.ts",
-    "verify:clippings": "tsx scripts/verify-clippings.ts"
+    "verify:clippings": "tsx scripts/verify-clippings.ts",
+    "verify:footer": "tsx scripts/verify-footer.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.5.1",

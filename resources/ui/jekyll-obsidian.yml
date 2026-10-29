@@ -1,0 +1,49 @@
+title: Feedgarden
+description: Discoveries from subscribed sources.
+lang: en
+url: ""
+baseurl: ""
+website:
+  source: content
+  theme: minimal
+  content:
+    publish_by_default: [clippings]
+    directories:
+      post: [blog, clippings]
+      doc: [docs]
+    directory_tags:
+      clippings: [source/clippings]
+  properties:
+    hidden: [first_seen, date_basis]
+  i18n:
+    enabled: true
+    locales: [en, zh-CN]
+    shared_directories: [clippings]
+  features:
+    search: true
+    feed: true
+    tags: false
+    graph: false
+    relations: false
+    previews: false
+    outline: true
+    favorites: true
+  home:
+    layout: archive
+    hide_tab_sources: true
+  blog:
+    page_size: 50
+    utc_offset: "+08:00"
+    timeline_granularity: day
+    ledger_group_by: day
+    export_max_days: 7
+    facets:
+      source: source/
+      topic: topics/
+  search:
+    mode: summary
+    max_entries: 3000
+    excerpt_length: 240
+    content_types: [post]
+  feed:
+    max_entries: 100

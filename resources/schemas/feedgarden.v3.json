@@ -1,0 +1,727 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "number",
+      "const": 3
+    },
+    "instanceId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "storage": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "dataDir": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "timezone": {
+      "default": "Asia/Shanghai",
+      "type": "string"
+    },
+    "observedDays": {
+      "default": 7,
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 30
+    },
+    "targets": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+          },
+          "repository": {
+            "type": "string",
+            "minLength": 1
+          },
+          "branch": {
+            "default": "main",
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_./-]*$"
+          },
+          "format": {
+            "default": "markdown",
+            "type": "string",
+            "enum": [
+              "json",
+              "markdown",
+              "jekyll"
+            ]
+          },
+          "managedPrefix": {
+            "default": "feed",
+            "type": "string"
+          },
+          "auxiliaryFiles": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "output": {
+            "type": "string"
+          },
+          "ui": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 1000
+              },
+              "lang": {
+                "type": "string",
+                "enum": [
+                  "en",
+                  "zh-CN"
+                ]
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "baseurl": {
+                "type": "string",
+                "pattern": "^(?:\\/[a-zA-Z0-9_/-]*)?$"
+              },
+              "features": {
+                "type": "object",
+                "properties": {
+                  "search": {
+                    "type": "boolean"
+                  },
+                  "feed": {
+                    "type": "boolean"
+                  },
+                  "tags": {
+                    "type": "boolean"
+                  },
+                  "graph": {
+                    "type": "boolean"
+                  },
+                  "relations": {
+                    "type": "boolean"
+                  },
+                  "previews": {
+                    "type": "boolean"
+                  },
+                  "outline": {
+                    "type": "boolean"
+                  },
+                  "favorites": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "repository"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "feed": {
+      "default": {
+        "directory": "content",
+        "topics": "config/topics.json"
+      },
+      "type": "object",
+      "properties": {
+        "directory": {
+          "default": "content",
+          "type": "string"
+        },
+        "topics": {
+          "default": "config/topics.json",
+          "type": "string"
+        },
+        "locales": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "collection": {
+      "default": {
+        "backfillDays": 7,
+        "enrichmentRefreshDays": 7
+      },
+      "type": "object",
+      "properties": {
+        "backfillDays": {
+          "default": 7,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30
+        },
+        "enrichmentRefreshDays": {
+          "default": 7,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30
+        }
+      },
+      "additionalProperties": false
+    },
+    "agent": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "candidates": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "effort": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "account": {
+                    "default": "default",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "maxDailyCalls": {
+                    "default": 80,
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "model"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "account": {
+              "default": "default",
+              "type": "string",
+              "minLength": 1
+            },
+            "command": {
+              "type": "string",
+              "minLength": 1
+            },
+            "args": {
+              "default": [
+                "acp"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "default": [],
+              "description": "Additional parent environment variable names explicitly passed to agent processes. Values stay outside configuration.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+              }
+            },
+            "effort": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "timeoutSeconds": {
+              "default": 300,
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 300
+            },
+            "maxBatchItems": {
+              "default": 10,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            },
+            "maxInputChars": {
+              "default": 24000,
+              "type": "integer",
+              "minimum": 4000,
+              "maximum": 24000
+            },
+            "maxItemChars": {
+              "default": 4000,
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 4000
+            },
+            "maxDailyCalls": {
+              "default": 80,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "workspaceRetentionDays": {
+              "default": 7,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 365
+            },
+            "maxTranscriptChunks": {
+              "default": 64,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1024
+            },
+            "backend": {
+              "default": "opencode",
+              "type": "string",
+              "const": "opencode"
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "candidates": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "effort": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "account": {
+                    "default": "default",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "maxDailyCalls": {
+                    "default": 80,
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "model"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "account": {
+              "default": "default",
+              "type": "string",
+              "minLength": 1
+            },
+            "command": {
+              "type": "string",
+              "minLength": 1
+            },
+            "args": {
+              "default": [
+                "acp"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "inheritEnvironment": {
+              "default": [],
+              "description": "Additional parent environment variable names explicitly passed to agent processes. Values stay outside configuration.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+              }
+            },
+            "effort": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "timeoutSeconds": {
+              "default": 300,
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 300
+            },
+            "maxBatchItems": {
+              "default": 10,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            },
+            "maxInputChars": {
+              "default": 24000,
+              "type": "integer",
+              "minimum": 4000,
+              "maximum": 24000
+            },
+            "maxItemChars": {
+              "default": 4000,
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 4000
+            },
+            "maxDailyCalls": {
+              "default": 80,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "workspaceRetentionDays": {
+              "default": 7,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 365
+            },
+            "maxTranscriptChunks": {
+              "default": 64,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1024
+            },
+            "backend": {
+              "type": "string",
+              "const": "dsh"
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "backend",
+            "model"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "allOf": [
+              {
+                "pattern": "^[a-z0-9][a-z0-9_-]*$"
+              },
+              {
+                "pattern": "^(?!clippings$)"
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "enabled": {
+            "default": true,
+            "type": "boolean"
+          },
+          "timezone": {
+            "default": "Asia/Shanghai",
+            "type": "string"
+          },
+          "intervalHours": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "processAfter": {
+            "default": "06:00",
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "streams": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_.-]+$"
+                },
+                "enabled": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "routes": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                          },
+                          "enabled": {
+                            "default": true,
+                            "type": "boolean"
+                          },
+                          "transport": {
+                            "default": "fetch",
+                            "type": "string",
+                            "enum": [
+                              "fetch",
+                              "curl"
+                            ]
+                          },
+                          "limit": {
+                            "default": 500,
+                            "description": "Maximum items for hn-api and arxiv-api. Other channel kinds use their feed window or adapter-specific bounds.",
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 2000
+                          },
+                          "authTokenEnv": {
+                            "default": "TWITTER_AUTH_TOKEN",
+                            "type": "string"
+                          },
+                          "csrfTokenEnv": {
+                            "default": "TWITTER_CT0",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "const": "podcast-rss"
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "podcastName": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "url",
+                          "podcastName"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                          },
+                          "enabled": {
+                            "default": true,
+                            "type": "boolean"
+                          },
+                          "transport": {
+                            "default": "fetch",
+                            "type": "string",
+                            "enum": [
+                              "fetch",
+                              "curl"
+                            ]
+                          },
+                          "limit": {
+                            "default": 500,
+                            "description": "Maximum items for hn-api and arxiv-api. Other channel kinds use their feed window or adapter-specific bounds.",
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 2000
+                          },
+                          "authTokenEnv": {
+                            "default": "TWITTER_AUTH_TOKEN",
+                            "type": "string"
+                          },
+                          "csrfTokenEnv": {
+                            "default": "TWITTER_CT0",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "hn-api",
+                              "feed",
+                              "sitemap",
+                              "anthropic-html",
+                              "github-trending",
+                              "github-search",
+                              "x-cli",
+                              "follow-builders",
+                              "arxiv-api",
+                              "ph-html"
+                            ]
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "routes"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "includeKeywords": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 2
+            }
+          },
+          "selection": {
+            "type": "object",
+            "properties": {
+              "method": {
+                "type": "string",
+                "enum": [
+                  "hn-engagement",
+                  "reddit-rss-percentile"
+                ]
+              },
+              "dailyLimit": {
+                "default": 50,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2000
+              },
+              "updateDays": {
+                "default": 7,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 30
+              }
+            },
+            "required": [
+              "method"
+            ],
+            "additionalProperties": false
+          },
+          "agent": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "effort": {
+                "type": "string",
+                "minLength": 1
+              },
+              "candidates": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "model": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "effort": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "account": {
+                      "default": "default",
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "maxDailyCalls": {
+                      "default": 80,
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "model"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "intervalHours",
+          "streams"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "version",
+    "instanceId",
+    "agent",
+    "sources"
+  ],
+  "additionalProperties": false
+}

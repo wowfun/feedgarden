@@ -1,0 +1,674 @@
+{
+  "version": 1,
+  "topics": [
+    {
+      "id": "agents",
+      "name": {
+        "en": "Agents",
+        "zh-CN": "智能体"
+      },
+      "description": "Agent design, orchestration and autonomous task execution.",
+      "aliases": [
+        "agentic systems"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "coding",
+      "name": {
+        "en": "Coding",
+        "zh-CN": "编程"
+      },
+      "description": "Software development, coding assistants and developer tools.",
+      "aliases": [
+        "code generation"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "models",
+      "name": {
+        "en": "Models",
+        "zh-CN": "模型"
+      },
+      "description": "AI model releases, architecture, training and capabilities.",
+      "aliases": [
+        "language models"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "inference",
+      "name": {
+        "en": "Inference",
+        "zh-CN": "推理部署"
+      },
+      "description": "Model serving, runtime efficiency, hardware and deployment.",
+      "aliases": [],
+      "deprecated": false
+    },
+    {
+      "id": "evaluation",
+      "name": {
+        "en": "Evaluation",
+        "zh-CN": "评测"
+      },
+      "description": "Benchmarks, measurement, reliability and model evaluation.",
+      "aliases": [
+        "evals"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "research",
+      "name": {
+        "en": "Research",
+        "zh-CN": "研究"
+      },
+      "description": "Research methods, papers and scientific advances.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "products",
+      "name": {
+        "en": "Products",
+        "zh-CN": "产品"
+      },
+      "description": "Product launches, applications and user-facing AI services.",
+      "aliases": [],
+      "deprecated": false
+    },
+    {
+      "id": "industry",
+      "name": {
+        "en": "Industry",
+        "zh-CN": "行业"
+      },
+      "description": "Organizations, funding, policy and the technology industry.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "energy",
+      "name": {
+        "en": "Energy",
+        "zh-CN": "能源"
+      },
+      "description": "Electricity generation, storage, grids and the economics of power infrastructure.",
+      "aliases": [],
+      "deprecated": false
+    },
+    {
+      "id": "security-privacy",
+      "name": {
+        "en": "Security & Privacy",
+        "zh-CN": "安全与隐私"
+      },
+      "description": "Device and system security, surveillance capabilities, exploits and privacy protection.",
+      "aliases": [],
+      "deprecated": false
+    },
+    {
+      "id": "content-provenance",
+      "name": {
+        "en": "Content Provenance",
+        "zh-CN": "内容溯源"
+      },
+      "description": "Standards and techniques for proving the origin and authorship of text, images and media.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "hardware",
+      "name": {
+        "en": "Hardware",
+        "zh-CN": "硬件"
+      },
+      "description": "Physical devices, electronics, components and do-it-yourself hardware builds.",
+      "aliases": [],
+      "deprecated": false
+    },
+    {
+      "id": "communication",
+      "name": {
+        "en": "Communication",
+        "zh-CN": "沟通"
+      },
+      "description": "Human conversation, interpersonal communication and the social dynamics of talking with others.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "health",
+      "name": {
+        "en": "Health & Medicine",
+        "zh-CN": "健康与医学"
+      },
+      "description": "Human health, clinical conditions, treatments and medical research.",
+      "aliases": [
+        "medicine",
+        "clinical research"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "culture-society",
+      "name": {
+        "en": "Culture & Society",
+        "zh-CN": "文化与社会"
+      },
+      "description": "Cultural trends, social change, media consumption and public discourse.",
+      "aliases": [
+        "society",
+        "culture"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "history",
+      "name": {
+        "en": "History",
+        "zh-CN": "历史"
+      },
+      "description": "Historical events, documents, archives and their interpretation.",
+      "aliases": [
+        "historical archives"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "astronomy",
+      "name": {
+        "en": "Astronomy",
+        "zh-CN": "天文学"
+      },
+      "description": "Planets, celestial bodies, orbital dynamics and observational sky surveys.",
+      "aliases": [
+        "space science",
+        "planetary science"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "generative-media",
+      "name": {
+        "en": "Generative Media",
+        "zh-CN": "生成式媒体"
+      },
+      "description": "AI-generated music, video, images and other creative media, including tools, quality debates and their cultural and economic effects.",
+      "aliases": [
+        "AI art",
+        "AI music",
+        "AI-generated content"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "open-source",
+      "name": {
+        "en": "Open Source",
+        "zh-CN": "开源"
+      },
+      "description": "Open source projects, their communities, governance, funding and infrastructure sustainability.",
+      "aliases": [
+        "FOSS",
+        "free software"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "quantum-physics",
+      "name": {
+        "en": "Quantum Physics",
+        "zh-CN": "量子物理"
+      },
+      "description": "Quantum mechanics experiments, entanglement, and foundational physics research.",
+      "aliases": [
+        "quantum mechanics",
+        "quantum information"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "agriculture",
+      "name": {
+        "en": "Agriculture",
+        "zh-CN": "农业"
+      },
+      "description": "Farming, crop production and the use of agricultural land and products, including food-versus-fuel debates.",
+      "aliases": [
+        "farming",
+        "crop production"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "system-dynamics",
+      "name": {
+        "en": "System Dynamics",
+        "zh-CN": "系统动力学"
+      },
+      "description": "Stock-and-flow modelling, feedback loops, simulation of dynamic systems and the tools and languages used to build and run such models.",
+      "aliases": [
+        "stock and flow diagrams",
+        "systems thinking",
+        "反馈回路"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "geopolitics",
+      "name": {
+        "en": "Geopolitics",
+        "zh-CN": "地缘政治"
+      },
+      "description": "International conflict, military technology and statecraft, including drone and missile warfare and its policy debate.",
+      "aliases": [
+        "international conflict",
+        "military technology"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "ai-safety",
+      "name": {
+        "en": "AI Safety",
+        "zh-CN": "AI 安全"
+      },
+      "description": "AI safety and alignment: ensuring AI systems behave as intended, safety research, and the institutional responsibility for developing AI safely.",
+      "aliases": [
+        "AI alignment",
+        "AI safety research",
+        "AI 安全"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "education",
+      "name": {
+        "en": "Education",
+        "zh-CN": "教育"
+      },
+      "description": "Schools, teaching and learning, including the use of AI tools in classrooms and for students, teachers and educators.",
+      "aliases": [
+        "edtech",
+        "teaching",
+        "learning"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "ethics-compute-access",
+      "name": {
+        "en": "Research Compute Access & Ethics",
+        "zh-CN": "科研算力获取与伦理"
+      },
+      "description": "Access to GPU and compute resources for academic research, queueing and allocation constraints, and the ethical questions raised when researchers use employer or third-party infrastructure.",
+      "aliases": [
+        "compute access",
+        "GPU allocation"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "memory-management",
+      "name": {
+        "en": "Memory Management",
+        "zh-CN": "内存管理"
+      },
+      "description": "Memory allocators, stack and buffer layout, fragmentation, and memory reuse strategies in systems and application software.",
+      "aliases": [
+        "memory allocation",
+        "allocators"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "land-use",
+      "name": {
+        "en": "Land Use",
+        "zh-CN": "土地利用"
+      },
+      "description": "Land parcels, property boundaries, public and state-owned land, easements and the practical implications of owning land adjacent to public holdings.",
+      "aliases": [
+        "public land",
+        "property boundaries"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "linux",
+      "name": {
+        "en": "Linux",
+        "zh-CN": "Linux"
+      },
+      "description": "Linux distributions and their releases, desktop environments, display servers, packaging formats and system software choices.",
+      "aliases": [
+        "linux distributions",
+        "linux desktop"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "ai-code-policy",
+      "name": {
+        "en": "AI Code Contribution Policies",
+        "zh-CN": "AI 代码贡献政策"
+      },
+      "description": "Project rules and debates about whether AI-generated or AI-assisted code may be contributed to open source and other software projects, and how such contributions are disclosed and reviewed.",
+      "aliases": [
+        "AI-generated code",
+        "AI-assisted commits",
+        "vibe coding policy"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "ai-and-work",
+      "name": {
+        "en": "AI and Work",
+        "zh-CN": "AI 与就业"
+      },
+      "description": "How AI changes jobs, hiring, productivity, workplace organization and labor demand, including expectations about automation and employment.",
+      "aliases": [
+        "future of work",
+        "labor market",
+        "AI and employment"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "digital-ownership",
+      "name": {
+        "en": "Digital Ownership",
+        "zh-CN": "数字所有权"
+      },
+      "description": "Ownership, preservation and continued access rights for digital goods such as video games and software, including offline modes, server shutdowns and community-run servers.",
+      "aliases": [
+        "video game preservation",
+        "software preservation",
+        "right to own"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "agent-memory",
+      "name": {
+        "en": "Agent Memory",
+        "zh-CN": "智能体记忆"
+      },
+      "description": "Storage, retrieval, selection and reuse of past experiences and knowledge by LLM agents, including memory assembly and context construction.",
+      "aliases": [
+        "LLM agent memory",
+        "experience memory"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "image-compression",
+      "name": {
+        "en": "Image Compression",
+        "zh-CN": "图像压缩"
+      },
+      "description": "Image codecs and compression formats such as JPEG, WebP, AVIF and JPEG XL, including file size, visual quality, encoding speed and browser support.",
+      "aliases": [
+        "image codecs",
+        "image formats"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "accessibility",
+      "name": {
+        "en": "Accessibility",
+        "zh-CN": "无障碍"
+      },
+      "description": "Assistive technology and accessible interfaces that let people with disabilities use software, hardware and digital services independently.",
+      "aliases": [
+        "assistive technology",
+        "a11y"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "computer-graphics",
+      "name": {
+        "en": "Computer Graphics",
+        "zh-CN": "计算机图形学"
+      },
+      "description": "Real-time rendering, shaders, graphics APIs such as WebGPU, and the techniques used to produce interactive 3D scenes.",
+      "aliases": [
+        "real-time rendering",
+        "shaders"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "biodiversity",
+      "name": {
+        "en": "Biodiversity",
+        "zh-CN": "生物多样性"
+      },
+      "description": "Wildlife populations, species abundance and ecosystem health, including population indices, conservation status and debate over how declines are measured and interpreted.",
+      "aliases": [
+        "wildlife populations",
+        "species decline"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "hallucination-detection",
+      "name": {
+        "en": "Hallucination Detection",
+        "zh-CN": "幻觉检测"
+      },
+      "description": "Detection of unsupported or fabricated model outputs, including attention-based probes, grounding checkers and LLM judges used to verify factual consistency with supplied context.",
+      "aliases": [
+        "grounding checks",
+        "faithfulness detection",
+        "factual consistency"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "ontologies",
+      "name": {
+        "en": "Ontologies",
+        "zh-CN": "本体"
+      },
+      "description": "Construction, refinement and maintenance of ontologies and class hierarchies, including axiom repair, subsumption errors and embedding-assisted knowledge engineering.",
+      "aliases": [
+        "ontology engineering",
+        "knowledge graphs"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "immigration",
+      "name": {
+        "en": "Immigration",
+        "zh-CN": "移民"
+      },
+      "description": "Public opinion on immigration and migration policy, including people's desire to move between countries and host countries' openness to newcomers.",
+      "aliases": [
+        "migration",
+        "emigration"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "agent-self-improvement",
+      "name": {
+        "en": "Agent Self-Improvement",
+        "zh-CN": "智能体自我改进"
+      },
+      "description": "Agents that revise their own prompts, harnesses, skills, workflows or policies over time, including recursive self-improvement, and the safety and evaluation limits of automated self-modification.",
+      "aliases": [
+        "recursive self-improvement",
+        "self-evolving agents"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "web-archiving",
+      "name": {
+        "en": "Web Archiving",
+        "zh-CN": "网页归档"
+      },
+      "description": "Preservation of websites and born-digital web content through crawls, archives and searchable collections, including efforts to keep defunct services such as GeoCities accessible.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "politics",
+      "name": {
+        "en": "Politics",
+        "zh-CN": "政治"
+      },
+      "description": "Government affairs, political appointments, public officials, elections and political debate.",
+      "aliases": [
+        "government",
+        "political news"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "amateur-radio",
+      "name": {
+        "en": "Amateur Radio",
+        "zh-CN": "业余无线电"
+      },
+      "description": "Amateur radio operation, RF equipment and spectrum regulation, including ham-band transceivers, software-defined radio, licensing rules and marketplace restrictions on radio gear.",
+      "aliases": [
+        "ham radio",
+        "SDR",
+        "software-defined radio",
+        "RF equipment"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "ai-financing",
+      "name": {
+        "en": "AI Financing",
+        "zh-CN": "AI 融资"
+      },
+      "description": "Debt issuance, credit ratings, capital raising and the financial structure of AI companies and their infrastructure buildout.",
+      "aliases": [
+        "AI debt",
+        "AI capex"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "personal-finance",
+      "name": {
+        "en": "Personal Finance",
+        "zh-CN": "个人理财"
+      },
+      "description": "Personal finance apps and methods for tracking accounts, spending and budgets, and for forecasting household cash flow.",
+      "aliases": [
+        "budgeting",
+        "money management",
+        "cash-flow tracking"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "public-safety",
+      "name": {
+        "en": "Public Safety",
+        "zh-CN": "公共安全"
+      },
+      "description": "Emergency call routing and dispatch, civilian crisis-response programs, and the division of labor between police, fire, medical and other first responders.",
+      "aliases": [
+        "emergency services",
+        "911 dispatch",
+        "crisis response"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "game-engines",
+      "name": {
+        "en": "Game Engines",
+        "zh-CN": "游戏引擎"
+      },
+      "description": "Game engine architecture, frameworks and source-code releases used to build and run video games.",
+      "aliases": [
+        "game engine",
+        "game development"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "invasive-species",
+      "name": {
+        "en": "Invasive Species",
+        "zh-CN": "入侵物种"
+      },
+      "description": "Non-native plants, animals and other organisms that spread beyond their original range and harm ecosystems, agriculture or public health, and efforts to control them.",
+      "aliases": [
+        "biological invasions",
+        "non-native species"
+      ],
+      "deprecated": false,
+      "hidden": true
+    },
+    {
+      "id": "cloud-computing",
+      "name": {
+        "en": "Cloud Computing",
+        "zh-CN": "云计算"
+      },
+      "description": "Cloud computing services and platforms, including reliance on remote providers, vendor lock-in and the trade-offs between hosted software and local control.",
+      "aliases": [
+        "cloud services",
+        "SaaS"
+      ],
+      "deprecated": false
+    },
+    {
+      "id": "electric-vehicles",
+      "name": {
+        "en": "Electric Vehicles",
+        "zh-CN": "电动汽车"
+      },
+      "description": "Electric vehicles, battery-powered cars, charging speed and range, and the market push for affordable mass-market EVs.",
+      "aliases": [
+        "EV",
+        "electric cars"
+      ],
+      "deprecated": false,
+      "hidden": true
+    }
+  ]
+}

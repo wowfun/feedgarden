@@ -1,0 +1,255 @@
+import { load } from 'cheerio';
+import { DateTime } from 'luxon';
+import { execFile } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { promisify } from 'node:util';
+import type { Channel, Source, Stream } from '../../contracts/configuration.js';
+import type { Collection, Item, RankingWindow } from '../../contracts/items.js';
+import { iso, isoDate } from '../../contracts/time.js';
+import type { StoragePaths } from '../../instance/index.js';
+import { mapLimit } from '../../platform/concurrency.js';
+import { errorText } from '../../platform/errors.js';
+import { hash } from '../../platform/hash.js';
+import { Http } from '../../platform/http/client.js';
+import { pythonExecutable } from '../../platform/process/command.js';
+import { validationEnvironment } from '../../platform/process/execute.js';
+import { safeUrl } from '../../platform/url.js';
+import { type Storage } from '../../storage/index.js';
+import { parsePodcastFeed } from '../podcasts.js';
+import { array, date, parseFeed, parseFeedDocument, parseFollowBuilders, parseProductHunt, parseTrending, parseXTimeline, plain, text, xml, type ParseContext } from './parsers.js';
+
+const exec = promisify(execFile);
+export interface ChannelContext { source: Source; stream: Stream; channel: Channel; store: Pick<Storage, 'channel' | 'assertLease'> & { sources: Pick<Storage['sources'], 'hasItem' | 'discoveryCheck' | 'skipDiscovery' | 'forgetDiscovery'> }; http: Http; now: string; since: string; restartRange?: boolean; twitterEnvironment?: StoragePaths['twitterEnvironment'] }
+export type Adapter = (context: ChannelContext) => Promise<Collection>;
+function base(c: ChannelContext): ParseContext { return { source: c.source.id, stream: c.stream.id, channel: c.channel.id, observedAt: c.now, timezone: c.source.timezone }; }
+function collected(c: ChannelContext, items: Item[], notes: string[] = [], cursor?: string): Collection {
+  return { items, raw: c.http.raw, cursor, coverage: { status: notes.length ? 'partial' : 'complete', from: c.since, to: c.now, notes } };
+}
+async function feed(c: ChannelContext): Promise<Collection> {
+  const raw = await c.http.get(c.channel.url!, c.source.id === 'reddit' ? 60000 : c.source.id === 'arxiv' ? 3100 : 0, c.channel.transport);
+  const notes: string[] = [];
+  const feedUrl = new URL(c.channel.url!);
+  const window = c.source.id === 'reddit' && feedUrl.pathname.endsWith('/top.rss') ? feedUrl.searchParams.get('t') : undefined;
+  const redditWindow = window && ['day', 'week', 'month', 'year', 'all'].includes(window) ? window as RankingWindow : undefined;
+  const items = parseFeed(raw.body, base(c), notes, redditWindow).map(item => c.source.id === 'rss' ? { ...item, id: hash(safeUrl(c.channel.url!)) + ':' + item.id } : item);
+  if (items.length) notes.push('Recent feed window; completeness before the oldest returned item is unknown.');
+  if (c.source.id === 'hackernews') notes.push('Hacker News front-page RSS; score and comment counts are unavailable.');
+  if (c.source.id === 'producthunt') notes.push('New-product feed, not a dated leaderboard.');
+  const result = collected(c, items, notes);
+  if (redditWindow) {
+    const document = xml(raw.body);
+    result.ranking = { method: 'reddit-rss-percentile', window: redditWindow, size: array(document.feed?.entry ?? document.rss?.channel?.item ?? document.RDF?.item).length };
+  }
+  return result;
+}
+async function podcast(c: ChannelContext): Promise<Collection> {
+  if (c.channel.kind !== 'podcast-rss') throw new Error('Expected podcast-rss channel');
+  const raw = await c.http.get(c.channel.url), notes: string[] = [];
+  const items = parsePodcastFeed(raw.body, base(c), c.channel.podcastName, notes);
+  notes.push('Podcast RSS window; older history before the returned episodes is unknown.');
+  return collected(c, items, notes);
+}
+async function hn(c: ChannelContext): Promise<Collection> {
+  const url = 'https://hacker-news.firebaseio.com/v0';
+  const raw = await c.http.get(`${url}/topstories.json`); const ids: unknown = JSON.parse(raw.body);
+  if (!Array.isArray(ids) || ids.some(id => typeof id !== 'number')) throw new Error('Invalid HN topstories response');
+  const failures: string[] = [];
+  const attempted = ids.slice(0, c.channel.limit) as number[];
+  const ranks = new Map(attempted.map((id, index) => [id, index + 1]));
+  const items = await mapLimit(attempted, 8, async id => {
+    try {
+      const raw = await c.http.get(`${url}/item/${id}.json`); const row = JSON.parse(raw.body);
+      if (!row || row.deleted || row.dead || row.type !== 'story') return undefined;
+      if (!row.title || !Number.isFinite(row.time)) throw new Error('Malformed HN story');
+      return {
+        ...base(c), id: String(id), title: plain(row.title), url: safeUrl(row.url ?? `https://news.ycombinator.com/item?id=${id}`),
+        publishedAt: new Date(row.time * 1000).toISOString(), author: row.by, text: plain(row.text ?? ''),
+        metrics: { score: row.score ?? null, comments: row.descendants ?? null, rank: ranks.get(id)! }, basis: 'published',
+        metadata: { discussionUrl: `https://news.ycombinator.com/item?id=${id}` }
+      } satisfies Item;
+    } catch { failures.push(String(id)); return undefined; }
+  });
+  if (attempted.length && failures.length === attempted.length) throw new Error('All HN item requests failed');
+  return collected(c, items.filter((item): item is NonNullable<typeof item> => !!item), [
+    ...(ids.length > c.channel.limit ? [`Candidate snapshot truncated to ${c.channel.limit} items.`] : []),
+    ...(failures.length ? [`${failures.length} HN item requests failed.`] : []),
+  ]);
+}
+async function trending(c: ChannelContext): Promise<Collection> { return collected(c, parseTrending((await c.http.page(c.channel.url!)).body, base(c))); }
+async function githubSearch(c: ChannelContext): Promise<Collection> {
+  const from = DateTime.fromISO(c.now).minus({ days: 1 }).toISODate();
+  const query = encodeURIComponent(`pushed:>=${from} stars:>50 archived:false`);
+  const body = JSON.parse((await c.http.get(c.channel.url ?? `https://api.github.com/search/repositories?q=${query}&sort=stars&order=desc&per_page=50`)).body);
+  if (!Array.isArray(body.items)) throw new Error('Invalid GitHub search response');
+  return collected(c, body.items.map((row: any, index: number): Item => ({ ...base(c), id: String(row.full_name).toLowerCase(), title: row.full_name, url: safeUrl(row.html_url), text: row.description ?? '', publishedAt: c.now, basis: 'observed', metrics: { stars: row.stargazers_count, rank: index + 1 } })), ['Repository discovery by recent push and total stars; not GitHub Trending.']);
+}
+async function followBuilders(c: ChannelContext): Promise<Collection> {
+  const { generatedAt: generated, items } = parseFollowBuilders((await c.http.shared(c.channel.url!)).body, base(c));
+  const result = collected(c, items, [`Third-party daily sample generated at ${generated}: up to 3 posts per account; replies and complete threads are not covered. Missing accounts do not imply no activity.`]);
+  if (Date.parse(c.now) - Date.parse(generated) > 36 * 3600_000) result.coverage.status = 'stale';
+  return result;
+}
+async function xCli(c: ChannelContext): Promise<Collection> {
+  const auth = process.env[c.channel.authTokenEnv], csrf = process.env[c.channel.csrfTokenEnv];
+  if (!auth || !csrf) throw new Error('X explicit cookies unavailable; use limited feed fallback');
+  if (!c.twitterEnvironment) throw new Error('Twitter CLI requires a resolved tool directory');
+  const executable = pythonExecutable(c.twitterEnvironment, 'twitter');
+  const marker = resolve(c.twitterEnvironment, 'feedgarden-env-only.json');
+  if (!existsSync(executable) || !existsSync(marker)) throw new Error('X CLI is not installed with the verified env-only authentication patch: ' + c.twitterEnvironment);
+  const manifest = JSON.parse(readFileSync(marker, 'utf8'));
+  if (hash(readFileSync(resolve(manifest.authFile), 'utf8')) !== manifest.authHash) throw new Error('X CLI authentication patch integrity check failed');
+  const run = async (limit: number) => {
+    const result = await exec(executable, ['user-posts', c.stream.id, '--max', String(limit), '--json'], {
+      timeout: 90000, maxBuffer: 8_000_000, signal: c.http.signal,
+      env: { ...validationEnvironment(), LANG: 'C.UTF-8', TWITTER_AUTH_TOKEN: auth, TWITTER_CT0: csrf, TWITTER_PROXY: process.env.TWITTER_PROXY, FEEDGARDEN_AUTH_ENV_ONLY: '1' }, cwd: c.twitterEnvironment
+    });
+    c.http.raw.push({ url: `cli:twitter/user-posts/${c.stream.id}`, status: 200, body: result.stdout, fetchedAt: c.now, headers: {} });
+    const parsed = JSON.parse(result.stdout); if (!parsed.ok || !Array.isArray(parsed.data)) throw new Error('Invalid X CLI output');
+    return parsed.data as any[];
+  };
+  let rows = await run(100);
+  const boundary = c.store.channel(c.source.id, c.stream.id, c.channel.id)?.cursor;
+  if (boundary && !rows.some(row => String(row?.id) === boundary) && rows.length >= 100) rows = await run(200);
+  const notes: string[] = [], items = parseXTimeline(rows, base(c), notes);
+  if (boundary && !items.some(item => item.id === boundary)) notes.push('The current timeline did not overlap the previous boundary; a collection gap may exist.');
+  if (!boundary && items.length >= 100) notes.push('Initial timeline is bounded to 100 posts; earlier history is unknown.');
+  notes.push('The timeline endpoint does not guarantee complete author threads.');
+  const newest = items.map(item => item.id).sort((a, b) => BigInt(a) > BigInt(b) ? -1 : 1)[0];
+  return collected(c, items, notes, newest ?? boundary ?? undefined);
+}
+async function arxiv(c: ChannelContext): Promise<Collection> {
+  const checkpoint = c.restartRange ? undefined : c.store.channel(c.source.id, c.stream.id, c.channel.id)?.cursor;
+  const range: { from: string; to: string; offset: number } = checkpoint ? JSON.parse(checkpoint) : { from: c.since, to: c.now, offset: 0 };
+  const from = DateTime.fromISO(range.from).toUTC().toFormat('yyyyLLddHHmm');
+  const to = DateTime.fromISO(range.to).toUTC().toFormat('yyyyLLddHHmm');
+  const query = encodeURIComponent(`cat:${c.stream.id} AND submittedDate:[${from} TO ${to}]`);
+  let start = range.offset; const items: Item[] = []; let total = 0;
+  const notes: string[] = [];
+  do {
+    try {
+      const size = Math.min(200, c.channel.limit - (start - range.offset));
+      const raw = await c.http.get(`https://export.arxiv.org/api/query?search_query=${query}&sortBy=submittedDate&sortOrder=ascending&start=${start}&max_results=${size}`, 3100);
+      const parsed = xml(raw.body); if (!parsed.feed) throw new Error('Invalid arXiv API response');
+      total = Number(text(parsed.feed.totalResults));
+      if (!Number.isSafeInteger(total) || total < 0) throw new Error('Invalid arXiv result count');
+      const page = parseFeedDocument(parsed, base(c)), scanned = array(parsed.feed.entry).length;
+      if (!scanned && start < total) throw new Error('arXiv pagination ended before the advertised result count');
+      items.push(...page); start += scanned;
+      if (!scanned) break;
+    } catch (error) {
+      if (start === range.offset) throw error;
+      notes.push('Pagination interrupted; the next run resumes at the first uncommitted page.'); break;
+    }
+  } while (start < total && start - range.offset < c.channel.limit);
+  if (start < total) notes.push(`Retrieved ${start} of ${total} matching papers; the remaining range will resume on the next run.`);
+  const result = collected(c, items, notes, notes.length ? JSON.stringify({ ...range, offset: start }) : '');
+  result.coverage.from = range.from; result.coverage.to = range.to;
+  return result;
+}
+async function productHunt(c: ChannelContext): Promise<Collection> {
+  const checkpoint = c.restartRange ? undefined : c.store.channel(c.source.id, c.stream.id, c.channel.id)?.cursor;
+  const range: { from: string; to: string; next?: string } = checkpoint ? JSON.parse(checkpoint) : { from: c.since, to: c.now };
+  const from = range.next ? DateTime.fromISO(range.next, { zone: c.source.timezone }) : DateTime.fromISO(range.from).setZone(c.source.timezone).startOf('day');
+  const to = DateTime.fromISO(range.to).setZone(c.source.timezone).startOf('day');
+  if (!from.isValid || !to.isValid) throw new Error('Invalid Product Hunt range checkpoint');
+  const items: Item[] = [], notes: string[] = []; let succeeded = false;
+  let day = from;
+  for (let count = 0; day <= to && count < 7; count++, day = day.plus({ days: 1 })) {
+    c.http.signal?.throwIfAborted();
+    const url = `https://www.producthunt.com/leaderboard/daily/${day.year}/${day.month}/${day.day}`;
+    try {
+      const page = parseProductHunt((await c.http.page(url)).body, base(c), isoDate(day, 'Product Hunt day'));
+      items.push(...page.map(item => ({ ...item, publishedAt: iso(day.toUTC(), 'Product Hunt publication date') })));
+      succeeded = true;
+    } catch (error) { c.http.signal?.throwIfAborted(); notes.push(`${day.toISODate()}: ${errorText(error)}`); }
+  }
+  if (!succeeded && notes.length) throw new Error(notes.join('; '));
+  const continuing = day <= to;
+  if (continuing) notes.push('Historical leaderboard range continues from ' + day.toISODate() + '; at most seven daily pages are fetched per run.');
+  else if (from <= to && to.hasSame(DateTime.fromISO(c.now).setZone(c.source.timezone), 'day')) notes.push('The current source-local day is still in progress; its leaderboard is a provisional snapshot.');
+  const result = collected(c, items, notes, continuing ? JSON.stringify({ ...range, next: isoDate(day, 'Product Hunt day') }) : '');
+  result.coverage.from = range.from; result.coverage.to = range.to;
+  return result;
+}
+async function officialPages(c: ChannelContext): Promise<Collection> {
+  const origin = new URL(c.channel.url!).origin;
+  const articlePath = (path: string) => c.source.id === 'anthropic'
+    ? (c.stream.id === 'engineering' ? /^\/(engineering|research)\/[^/]+\/?$/.test(path) : new RegExp(`^/${c.stream.id}/[^/]+/?$`).test(path)) || c.stream.id === 'blog' && origin === 'https://claude.com' && /^\/resources\/articles\/[^/]+\/?$/.test(path)
+    : /^\/(index|news|research)\//.test(path);
+  const urls = new Set<string>();
+  const first = await c.http.page(c.channel.url!);
+  if (c.channel.kind === 'sitemap') {
+    const document = xml(first.body);
+    const children = array<any>(document.sitemapindex?.sitemap).map(row => text(row.loc)).filter(url => new URL(url).origin === origin);
+    const documents = [document];
+    for (const child of children.slice(0, 12)) documents.push(xml((await c.http.page(child)).body));
+    for (const document of documents) for (const entry of array<any>(document.urlset?.url)) {
+      const url = text(entry.loc);
+      if (new URL(url).origin !== origin) continue;
+      const path = new URL(url).pathname;
+      if (articlePath(path)) urls.add(url);
+    }
+  } else {
+    const $ = load(first.body);
+    $('nav,footer,header:not(main header)').remove();
+    $('a[href]').each((_index, element) => {
+      const href = $(element).attr('href'); if (!href) return;
+      const url = new URL(href, origin); if (url.origin === origin && articlePath(url.pathname)) urls.add(url.href);
+    });
+  }
+  if (!urls.size) throw new Error('Official list/sitemap contained no recognizable article links');
+  const items: Item[] = []; let failures = 0, nonArticles = 0, outsideEngineering = 0;
+  // URLs already stored retain their original publication date; sitemap lastmod is never used as publication time.
+  const known = c.store.sources.hasItem;
+  const skipped = c.store.sources.discoveryCheck;
+  const skip = (url: string, reason: string) => { c.store.assertLease(); c.store.sources.skipDiscovery(c.source.id, c.stream.id, safeUrl(url), reason, c.now); };
+  const fresh: string[] = [], rechecks: { url: string; checkedAt: number }[] = [];
+  const expiredBefore = Date.parse(c.now) - 7 * 86400_000;
+  for (const url of urls) {
+    if (known(c.source.id, safeUrl(url))) continue;
+    const decision = skipped(c.source.id, c.stream.id, safeUrl(url)) as { checked_at: string } | undefined;
+    if (!decision) { fresh.push(url); continue; }
+    const checkedAt = Date.parse(decision.checked_at);
+    if (!Number.isFinite(checkedAt) || checkedAt <= expiredBefore) rechecks.push({ url, checkedAt: Number.isFinite(checkedAt) ? checkedAt : 0 });
+  }
+  rechecks.sort((a, b) => a.checkedAt - b.checkedAt);
+  // Keep the same total budget while giving expired decisions a share even
+  // during steady discovery. If fresh URLs are scarce, rechecks fill the batch.
+  const due = rechecks.map(row => row.url);
+  const unseen = [...due.slice(0, 10), ...fresh, ...due.slice(10)];
+  for (const url of unseen.slice(0, 50)) {
+    try {
+      const raw = await c.http.page(url); const $ = load(raw.body);
+      const objects: any[] = [];
+      $('script[type="application/ld+json"]').each((_i, element) => { try { objects.push(JSON.parse($(element).text())); } catch { } });
+      const entities = objects.flatMap(object => array<any>(object['@graph'] ?? object));
+      const article = entities.find(object => array(object?.['@type']).some(type => ['Article', 'BlogPosting', 'NewsArticle'].includes(String(type)))
+        && (!object.url || new URL(String(object.url), url).href === url));
+      // Category pages also use <article>/<h1>. Require page-level article
+      // metadata before allowing an undated page to become a first observation.
+      const pageType = $('meta[property="og:type"]').attr('content')?.toLowerCase();
+      if (!article && pageType !== 'article') { if (pageType === 'website') { nonArticles++; skip(url, 'non-article'); } else failures++; continue; }
+      if (c.stream.id === 'engineering' && c.channel.kind === 'sitemap'
+        && !/engineering/i.test(text(article?.articleSection))
+        && !$('article header a[href]').toArray().some(element => new URL($(element).attr('href')!, url).pathname.replace(/\/$/, '') === '/engineering')) { outsideEngineering++; skip(url, 'outside-engineering'); continue; }
+      const published = date(article?.datePublished ?? $('meta[property="article:published_time"]').attr('content') ?? $('time[datetime]').first().attr('datetime'), c.source.timezone);
+      const title = plain(article?.headline ?? $('h1').first().text());
+      $('script,style,nav,footer,header').remove();
+      const body = plain($('article').first().find('p').text() || $('main').first().find('p').text());
+      if (!title || !body) { failures++; continue; }
+      c.store.assertLease();
+      c.store.sources.forgetDiscovery(c.source.id, c.stream.id, safeUrl(url));
+      items.push({
+        ...base(c), id: safeUrl(url), title, url: safeUrl(url), publishedAt: published ?? c.now, basis: published ? 'published' : 'observed', metrics: {},
+        text: plain($('article').first().text() || $('main').first().text()).slice(0, 100000),
+      });
+    } catch { failures++; }
+  }
+  if (unseen.length && !items.length && failures) throw new Error('All official article pages were inaccessible or lacked article content');
+  const result = collected(c, items, [...(failures ? [`${failures} official pages were inaccessible or lacked article content.`] : []), ...(unseen.length > 50 ? ['Discovery budget is 50 detail pages per run; remaining new URLs and expired skip decisions will be checked on later runs.'] : [])]);
+  // Informational filtering and date provenance do not indicate missing coverage.
+  result.coverage.notes.push(...(nonArticles ? [`Skipped ${nonArticles} non-article pages; category/list pages are discovery only.`] : []), ...(outsideEngineering ? [`Skipped ${outsideEngineering} article pages outside the Engineering section.`] : []), ...(items.some(item => item.basis === 'observed') ? ['Pages without a verifiable publication date use their first observation.'] : []));
+  return result;
+}
+export const adapters: Record<Channel['kind'], Adapter> = { 'hn-api': hn, feed, 'podcast-rss': podcast, sitemap: officialPages, 'anthropic-html': officialPages, 'github-trending': trending, 'github-search': githubSearch, 'x-cli': xCli, 'follow-builders': followBuilders, 'arxiv-api': arxiv, 'ph-html': productHunt };

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile,execFileSync } from 'node:child_process';
-import { mkdir,mkdtemp,rm } from 'node:fs/promises';
+import { mkdir,mkdtemp,rm,writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join,resolve } from 'node:path';
 import test from 'node:test';
@@ -11,10 +11,12 @@ import type { Item } from '../../src/contracts/items.js';
 import { loadInstance } from '../../src/instance/index.js';
 import { openTestInstance as openInstance } from '../support/database.js';
 
-test('one sync processes explicit history, publishes partial results and reuses accepted work after routing changes', async () => {
+test('one sync processes explicit history and reuses accepted work with inherited CRLF settings', async () => {
   const root = await mkdtemp(join(tmpdir(), 'fdg-e2e-')),
     workspace = join(root, 'instance'),
     remote = join(root, 'remote.git');
+  const globalConfig = join(root, 'gitconfig');
+  await writeFile(globalConfig, '[core]\n\tautocrlf = true\n\teol = crlf\n');
   await mkdir(remote);
   execFileSync('git', ['init', '--bare', '--initial-branch=main'], { cwd: remote, stdio: 'ignore' });
   await setup({ workspace });
@@ -60,7 +62,7 @@ test('one sync processes explicit history, publishes partial results and reuses 
       return {
         code: 0,
         ...JSON.parse(
-          (await promisify(execFile)(process.execPath, args, { timeout: 120000, windowsHide: true })).stdout,
+          (await promisify(execFile)(process.execPath, args, { timeout: 120000, windowsHide: true, env: { ...process.env, GIT_CONFIG_GLOBAL: globalConfig } })).stdout,
         ),
       };
     } catch (error) {

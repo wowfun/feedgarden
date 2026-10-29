@@ -1,17 +1,19 @@
-import { agentRuntime } from '../src/storage-paths.js';
 import assert from 'node:assert/strict';
+import { mkdir,mkdtemp,readFile,rm,stat,writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import { mkdtemp, mkdir, writeFile, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { configSchema, loadConfig } from '../src/config.js';
-import { generateBatch, generateTask, resolveAgent, type SummaryInput } from '../src/agent.js';
-import { validationEnvironment } from '../src/build-site.js';
-import { validationDirectory as resolveValidationDirectory } from './validation-paths.js';
 import { parseArgs } from 'node:util';
-import Database from 'better-sqlite3';
+import { generateBatch,generateTask,resolveAgent } from '../src/agent/index.js';
+import { type SummaryInput } from '../src/contracts/agent.js';
+import { configSchema } from '../src/contracts/configuration.js';
+import { agentRuntime } from '../src/instance/index.js';
+import { validationEnvironment } from '../src/platform/process/execute.js';
+import Database from '../src/storage/sqlite.js';
+import { developmentConfig } from './development-config.js';
+import { validationDirectory as resolveValidationDirectory,validationContext } from './validation-paths.js';
 const { values } = parseArgs({ options: { config: { type: 'string' }, command: { type: 'string' }, 'mcp-delay-ms': { type: 'string', default: '7000' } } });
-const validationDirectory = resolveValidationDirectory(loadConfig(values.config));
+const validationDirectory = resolveValidationDirectory(developmentConfig(values.config));
 const mcpDelayMs = Number(values['mcp-delay-ms']);
 if (!Number.isSafeInteger(mcpDelayMs) || mcpDelayMs < 0 || mcpDelayMs > 30000) throw new Error('--mcp-delay-ms must be an integer from 0 to 30000');
 
@@ -59,7 +61,7 @@ const delayed = join(root, 'delayed-mcp'); await mkdir(delayed);
 await writeFile(join(delayed, 'package.json'), JSON.stringify({ name: 'feedgarden-delayed-mcp', type: 'module', exports: { './server': './index.mjs' } }));
 await writeFile(join(delayed, 'wrapper.mjs'), `import { appendFileSync } from 'node:fs'; import { setTimeout } from 'node:timers/promises'; import { pathToFileURL } from 'node:url'; const log = stage => appendFileSync(${JSON.stringify(delayLog)}, JSON.stringify({stage, at: Date.now(), directory: process.cwd()}) + '\\n'); log('starting'); await setTimeout(${mcpDelayMs}); log('ready'); const entry = process.argv.splice(2, 1)[0]; await import(pathToFileURL(entry).href);`);
 await writeFile(join(delayed, 'index.mjs'), `export default { id: 'feedgarden-delayed-mcp', async setup({ mcp }) { await mcp.transform(editor => editor.update('feedgarden', config => { config.command.splice(1, 0, ${JSON.stringify(join(delayed, 'wrapper.mjs'))}); })); } };`);
-const selections = { version: 2, storage: { root }, agent: { command: values.command, timeoutSeconds: 60 }, sources: [{ id: 'one', name: 'One', intervalHours: 1, streams: [{ id: 'main', channels: [{ id: 'feed', kind: 'feed' }] }] }] };
+const selections = { version:3,instanceId:'00000000-0000-4000-8000-000000000001', storage: { dataDir: root }, agent: { command: values.command, timeoutSeconds: 60 }, sources: [{ id: 'one', name: 'One', intervalHours: 1, streams: [{ id: 'main', routes: [{ id: 'feed', kind: 'feed' }] }] }] };
 try {
   for (const name of Object.keys(process.env)) delete process.env[name];
   Object.assign(process.env, validationEnvironment(inherited), { PATH: inherited.PATH ?? inherited.Path, HOME: root, USERPROFILE: root, OPENCODE_CONFIG_DIR: profile,
@@ -69,7 +71,7 @@ try {
     providers: { fixture: { package: '@opencode-ai/ai/providers/openai-compatible', settings: { baseURL: 'http://127.0.0.1:' + address.port + '/v1', apiKey: 'fixture-only' },
       models: { mock: { name: 'Local fixture', limit: { context: 128000, output: 8000 }, variants: [{ id: 'low' }, { id: 'high' }] } } } },
   }));
-  const agent = agentRuntime(configSchema.parse(selections));
+  const agent = agentRuntime(validationContext(configSchema.parse(selections)));
   const resolved = await resolveAgent(agent);
   assert.equal(requests.length, 0, 'configuration probes must not call the model');
   assert.equal(resolved.model, 'fixture/mock'); assert.equal(resolved.effort, 'low');

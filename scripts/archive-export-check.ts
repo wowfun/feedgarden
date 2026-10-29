@@ -1,7 +1,7 @@
+import type { Page } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
-import type { Page } from '@playwright/test';
+import { join,resolve } from 'node:path';
 
 // Check the downloaded file against the already-built publication, without
 // regenerating content from the local database or requesting external sources.

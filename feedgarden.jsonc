@@ -1,5 +1,6 @@
+// Existing site: explicit v2 upgrade input. New instances use fdg setup.
 {
-  "$schema": "./schemas/feedgarden.schema.json",
+  "$schema": "./schemas/feedgarden.v2.schema.json",
   "version": 2,
   "storage": {
     "root": ".local/feedgarden"

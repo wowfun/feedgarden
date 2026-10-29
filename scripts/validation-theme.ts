@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
-import { buildSite, run } from '../src/build-site.js';
-import { readSiteBundle, siteBundleFiles, siteBundleIdentity } from '../src/site-bundle.js';
+import { readFile,writeFile } from 'node:fs/promises';
+import { join,resolve } from 'node:path';
+import { run } from '../src/platform/process/execute.js';
+import { buildSite,readSiteBundle,siteBundleFiles,siteBundleIdentity } from '../src/ui/index.js';
 import { installLocalTheme } from './local-theme.js';
 
 // Both modes build disposable content copies. Published validation always uses

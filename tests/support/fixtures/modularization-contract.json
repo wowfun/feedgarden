@@ -1,0 +1,161 @@
+{
+  "config": {
+    "version": 3,
+    "instanceId": "00000000-0000-4000-8000-000000000001",
+    "storage": {},
+    "timezone": "Asia/Shanghai",
+    "observedDays": 7,
+    "targets": [],
+    "feed": {
+      "directory": "content",
+      "topics": "config/topics.json"
+    },
+    "collection": {
+      "backfillDays": 7,
+      "enrichmentRefreshDays": 7
+    },
+    "agent": {
+      "candidates": [],
+      "account": "default",
+      "args": [
+        "acp"
+      ],
+      "inheritEnvironment": [],
+      "timeoutSeconds": 300,
+      "maxBatchItems": 10,
+      "maxInputChars": 24000,
+      "maxItemChars": 4000,
+      "maxDailyCalls": 80,
+      "workspaceRetentionDays": 7,
+      "maxTranscriptChunks": 64,
+      "backend": "opencode",
+      "model": "fixture/model"
+    },
+    "sources": [
+      {
+        "id": "hackernews",
+        "name": "HN",
+        "enabled": true,
+        "timezone": "Asia/Shanghai",
+        "intervalHours": 1,
+        "processAfter": "06:00",
+        "streams": [
+          {
+            "id": "main",
+            "enabled": true,
+            "routes": [
+              {
+                "id": "api",
+                "enabled": true,
+                "transport": "fetch",
+                "limit": 500,
+                "authTokenEnv": "TWITTER_AUTH_TOKEN",
+                "csrfTokenEnv": "TWITTER_CT0",
+                "kind": "hn-api"
+              }
+            ]
+          }
+        ],
+        "includeKeywords": [],
+        "selection": {
+          "method": "hn-engagement",
+          "dailyLimit": 10,
+          "updateDays": 7
+        }
+      }
+    ]
+  },
+  "item": {
+    "source": "hackernews",
+    "id": "42",
+    "stream": "main",
+    "channel": "api",
+    "title": "A Ｔool & 中文",
+    "url": "https://example.test/post?utm_source=fixture",
+    "publishedAt": "2026-10-09T10:00:00.000Z",
+    "observedAt": "2026-10-09T11:00:00.000Z",
+    "basis": "published",
+    "text": "Fixed  evidence\nwith whitespace.",
+    "metrics": {
+      "score": 10
+    },
+    "media": [
+      {
+        "id": "clip",
+        "type": "video",
+        "url": "https://example.test/video.mp4",
+        "title": "Demo"
+      }
+    ],
+    "metadata": {
+      "transcriptRecipe": "stable-recipe"
+    }
+  },
+  "record": {
+    "item": {
+      "source": "hackernews",
+      "id": "42",
+      "stream": "main",
+      "channel": "api",
+      "title": "A Ｔool & 中文",
+      "url": "https://example.test/post?utm_source=fixture",
+      "publishedAt": "2026-10-09T10:00:00.000Z",
+      "observedAt": "2026-10-09T11:00:00.000Z",
+      "basis": "published",
+      "text": "Fixed  evidence\nwith whitespace.",
+      "metrics": {
+        "score": 10
+      },
+      "media": [
+        {
+          "id": "clip",
+          "type": "video",
+          "url": "https://example.test/video.mp4",
+          "title": "Demo"
+        }
+      ],
+      "metadata": {
+        "transcriptRecipe": "stable-recipe"
+      }
+    },
+    "copy": {
+      "source": "hackernews",
+      "id": "42",
+      "topics": [
+        "coding"
+      ],
+      "media": [
+        "clip"
+      ],
+      "en": {
+        "title": "A tool",
+        "summary": "One paragraph.\n\n- Exact source facts"
+      },
+      "zh-CN": {
+        "title": "一个工具",
+        "summary": "一段固定摘要。"
+      }
+    },
+    "firstSeen": "2026-10-09T11:00:00.000Z",
+    "date": "2026-10-09T10:00:00.000Z",
+    "dateBasis": "published",
+    "updated": "2026-10-09T12:00:00.000Z"
+  },
+  "transcript": {
+    "segments": [
+      {
+        "id": "segment-1",
+        "text": "Immutable transcript evidence."
+      }
+    ],
+    "maxChars": 500
+  },
+  "expected": {
+    "summary": "7222c0d321516d4714a6088adb98606ba862c88c23b3e2c21ff84719b99b0d2c",
+    "task": "e6ee5072dc2270a8dd84bcadf0a380e85b70b9f246b58194f597cd0d869f7c3b",
+    "selection": "5fb24624a91663cb3dc3a1e16fe6e858326a8c9097f3757082ab3760f771429e",
+    "path": "hackernews/2026-10/09/item-7.md",
+    "en": "---\npublish: true\ncontent_type: \"post\"\ntitle: \"A tool\"\ndescription: \"One paragraph. - Exact source facts\"\ndate: \"2026-10-09T10:00:00.000Z\"\nupdated: \"2026-10-09T12:00:00.000Z\"\nfirst_seen: \"2026-10-09T11:00:00.000Z\"\ndate_basis: \"published\"\nsource_url: \"https://example.test/post\"\ntags: [\"source/hackernews\",\"topics/coding\"]\n---\n\n## Article\n\nOne paragraph.\n\n- Exact source facts\n\n## Media\n\n![Video: Demo](<https://example.test/video.mp4>)\n\n[Video: Demo](<https://example.test/video.mp4>)\n",
+    "zh": "---\npublish: true\ncontent_type: \"post\"\ntitle: \"一个工具\"\ndescription: \"一段固定摘要。\"\ndate: \"2026-10-09T10:00:00.000Z\"\nupdated: \"2026-10-09T12:00:00.000Z\"\nfirst_seen: \"2026-10-09T11:00:00.000Z\"\ndate_basis: \"published\"\nsource_url: \"https://example.test/post\"\ntags: [\"source/hackernews\",\"topics/coding\"]\n---\n\n## 正文提炼\n\n一段固定摘要。\n\n## 媒体\n\n![视频: Demo](<https://example.test/video.mp4>)\n\n[视频: Demo](<https://example.test/video.mp4>)\n"
+  }
+}

@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { delimiter, join, resolve } from 'node:path';
-import { run, validationEnvironment } from '../src/build-site.js';
+import { delimiter,join,resolve } from 'node:path';
+import { run,validationEnvironment } from '../src/platform/process/execute.js';
 
 export async function installLocalTheme(gem: string, gemHome: string) {
   const environment = validationEnvironment();

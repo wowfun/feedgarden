@@ -1,36 +1,33 @@
 {
   "name": "feedgarden",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "engines": {
-    "node": ">=24 <27"
+    "node": ">=24.12 <25 || >=26 <27"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
-    "feedgarden": "tsx src/cli.ts",
-    "fetch:clippings": "tsx scripts/fetch-clippings.ts",
+    "test": "node scripts/test.mjs",
     "schema": "tsx scripts/schema.ts",
-    "site:build": "tsx scripts/site-build.ts",
-    "site:serve": "tsx scripts/site-serve.ts",
     "test:visual": "tsx scripts/visual-check.ts",
-    "setup:twitter": "tsx scripts/setup-twitter.ts",
-    "schedule:prepare": "tsx scripts/schedule.ts",
     "verify:agent": "tsx scripts/live-agent.ts",
     "verify:opencode": "tsx scripts/verify-opencode.ts",
     "verify:collect": "tsx scripts/live-collect.ts",
     "verify:scale": "tsx scripts/scale-check.ts",
     "verify:clippings": "tsx scripts/verify-clippings.ts",
-    "verify:footer": "tsx scripts/verify-footer.ts"
+    "verify:footer": "tsx scripts/verify-footer.ts",
+    "verify:ui": "tsx scripts/ui-smoke.ts",
+    "fdg": "tsx src/cli.ts",
+    "dev:site:build": "tsx scripts/site-build.ts",
+    "test:package": "node scripts/package-smoke.mjs",
+    "dev:site:serve": "tsx scripts/preview-site.ts",
+    "check:architecture": "node scripts/architecture.mjs"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.5.1",
-    "@deepseek-ai/dsh": "0.1.7-rc.2",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@mozilla/readability": "0.6.0",
-    "better-sqlite3": "13.0.3",
     "cheerio": "1.2.0",
     "fast-xml-parser": "5.5.9",
     "jsdom": "27.4.0",
@@ -47,7 +44,6 @@
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",
-    "@types/better-sqlite3": "7.6.13",
     "@types/jsdom": "30.0.0",
     "@types/luxon": "3.7.1",
     "@types/node": "24.12.0",
@@ -56,11 +52,13 @@
     "typescript": "6.0.2"
   },
   "allowScripts": {
-    "better-sqlite3@13.0.3": true,
-    "esbuild@0.27.7": true,
-    "@deepseek-ai/dsh-subprocess-local@0.1.7-rc.2": true,
-    "koffi@3.3.2": true,
-    "node-pty@1.2.0-beta.15": true,
-    "protobufjs@7.6.6": true
-  }
+    "esbuild@0.27.7": true
+  },
+  "bin": {
+    "fdg": "dist/src/cli.js"
+  },
+  "files": [
+    "dist/src",
+    "resources"
+  ]
 }

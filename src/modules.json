@@ -1,0 +1,167 @@
+{
+  "modules": {
+    "contracts": {
+      "dependencies": [],
+      "public": [
+        "agent.ts",
+        "archives.ts",
+        "configuration.ts",
+        "errors.ts",
+        "items.ts",
+        "model-errors.ts",
+        "outcomes.ts",
+        "publishing.ts",
+        "registry.ts",
+        "scoring.ts",
+        "tasks.mjs",
+        "time.ts",
+        "topics.mjs",
+        "window.ts",
+        "content.ts"
+      ]
+    },
+    "platform": {
+      "dependencies": [
+        "contracts"
+      ],
+      "public": [
+        "hash.ts",
+        "files.ts",
+        "errors.ts",
+        "time.ts",
+        "url.ts",
+        "concurrency.ts",
+        "media.ts",
+        "resources.ts",
+        "lock.ts",
+        "retention.ts",
+        "git.ts",
+        "process/command.ts",
+        "process/lifecycle.ts",
+        "process/execute.ts",
+        "http/client.ts",
+        "http/contracts.ts",
+        "http/destination.ts",
+        "http/images.ts"
+      ]
+    },
+    "instance": {
+      "dependencies": [
+        "contracts"
+      ],
+      "public": [
+        "index.ts"
+      ]
+    },
+    "storage": {
+      "dependencies": [
+        "contracts",
+        "platform",
+        "instance"
+      ],
+      "public": [
+        "index.ts"
+      ]
+    },
+    "agent": {
+      "dependencies": [
+        "contracts",
+        "platform",
+        "storage",
+        "instance"
+      ],
+      "public": [
+        "index.ts"
+      ]
+    },
+    "sources": {
+      "dependencies": [
+        "contracts",
+        "platform",
+        "instance",
+        "storage"
+      ],
+      "public": [
+        "index.ts"
+      ]
+    },
+    "content": {
+      "dependencies": [
+        "contracts",
+        "platform",
+        "instance",
+        "storage",
+        "sources",
+        "agent"
+      ],
+      "public": [
+        "index.ts"
+      ]
+    },
+    "ui": {
+      "dependencies": [
+        "contracts",
+        "platform",
+        "instance",
+        "content"
+      ],
+      "public": [
+        "index.ts"
+      ]
+    },
+    "publishing": {
+      "dependencies": [
+        "contracts",
+        "platform",
+        "instance",
+        "storage",
+        "content",
+        "ui"
+      ],
+      "public": [
+        "index.ts"
+      ]
+    },
+    "runs": {
+      "dependencies": [
+        "contracts",
+        "platform",
+        "instance",
+        "storage"
+      ],
+      "public": [
+        "index.ts"
+      ]
+    },
+    "app": {
+      "dependencies": [
+        "contracts",
+        "platform",
+        "instance",
+        "storage",
+        "sources",
+        "content",
+        "agent",
+        "ui",
+        "publishing",
+        "runs"
+      ],
+      "public": [
+        "index.ts"
+      ]
+    }
+  },
+  "bootstraps": {
+    "src/cli.ts": [
+      "src/app/cli.ts"
+    ],
+    "src/worker.ts": [
+      "src/storage/worker.ts",
+      "src/cli.ts"
+    ]
+  },
+  "workerClosure": [
+    "src/storage/worker.ts",
+    "src/storage/sqlite.ts"
+  ]
+}

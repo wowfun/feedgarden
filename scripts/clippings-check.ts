@@ -1,7 +1,7 @@
+import { chromium,expect,type Page } from '@playwright/test';
 import assert from 'node:assert/strict';
-import { readFile, mkdir, writeFile } from 'node:fs/promises';
-import { resolve, join } from 'node:path';
-import { chromium, expect, type Page } from '@playwright/test';
+import { mkdir,readFile,writeFile } from 'node:fs/promises';
+import { join,resolve } from 'node:path';
 import { checkArchiveExport } from './archive-export-check.js';
 import { staticServer } from './static-server.js';
 

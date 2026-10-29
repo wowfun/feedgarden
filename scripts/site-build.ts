@@ -1,2 +1,2 @@
-import { buildSite } from '../src/build-site.js';
+import { buildSite } from '../src/ui/index.js';
 console.log(await buildSite());

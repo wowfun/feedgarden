@@ -1,17 +1,17 @@
-import { loadConfig } from '../src/config.js';
-import { validationDirectory } from './validation-paths.js';
 import assert from 'node:assert/strict';
-import { cp, mkdir, readFile, writeFile, mkdtemp } from 'node:fs/promises';
+import { cp,mkdir,mkdtemp,readFile,writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { parse, stringify } from 'yaml';
-import { run, validationEnvironment } from '../src/build-site.js';
+import { parse,stringify } from 'yaml';
+import { run,validationEnvironment } from '../src/platform/process/execute.js';
 import { checkClippings } from './clippings-check.js';
+import { developmentConfig } from './development-config.js';
+import { validationDirectory } from './validation-paths.js';
 import { validationTheme } from './validation-theme.js';
 
 const { values } = parseArgs({ options: { config: { type: 'string' }, gem: { type: 'string' }, help: { type: 'boolean' } } });
 if (values.help) { console.log('Usage: npm run verify:clippings -- [--config FILE] [--gem PATH]\nBuild and check isolated content copies with the frozen published theme by default, or an explicit local gem. No database or publication access.'); process.exit(0); }
-const project = process.cwd(), base = join(validationDirectory(loadConfig(values.config)), 'clippings');
+const project = process.cwd(), base = join(validationDirectory(developmentConfig(values.config)), 'clippings');
 await mkdir(base, { recursive: true });
 const root = await mkdtemp(join(base, 'run-'));
 const environment = validationEnvironment();

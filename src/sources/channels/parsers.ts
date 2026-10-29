@@ -1,0 +1,157 @@
+import { load } from 'cheerio';
+import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { DateTime } from 'luxon';
+import type { Item, RankingWindow } from '../../contracts/items.js';
+import { redditRanking } from '../../contracts/scoring.js';
+import { iso } from '../../contracts/time.js';
+import { safeUrl } from '../../platform/url.js';
+import { extractMedia, mediaForUrl } from '../media.js';
+import { productHuntObjects } from '../producthunt.js';
+
+export const array = <T>(value: T | T[] | undefined): T[] => value === undefined ? [] : Array.isArray(value) ? value : [value];
+export const plain = (value: unknown): string => load(typeof value === 'string' ? value : String(value ?? ''), {}, false).text().replace(/\s+/g, ' ').trim();
+export function text(value: any): string { return typeof value === 'object' && value ? String(value['#text'] ?? '') : String(value ?? ''); }
+export function date(value: unknown, timezone = 'Asia/Shanghai'): string | undefined {
+  const input = String(value ?? '').trim();
+  if (!input) return undefined;
+  for (const parsed of [DateTime.fromISO(input, { zone: timezone }), DateTime.fromRFC2822(input, { zone: timezone }), DateTime.fromSQL(input, { zone: timezone })]) {
+    if (parsed.isValid) return iso(parsed.toUTC());
+  }
+  return undefined;
+}
+export function xml(body: string): any {
+  if (/<!DOCTYPE/i.test(body)) throw new Error('DTD declarations are not accepted in feeds');
+  if (XMLValidator.validate(body) !== true) throw new Error('Invalid XML response');
+  return new XMLParser({
+    ignoreAttributes: false, attributeNamePrefix: '@', removeNSPrefix: true, parseTagValue: false,
+    processEntities: { enabled: true, maxTotalExpansions: 250_000, maxExpandedLength: 12_000_000 },
+  }).parse(body);
+}
+export interface ParseContext { source: string; stream: string; channel: string; observedAt: string; timezone?: string }
+function parseEntries<T>(entries: any[], convert: (entry: any, index: number) => T[], label: string, notes?: string[]): T[] {
+  let failed = 0;
+  const items = entries.flatMap((entry, index) => {
+    try { return convert(entry, index); }
+    catch (error) { if (!notes) throw error; failed++; return []; }
+  });
+  if (failed && !items.length) throw new Error(`All ${label} entries failed validation`);
+  if (failed) notes!.push(`${failed} malformed ${label} entries were skipped.`);
+  return items;
+}
+export function parseFollowBuilders(body: string, context: ParseContext): { generatedAt: string; items: Item[] } {
+  const feed = JSON.parse(body);
+  const generatedAt = date(feed.generatedAt);
+  if (!generatedAt || !Array.isArray(feed.x)) throw new Error('Invalid follow-builders feed: expected generatedAt and x accounts');
+  const account = feed.x.find((row: any) => String(row.handle).replace(/^@/, '').toLowerCase() === context.stream.toLowerCase());
+  if (account && !Array.isArray(account.tweets)) throw new Error('Invalid follow-builders account timeline');
+  const items: Item[] = (account?.tweets ?? []).map((row: any) => {
+    if (!/^\d+$/.test(String(row.id)) || typeof row.text !== 'string') throw new Error('Invalid sampled X post');
+    return {
+      ...context, id: String(row.id), title: plain(row.text).slice(0, 180), text: plain(row.text),
+      url: safeUrl(row.url ?? `https://x.com/${context.stream}/status/${row.id}`), author: context.stream,
+      publishedAt: date(row.createdAt, context.timezone) ?? context.observedAt, basis: date(row.createdAt, context.timezone) ? 'published' : 'observed', metrics: { score: row.likes ?? null, comments: row.replies ?? null },
+      kind: row.isQuote ? 'quote' : 'original', metadata: { feedGeneratedAt: generatedAt },
+    } satisfies Item;
+  });
+  return { generatedAt, items };
+}
+export function parseFeed(body: string, context: ParseContext, notes?: string[], redditWindow?: RankingWindow): Item[] {
+  return parseFeedDocument(xml(body), context, notes, redditWindow);
+}
+export function parseFeedDocument(document: any, context: ParseContext, notes?: string[], redditWindow?: RankingWindow): Item[] {
+  if (!document.rss?.channel && !document.feed && !document.RDF) throw new Error('Response is not an RSS or Atom feed');
+  const entries: any[] = array(document.feed?.entry ?? document.rss?.channel?.item ?? document.RDF?.item);
+  const announcementDate = context.source === 'arxiv' && !document.feed;
+  // Callers with a page-offset checkpoint keep strict parsing. Snapshot feeds
+  // may supply notes to retain valid entries and report degraded coverage.
+  return parseEntries<Item>(entries, (entry, index) => {
+    if (context.source === 'arxiv' && entry.announce_type && text(entry.announce_type) !== 'new') return [];
+    const links: any[] = array(entry.link);
+    const link = links.find(link => typeof link === 'string' || !link['@rel'] || link['@rel'] === 'alternate');
+    const rawUrl = typeof link === 'string' ? link : link?.['@href'];
+    const title = plain(text(entry.title));
+    if (!rawUrl || !title) throw new Error('Feed entry has no title or link');
+    const url = safeUrl(rawUrl);
+    let id = text(entry.id ?? entry.guid) || url;
+    if (context.source === 'arxiv') id = url.match(/(?:abs|pdf)\/([^?#]+)/)?.[1]?.replace(/v\d+$/, '') ?? id;
+    if (context.source === 'hackernews') id = text(entry.comments).match(/[?&]id=(\d+)/)?.[1] ?? id;
+    if (context.source === 'reddit') {
+      const postId = new URL(url).pathname.match(/\/comments\/([a-z0-9]+)(?:\/|$)/i)?.[1];
+      if (postId) id = 't3_' + postId.toLowerCase();
+    }
+    const published = date(text(entry.published ?? entry.pubDate ?? entry.date), context.timezone);
+    const rawSummary = [entry.encoded, entry.content, entry.summary, entry.description].map(text).find(Boolean) ?? '';
+    const summary = context.source === 'reddit' ? plain(load(rawSummary)('div.md').text()) : plain(rawSummary);
+    const media = extractMedia(rawSummary, url);
+    for (const enclosure of [...array(entry.enclosure), ...array(entry.content), ...array(entry.thumbnail)]) {
+      if (typeof enclosure !== 'object' || !enclosure?.['@url']) continue;
+      const kind = String(enclosure['@type'] ?? enclosure['@medium'] ?? '');
+      const type = kind.startsWith('image') ? 'image' : kind.startsWith('video') ? 'video' : kind.startsWith('audio') ? 'audio' : kind === 'application/pdf' ? 'pdf' : undefined;
+      if (!type) continue;
+      const candidate = mediaForUrl(type, enclosure['@url'], text(enclosure.title), url);
+      if (candidate && !media.some(existing => existing.url === candidate.url) && media.length < 6) media.push(candidate);
+    }
+    return [{
+      ...context, id, title, url, publishedAt: published ?? context.observedAt,
+      text: summary, author: plain(text(entry.author?.name ?? entry.creator ?? entry.author)),
+      media,
+      metrics: { rank: index + 1 }, basis: published ? context.source === 'arxiv' && !announcementDate ? 'submitted' : 'published' : 'observed',
+      ...(context.source === 'reddit' && redditWindow ? { ranking: redditRanking(index + 1, entries.length, context.observedAt, redditWindow) } : {}),
+      metadata: { missingPublicationDate: !published, ...(announcementDate ? { announcementDate: true } : {}), ...(entry.announce_type ? { announceType: text(entry.announce_type) } : {}) },
+    } satisfies Item];
+  }, 'feed', notes);
+}
+export function parseXTimeline(rows: any[], context: ParseContext, notes: string[]): Item[] {
+  return parseEntries<Item>(rows, row => {
+    const publishedAt = date(row.createdAtISO ?? row.createdAt, context.timezone);
+    if (!/^\d+$/.test(String(row.id)) || !publishedAt || typeof row.text !== 'string') throw new Error('Invalid X timeline item');
+    const body = plain(row.text);
+    return [{
+      ...context, id: String(row.id), title: body.slice(0, 180), text: body + (row.quotedTweet?.text ? ' Quoting @' + row.quotedTweet.author?.screenName + ': ' + plain(row.quotedTweet.text) : ''), author: row.author?.screenName ?? context.stream,
+      url: safeUrl(row.url ?? `https://x.com/${context.stream}/status/${row.id}`), publishedAt, basis: 'published',
+      metrics: { score: row.metrics?.likes ?? null, comments: row.metrics?.replies ?? null }, kind: row.isRetweet ? 'repost' : row.quotedTweet ? 'quote' : 'original',
+    }];
+  }, 'X timeline', notes);
+}
+export function parseTrending(body: string, context: ParseContext): Item[] {
+  const $ = load(body); const articles = $('article.Box-row');
+  if (!articles.length) throw new Error('GitHub Trending layout unavailable');
+  return articles.toArray().map((element, index) => {
+    const row = $(element); const href = row.find('h2 a').attr('href')?.trim();
+    if (!href || !/^\/[\w.-]+\/[\w.-]+$/.test(href)) throw new Error('Invalid Trending repository');
+    const stars = Number(row.find('a[href$="/stargazers"]').text().replace(/[^0-9]/g, ''));
+    const windowText = row.find('.float-sm-right').text().trim();
+    return {
+      ...context, id: href.slice(1).toLowerCase(), title: href.slice(1), url: safeUrl(href, 'https://github.com'),
+      text: row.find('p').text().trim(), publishedAt: context.observedAt, basis: 'observed',
+      metrics: { rank: index + 1, stars: Number.isFinite(stars) ? stars : null, starsWindow: Number(windowText.replace(/[^0-9]/g, '')) || null },
+      metadata: { windowLabel: windowText, language: row.find('[itemprop="programmingLanguage"]').text().trim() },
+    };
+  });
+}
+export function parseProductHunt(body: string, context: ParseContext, dateKey: string): Item[] {
+  const $ = load(body); const candidates = $('section:has(> [data-test="vote-button"]), [data-test="post-item"], [data-test^="post-item-"]');
+  if (!candidates.length) throw new Error('Product Hunt leaderboard layout unavailable');
+  const posts = new Map<string, Set<string>>();
+  for (const node of productHuntObjects(body)) {
+    if (node.__typename === 'Post' && /^\d+$/.test(String(node.id)) && DateTime.fromISO(String(node.featuredAt)).setZone(context.timezone ?? 'Asia/Shanghai').toISODate() === dateKey) {
+      for (const [prefix, slug] of [['products', node.product?.slug], ['posts', node.slug]]) {
+        if (typeof slug !== 'string' || !/^[\w-]+$/.test(slug)) continue;
+        const path = '/' + prefix + '/' + slug, ids = posts.get(path) ?? new Set<string>();
+        ids.add(String(node.id)); posts.set(path, ids);
+      }
+    }
+  }
+  return candidates.toArray().flatMap((element, index) => {
+    const row = $(element); const anchor = row.find('a[href^="/posts/"], a[href^="/products/"]').first();
+    const href = anchor.attr('href'); const title = anchor.text().trim();
+    if (!href || !title) return [];
+    const legacyId = href.split('?')[0]!, ids = posts.get(legacyId), nativePostId = ids?.size === 1 ? [...ids][0] : undefined;
+    const voteText = row.find('[data-test="vote-button"], [data-test="vote-button-count"]').first().text();
+    return [{
+      ...context, id: nativePostId ? 'tag:www.producthunt.com,2005:Post/' + nativePostId : legacyId, title: title.replace(/^\d+\.\s*/, ''), url: safeUrl(href, 'https://www.producthunt.com'),
+      text: row.find('[data-test="post-tagline"]').text().trim() || anchor.parent().next('span').text().trim(), publishedAt: date(dateKey, context.timezone)!, basis: 'leaderboard' as const,
+      metrics: { rank: index + 1, votes: /^\s*[\d,]+\s*$/.test(voteText) ? Number(voteText.replace(/,/g, '')) : null }, metadata: { leaderboardDate: dateKey, ...(nativePostId ? { nativePostId, legacyId } : {}) }
+    }];
+  });
+}

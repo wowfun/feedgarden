@@ -1,15 +1,15 @@
-import { loadConfig } from '../src/config.js';
-import { validationDirectory } from './validation-paths.js';
-import assert from 'node:assert/strict';
-import { cp, mkdir, readFile, writeFile, mkdtemp, stat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
-import { parseArgs } from 'node:util';
+import { chromium,expect } from '@playwright/test';
 import { load } from 'cheerio';
-import { chromium, expect } from '@playwright/test';
-import { parse, stringify } from 'yaml';
-import { validationTheme } from './validation-theme.js';
+import assert from 'node:assert/strict';
+import { cp,mkdir,mkdtemp,readFile,stat,writeFile } from 'node:fs/promises';
+import { join,resolve } from 'node:path';
+import { parseArgs } from 'node:util';
+import { parse,stringify } from 'yaml';
+import { developmentConfig } from './development-config.js';
 import { checkFooterPages } from './footer-check.js';
 import { staticServer } from './static-server.js';
+import { validationDirectory } from './validation-paths.js';
+import { validationTheme } from './validation-theme.js';
 
 const { values } = parseArgs({ options: { config: { type: 'string' }, gem: { type: 'string' }, 'personal-site': { type: 'string' }, port: { type: 'string' }, 'personal-port': { type: 'string' }, help: { type: 'boolean' } } });
 if (values.help) {
@@ -31,7 +31,7 @@ const sites = await Promise.all(definitions.map(async site => {
   const config = parse(await readFile(join(site.path, '.github/jekyll-obsidian.yml'), 'utf8'));
   return { ...site, config, baseurl: String(config.baseurl ?? '').replace(/\/$/, ''), contacts: (config.website.contacts ?? []).length };
 }));
-const base = join(validationDirectory(loadConfig(values.config)), 'footer');
+const base = join(validationDirectory(developmentConfig(values.config)), 'footer');
 await mkdir(base, { recursive: true });
 const root = await mkdtemp(join(base, 'run-')), builder = await validationTheme(root, values.gem);
 const builds: Record<string, string> = {}, evidence: unknown[] = [], audits: unknown[] = [];

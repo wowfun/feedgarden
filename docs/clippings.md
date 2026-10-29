@@ -8,7 +8,7 @@ Both language interfaces display the same title and body. Each keeps its own nav
 
 ## Add a clipping
 
-Keep `clippings/` as a regular directory containing regular files and directories, including attachments. Archive import, rendering, recovery and publication reject symbolic links and directory junctions. If a link interrupts a content handoff, the recovery journal and content trees are kept; replace or remove the link at the reported path before retrying `render`.
+Keep `clippings/` as a regular directory containing regular files and directories, including attachments. Archive import, rendering, recovery and publication reject symbolic links and directory junctions. If a link interrupts a content handoff, the recovery journal and content trees are kept; replace or remove the link at the reported path before retrying `export`.
 
 Choose a stable descriptive filename, such as `content/clippings/a-useful-note.md`:
 
@@ -44,10 +44,10 @@ If a process stops during the content-tree exchange, the journal completes the d
 ## Fetch and host images manually
 
 ```powershell
-npm run fetch:clippings -- "content/clippings/Building agents_ When to fold subagents into your main agent loop.md"
-npm run fetch:clippings -- content/clippings/folder content/clippings/another.md
-npm run fetch:clippings -- --all --dry-run
-npm run fetch:clippings -- --all --max-mib 64 --config feedgarden.jsonc
+fdg ui clippings fetch --target site "content/clippings/Building agents_ When to fold subagents into your main agent loop.md"
+fdg ui clippings fetch --target site content/clippings/folder content/clippings/another.md
+fdg ui clippings fetch --target site --all --dry-run
+fdg ui clippings fetch --target site --all --max-mib 64 --config feedgarden.jsonc
 ```
 
 Every explicit file or directory must be within the configured `feed.directory/clippings/` and outside its reserved `assets/` subtree. Explicit paths selecting no Markdown files fail with a nonzero exit. `--all` skips `assets/` and succeeds for an empty collection. Paths are relative to the working directory, just like the other CLI commands. No arguments shows help. `--dry-run` lists external Markdown image URLs without consulting the asset cache. A listed URL may reuse a cached image during the real run; an already-local reference is omitted. Dry-run does not create a lock, download files or write anything. The command runs only when invoked; collection, rendering, builds, CI and schedules do not fetch these images.
@@ -62,7 +62,7 @@ Files live at `assets/<SHA-256>.<extension>` inside Clippings; equal bytes share
 
 All images for one article must succeed before its text changes. A failed article keeps its original bytes, other articles continue, and the command exits nonzero with the reasons. Repeated URLs and existing local images are reused. The manifest does not record or validate `size` or `sha256`. Reuse checks the local path, regular-file status, configured byte limit and image type. New downloads use SHA-256 filenames for deduplication. Already-local references are not refreshed, and unreferenced assets are never automatically deleted. Rerunning an unchanged article neither downloads nor rewrites it.
 
-The command shares the runner filesystem lock with rendering and never opens SQLite. An unfinished content-exchange journal must first be recovered with `npm run feedgarden -- render`. Downloads are staged; complete attachments are installed atomically, followed by an atomic manifest update and an atomic article update. The article's identity and original bytes are rechecked just before replacement. Detected edits, renames or deletions abandon that article's commit. Avoid editing selected notes until the command exits: the final content check and replacement are separate filesystem operations. An interruption can leave complete unreferenced assets, manifest entries or `.fetch-*` staging folders; rerunning is safe. Retained staging folders can be inspected and removed manually when no runner is active.
+The command shares the runner filesystem lock with rendering and never opens SQLite. An unfinished content-exchange journal must first be recovered with `fdg export --target site --rebuild`. Downloads are staged; complete attachments are installed atomically, followed by an atomic manifest update and an atomic article update. The article's identity and original bytes are rechecked just before replacement. Detected edits, renames or deletions abandon that article's commit. Avoid editing selected notes until the command exits: the final content check and replacement are separate filesystem operations. An interruption can leave complete unreferenced assets, manifest entries or `.fetch-*` staging folders; rerunning is safe. Retained staging folders can be inspected and removed manually when no runner is active.
 
 Commit the rewritten Markdown, assets and manifest together. The local theme fix projects Markdown image references to the actual published attachment URL for Copy page and archive export: absolute when the site URL is configured, otherwise root-relative with `baseurl`. Both interfaces share the attachment; the on-disk note keeps its relative path.
 
@@ -70,7 +70,7 @@ Validation commands:
 
 ```powershell
 npm run typecheck
-node --import tsx --test --test-concurrency=1 tests/fetch-clippings.test.ts tests/clippings.test.ts
+node --import tsx --test --test-concurrency=1 tests/ui/fetch-clippings.test.ts tests/ui/clippings.test.ts
 # From .references/jekyll-obsidian/website:
 bundle exec ruby -Itest test/compiler/published_markdown_test.rb
 ```

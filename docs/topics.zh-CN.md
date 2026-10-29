@@ -11,7 +11,7 @@ Agent 不得选择隐藏或废弃主题，也不得创建隐藏主题。完整�
 使用 runner 锁应用修改：
 
 ```sh
-npm run feedgarden -- topics apply revised-topics.json
+fdg topics apply revised-topics.json
 ```
 
 保留 ID 及旧名称、别名。需要合并的主题使用 `deprecated` 和指向未废弃、未隐藏主题的 `replacedBy`。省略 `hidden` 与显式设置 `hidden: false` 在校验和合并时等价。不要在运行中的任务外直接覆盖注册表。

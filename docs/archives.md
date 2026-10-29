@@ -2,14 +2,14 @@
 
 ## Update or remove an archive
 
-Malformed bilingual archive pairs are preserved as opaque bytes and recorded in `gaps` under channel `archive`; only their platform/date's ranking is deferred. Other collection and summary work continues. Fix both visible files, then run `archives update PATH` to validate and save that pair, followed by `rank --history --source ID` to retry. Updates keep the native identity, date and file number. `archives remove PATH` removes both outputs of a platform pair through private exclusion, or removes an opaque file from the render snapshot. It retains platform archive rows; opaque-file originals remain in the maintenance backup. Both commands save the database and complete content tree first, print the backup path, and render locally without publishing. Files already replaced by generated summaries use `summarize --refresh` for updates. To undo maintenance, restore the printed private backup with runners stopped; merely editing or deleting rendered files is overwritten on the next render.
+Malformed bilingual archive pairs are preserved as opaque bytes and recorded in `gaps` under channel `archive`; only their platform/date's ranking is deferred. Other collection and summary work continues. Fix both visible files, then run `archives update PATH` to validate and save that pair, followed by `rank --history --source ID` to retry. Updates keep the native identity, date and file number. `archives remove PATH` removes both outputs of a platform pair through private exclusion, or removes an opaque file from the render snapshot. It retains platform archive rows; opaque-file originals remain in the maintenance backup. Both commands save the database and complete content tree first, print the backup path, and render locally without publishing. Files already replaced by generated summaries use `process --refresh` for updates. To undo maintenance, restore the printed private backup with runners stopped; merely editing or deleting rendered files is overwritten on the next render.
 
 ```sh
-npm run feedgarden -- archives update hackernews/2026-10/09/item-1.md
-npm run feedgarden -- archives remove other/draft.md
+fdg archives update hackernews/2026-10/09/item-1.md
+fdg archives remove other/draft.md
 ```
 
-Removal also recognizes generated `SOURCE/YYYY-MM/DD/item-N.md` paths registered in SQLite, for every source. Passing either language's path excludes that identity and removes both language outputs, including any opaque archive copies. Summary evidence, publication history and reserved item numbers remain private; repeating the removal is safe. Generated updates still use the summary pipeline. For example: `npm run feedgarden -- archives remove anthropic/2026-10/21/item-1.md`.
+Removal also recognizes generated `SOURCE/YYYY-MM/DD/item-N.md` paths registered in SQLite, for every source. Passing either language's path excludes that identity and removes both language outputs, including any opaque archive copies. Summary evidence, publication history and reserved item numbers remain private; repeating the removal is safe. Generated updates still use the summary pipeline. For example: `fdg archives remove anthropic/2026-10/21/item-1.md`.
 
 This exclusion persists through later collection, ranking and summary refresh/rebuild commands. There is no CLI un-exclude command. To undo removal, stop runners and restore the printed maintenance backup; that restores the database and content snapshot, including its other state at backup time.
 

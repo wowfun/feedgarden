@@ -1,7 +1,7 @@
-import assert from 'node:assert/strict';
-import { readFile, readdir } from 'node:fs/promises';
-import { join, relative, sep } from 'node:path';
 import { load } from 'cheerio';
+import assert from 'node:assert/strict';
+import { readFile,readdir } from 'node:fs/promises';
+import { join,relative,sep } from 'node:path';
 import { z } from 'zod';
 
 export interface FooterConfig {

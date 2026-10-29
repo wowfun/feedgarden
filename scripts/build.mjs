@@ -1,0 +1,17 @@
+import { rm } from 'node:fs/promises';
+import { resolve, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+const root = fileURLToPath(new URL('../', import.meta.url));
+const output = resolve(root, 'dist');
+if (relative(root, output) !== 'dist') throw new Error('Unexpected build output directory');
+const architecture = spawnSync(process.execPath, [resolve(root, 'scripts/architecture.mjs')], { cwd: root, stdio: 'inherit', windowsHide: true });
+if (architecture.error) throw architecture.error;
+if (architecture.status !== 0) process.exit(architecture.status ?? 1);
+const schema = spawnSync(process.execPath, ['--import', 'tsx', resolve(root, 'scripts/schema.ts'), '--check'], { cwd: root, stdio: 'inherit', windowsHide: true });
+if (schema.error) throw schema.error;
+if (schema.status !== 0) process.exit(schema.status ?? 1);
+await rm(output, { recursive: true, force: true });
+const result = spawnSync(process.execPath, [resolve(root, 'node_modules/typescript/bin/tsc')], { cwd: root, stdio: 'inherit', windowsHide: true });
+if (result.error) throw result.error;
+process.exitCode = result.status ?? 1;

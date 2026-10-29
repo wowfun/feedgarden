@@ -21,7 +21,7 @@ Agents cannot assign hidden topics or add hidden new topics. The full registry s
 For manual vocabulary changes, preserve IDs and old labels/aliases. Deprecate rather than delete; `replacedBy` must point directly to an active, visible topic. Omitted `hidden` and explicit `hidden: false` normalize identically for validation and merging. Rendering remaps stored IDs, and old shared query links remain usable. Apply changes through the runner lock:
 
 ```sh
-npm run feedgarden -- topics apply revised-topics.json
+fdg topics apply revised-topics.json
 ```
 
 Directly editing the canonical registry while a job runs is unsupported and detected by its fingerprint. Topic/file and SQLite commits are separate durable steps; their recovery protocol does not claim a distributed atomic transaction.

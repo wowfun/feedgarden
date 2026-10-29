@@ -2,64 +2,54 @@
 
 [English](README.md) | 简体中文
 
-Feedgarden 将开发者和 AI 信息源采集到本地 SQLite，并发布按时间排列的双语信息流。每个条目都有独立的 Markdown 页面、来源标签、1 至 3 个主题标签，以及可点击的原文链接。
+Feedgarden 为 agent 提供本地信息流：订阅采集、渠道实时查询、中英文检索、双语摘要加工，以及向明确的 Git 目标发布。主入口是 `fdg` CLI；Jekyll Obsidian 是可选 UI，核心功能不需要 Ruby。
 
-站点由 [jekyll-obsidian](https://github.com/wowfun/jekyll-obsidian) 构建。在线预览：[英文](https://sinputer.top/feedgarden/) | [简体中文](https://sinputer.top/feedgarden/zh-CN/)。
+## 使用本地安装包
 
-[Clippings](docs/clippings.zh-CN.md) 用于手工维护 Markdown 摘录，条目同时显示在独立 tab 和首页，中英文界面共用一份正文。
-
-文章列表支持按日独立折叠，标题显示本地化日期、星期及当前页条数。默认只展开最新一天，筛选和翻页保留手动开合状态，刷新后重置。详见[站点功能](docs/site.md)。
-
-## 快速开始
-
-运行器使用 Node 24 至 26（`npm ci`），锁定版本的 Jekyll Obsidian gem 使用 Ruby 4.0.6 和 Bundler，已包含编译后的前端资源。X 环境配置（`npm run setup:twitter`）还需要 `uv`。请另行安装 OpenCode 2，并在本机配置 provider 和凭据。Feedgarden 默认运行 `opencode acp`；未设置 `agent.model` / `agent.effort` 时继承 OpenCode 的模型与推理 variant，以 OpenCode 2.0.31 为验收基线。DSH 保留为可选后端，详见 [agent 配置](docs/configuration.md#agent-execution)。密钥不进入 Git 或生成的内容。Windows 上可直接解析 npm/pnpm 启动器中的明确入口，无需 shell。缓存身份包含 agent 版本；单个来源配置失败会单独报告，其他正常来源继续处理。
-
-在 Windows 上，请全局安装共用工具链。Feedgarden 使用 Node 24 至 26，并安装 RubyInstaller **Ruby+Devkit 4.0.6**、Bundler 4.0.16、Git 和 uv。安装后打开新的 PowerShell，使更新后的 PATH 生效。RubyInstaller 的 MSYS2 工具链用于构建原生 gem。`node_modules` 和经过修补的 X CLI 环境保留在项目本地，因为其版本及身份验证行为由本项目管理。
-
-Agent 子进程使用环境变量白名单。如果 OpenCode provider 从环境变量读取凭据，请在 `agent.inheritEnvironment` 中列出变量名，例如 `["DEEPSEEK_API_KEY"]`；OpenCode 配置目录中保存的认证仍然可用。
-
-```powershell
-winget install --id RubyInstallerTeam.RubyWithDevKit.4.0 --exact --version 4.0.6-1
-gem install bundler -v 4.0.16 --no-document
-npm ci
-bundle install
-npm run setup:twitter
-npm run feedgarden -- doctor
-npm run site:build
-npm run site:serve
-```
-
-预览地址为 `http://127.0.0.1:58002/feedgarden/`（中文版：`/feedgarden/zh-CN/`）。`doctor` 不调用模型，也不采集实时数据。摘要生成使用所选后端的本地 provider 凭据；经过身份验证的 X 采集还需要在运行器环境中设置 `TWITTER_AUTH_TOKEN` 和 `TWITTER_CT0`。新建的空数据库不包含已提交到仓库的文章历史，请勿仅为预览现有内容而运行 `render`。
-
-## 运行流程
-
-请从仓库根目录执行命令。私有数据和状态默认存放在 `.local/feedgarden/`，由 `storage.root` 控制；首次运行 Runner 命令时自动初始化数据库。旧存储配置及 `migrate` / `rollback` 命令不再支持。公开文章继续存放在 `content/`；详见[存储配置](docs/configuration.md#storage-layout)。
+运行基线为 **Node 24.x 的 24.12 及以上版本，或 26.x**。本次交付本地 tarball，不向 npm 发布。可执行名是 `fdg`，但 npm 上的同名包属于其他项目，调用时必须明确指定本地包：
 
 ```sh
-npm run feedgarden -- collect --source openai
-npm run feedgarden -- summarize --source openai
-npm run feedgarden -- render
-npm run site:build
-npm run feedgarden -- run --due --no-publish
+npm ci
+npm run build
+npm pack
+npx --yes --strict-allow-scripts --package /absolute/feedgarden-0.1.0.tgz -- fdg setup
+npx --yes --strict-allow-scripts --package /absolute/feedgarden-0.1.0.tgz -- fdg doctor
 ```
+
+显式安装该 tarball 后，可使用下面的 `fdg` 命令。`help --json` 提供机器可读的命令契约。给 agent 安装操作 Skill 时，执行 `skill install /absolute/skills/feedgarden`；安装回执包含已校验的绝对入口和实例路径。
+
+```sh
+fdg channels
+fdg channel github search --query 'language:typescript' --limit 10
+fdg read https://example.org/article
+fdg items search 模型
+fdg sync --detach
+fdg status RUN_ID --wait-seconds 10
+```
+
+默认操作用户级实例：Linux/macOS 使用 XDG，Windows 使用原生 AppData 目录。当前目录不会自动选择实例；工作区必须显式传入 `--workspace /absolute/project` 或 `--config /absolute/config.jsonc`。`setup` 生成稳定 UUID、七个日历日的采集起点及四个默认订阅，不配置发布目标。实时查询和网页读取仅在传入 `--save` 时保存。
+
+默认加工上海时区的昨天，以及最近七天首次观察到的无日期条目。空结果不会扩大窗口；显式保存的历史条目保留实际日期。每个 backend/account/model 独立记账，默认每模型每天 80 次，UTC 零点重置。只有 `--fallback` 显式启用候补；模型路由变化不会使已接受内容自动重做。OpenCode 需要另行配置；DSH 通过 `backend setup dsh` 显式安装固定版本。
+
+## 现有工作区与发布
+
+仓库中的 `feedgarden.jsonc` 保留为现有站点的 **v2 升级输入**，不是新实例默认配置。请保留配套的私有数据库与内容，先在副本上验证升级；普通读取、同步和诊断不会迁移生产实例。
+
+```sh
+fdg instance upgrade --workspace /absolute/workspace --dry-run
+fdg instance upgrade --workspace /absolute/workspace
+fdg targets inspect site --workspace /absolute/workspace
+fdg targets adopt site --expected-head FULL_SHA --workspace /absolute/workspace
+fdg sync --publish --detach --workspace /absolute/workspace
+```
+
+发布使用独立 checkout 和目标 owner manifest。非空且未受管的目标需要显式接管；外来 owner 还需 `--takeover`。本地缺少文件不代表删除。发布完成指 Git 推送已确认，部署状态另行验证。通用 Markdown/JSON 目标只需 Git；Jekyll 构建使用包内固定依赖及隔离目录。
 
 ## 文档
 
-部分专题提供中英文版本，其余详细文档为英文。
+- [配置与目录](docs/configuration.md)、[CLI 操作](docs/operations.md)、[架构](docs/architecture.md)
+- [每日任务](docs/daily-updates.zh-CN.md)、[发布](docs/deployment.md)、[开发与安装包验收](docs/development.md)
+- [来源](docs/sources.md)、[摘要](docs/summaries.md)、[播客](docs/podcasts.md)、[排名](docs/ranking.zh-CN.md)、[归档](docs/archives.md)、[主题](docs/topics.zh-CN.md)
+- [Clippings](docs/clippings.zh-CN.md)、[关联内容](docs/related-items.md)、[站点功能](docs/site.md)
 
-| 文档 | 内容 |
-| --- | --- |
-| [架构](docs/architecture.md) | 处理流程、模块边界、持久化状态与恢复 |
-| [配置](docs/configuration.md) | 配置发现与采集渠道 |
-| [来源](docs/sources.md) | Product Hunt、Hacker News 与 X 采集 |
-| [播客](docs/podcasts.md) | 单集发现、转录与恢复 |
-| [摘要与内容](docs/summaries.md) | 队列、预算、缓存标识与条目路径 |
-| [每日排名](docs/ranking.md) | 每日筛选、历史重排与私有候选 |
-| [归档维护](docs/archives.md) | 私有快照、显式更新与恢复 |
-| [主题词表](docs/topics.md) | 双语标签、弃用与词表更新 |
-| [站点功能](docs/site.md) | 文章、媒体、筛选、阅读、导出与收藏 |
-| [相关进展](docs/related-items.md) | 证据要求、到期规则与关联命令 |
-| [运行维护](docs/operations.md) | 调度、持久化、备份、限制与诊断 |
-| [每日任务 prompt](docs/daily-updates.zh-CN.md) | 上海时间 06:00／18:00、昨天的日期窗口与首次观察日期 |
-| [部署与发布](docs/deployment.md) | 构建环境、发布边界与冲突处理 |
-| [开发与验证](docs/development.md) | 主题归属、检查与隔离测试夹具 |
+现有站点：[英文](https://sinputer.top/feedgarden/)／[中文](https://sinputer.top/feedgarden/zh-CN/)。开发时可用 `npm run dev:site:build` 构建已提交内容；该命令不初始化实例或加工文章。

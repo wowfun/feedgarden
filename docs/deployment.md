@@ -1,23 +1,33 @@
-# Deployment and publishing
+# Targets and publication
 
-## Build environment
+Publication is opt-in. Setup creates no target. Configure a stable target ID with a repository, branch, format (`json`, `markdown`, `jekyll`) and non-root managed prefix. Generic targets default to `feed/`; a migrated Jekyll target uses `content/` with `config/topics.json` explicitly listed as an auxiliary managed file. The caller's cwd, origin and FETCH_HEAD are irrelevant.
 
-Publishing is disabled automatically by default. The remote `Gemfile` and `Gemfile.lock` must match the locally trusted files (ignoring CRLF/LF differences) before topic/content changes or validation. Temporary publication worktrees build with the trusted local bundle, never with a remote replacement Gemfile. Dependencies are installed in frozen mode; the build must leave both files unchanged. Theme builds use an environment allowlist, excluding provider/Git tokens, proxy variables and injected runtime options; Git fetch/push retain the caller’s credentials. This environment boundary is not an operating-system sandbox.
+```sh
+fdg targets add notes --repository /absolute/repository.git --format markdown --prefix feed
+fdg targets inspect notes
+fdg publish --target notes --dry-run
+fdg publish --target notes
+```
 
-## Publication
+An empty managed prefix can be claimed by first publication. Existing unowned content is refused. After reviewing the fetched head, use `targets adopt ID --expected-head FULL_SHA`; add `--takeover` only to transfer a foreign owner. Adoption imports history, topic vocabulary and reserved paths/numbers, retaining unknown native identities as opaque content. Local identity/path conflicts, symlinks and special files are rejected. The successful adoption push establishes ownership; a new generation prevents the old owner from publishing.
 
-`publish` fetches the configured branch into an isolated worktree, merges topic registries with a three-way base, validates the site, commits only `content/` and `config/topics.json`, and pushes without force. Independent topic additions merge; conflicting IDs stop the entire publication and preserve local data, with `.local/feedgarden/state/publish-conflict.json` for resolution. Integrate the code/theme change into the publication branch before publishing item content.
+The manifest lives inside the managed prefix and records instanceId, targetId, generation, numbering namespace, path identities and hashes. Data/targets/ID holds baselines, adopted bytes and receipts. Publication compares accepted exports with the fetched manifest and remote files. Missing local files remain remote. Only persistent explicit archive-removal intent authorizes deletion; remote removal/edit of another managed file stops publication. Unexpected identity changes or unowned path collisions are errors.
 
-## Topic conflicts
+Topic reconciliation uses the saved target baseline. For a deliberate conflict resolution, apply a complete validated registry with `topics apply FILE --target ID --remote-base FULL_SHA`. The SHA belongs to that target's fetched branch.
 
-To resolve a registry conflict, fetch and merge the recorded versions, then run `topics apply FILE --remote-base <recorded-remote-SHA>`, render, and retry.
+Before each ordinary push the expected remote head and lease are rechecked. There is no force push. Network-ambiguous pushes retain pending receipts; a retry checks whether the remote already contains the commit. Each target has an independent run checkpoint. A partial/deferred processing run may publish valid existing work, and retries do not repush completed target checkpoints. A confirmed Git push is the publication endpoint; Pages deployment is reported independently.
 
-## Analytics
+## Optional Jekyll UI
 
-The Cloudflare Web Analytics value in `website.analytics.token` is the public site identifier used by the browser beacon. It is distinct from a Cloudflare API credential or a DeepSeek API key, which must remain private. The theme embeds this identifier in the published page as required by [Cloudflare's beacon integration](https://developers.cloudflare.com/web-analytics/faq/). Keep the identifier assigned to the intended Web Analytics site; publishing it is not a reason to replace it. When deliberately changing the analytics site or domain, copy that site's beacon identifier from the Cloudflare dashboard into `.github/jekyll-obsidian.yml`, rebuild and redeploy, then check the published beacon and dashboard hostname. This repository uses one shared site configuration rather than an environment-variable override; omit `website.analytics` in a separate build configuration when analytics is unwanted.
+Jekyll targets require Git, Ruby 4.0.x and Bundler. Bundled Gemfile/Gemfile.lock and a fixed theme template are the trust source; target dependency files must match. Build uses frozen bundle settings and an isolated cache/ui staging directory. Target plugins, hooks, scripts and custom build commands are never executed.
 
-## Related documentation
+The target's optional `ui` object supports `title`, `description`, `lang` (`en` or `zh-CN`), an HTTP(S) `url`, `baseurl` and boolean `features` (`search`, `feed`, `tags`, `graph`, `relations`, `previews`, `outline`, `favorites`). These presentation settings overlay the bundled template. Arbitrary Jekyll configuration, plugin lists and executable hooks are rejected. The template includes bilingual routes, feed facets and shared Clippings content.
 
-- [Development and validation](development.md)
-- [Topic vocabulary](topics.md)
-- [Runner operations](operations.md)
+```sh
+fdg export --target site --rebuild
+fdg ui build --target site
+fdg ui serve --target site --port 4000
+fdg ui clippings fetch --target site --all --dry-run
+```
+
+The repository Pages workflow and `npm run dev:site:build` are developer validation/deployment paths for the existing checked-in site. They are not consumer runtime dependencies. Theme version changes remain separate from the CLI refactor.

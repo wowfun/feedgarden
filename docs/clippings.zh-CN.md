@@ -8,7 +8,7 @@ Clippings 是手工维护的内容板块。将 Markdown 文件放入 `content/cl
 
 ## 新增摘录
 
-`clippings/` 必须是普通目录，其中文件、子目录和附件也必须是普通文件或目录。归档导入、渲染、恢复和发布会拒绝符号链接及目录联接。如果链接导致内容交接中断，恢复记录和内容目录会保留；请先替换或删除错误信息所指路径的链接，再重试 `render`。
+`clippings/` 必须是普通目录，其中文件、子目录和附件也必须是普通文件或目录。归档导入、渲染、恢复和发布会拒绝符号链接及目录联接。如果链接导致内容交接中断，恢复记录和内容目录会保留；请先替换或删除错误信息所指路径的链接，再重试 `export`。
 
 选择稳定、含义明确的文件名，例如 `content/clippings/a-useful-note.md`：
 
@@ -44,10 +44,10 @@ description: 归档卡片中显示的简短介绍。
 ## 手动抓取并托管图片
 
 ```powershell
-npm run fetch:clippings -- "content/clippings/Building agents_ When to fold subagents into your main agent loop.md"
-npm run fetch:clippings -- content/clippings/folder content/clippings/another.md
-npm run fetch:clippings -- --all --dry-run
-npm run fetch:clippings -- --all --max-mib 64 --config feedgarden.jsonc
+fdg ui clippings fetch --target site "content/clippings/Building agents_ When to fold subagents into your main agent loop.md"
+fdg ui clippings fetch --target site content/clippings/folder content/clippings/another.md
+fdg ui clippings fetch --target site --all --dry-run
+fdg ui clippings fetch --target site --all --max-mib 64 --config feedgarden.jsonc
 ```
 
 指定的文件或目录必须位于配置中的 `feed.directory/clippings/` 内，且不能位于保留的 `assets/` 子目录中。显式路径未选中任何 Markdown 文件时，命令报错并以非零状态退出；`--all` 会跳过 `assets/`，允许空板块。路径相对于当前工作目录，与其他命令一致。不传参数时显示帮助。`--dry-run` 列出外部 Markdown 图片地址，不检查附件缓存；列出的 URL 在实际执行时可能复用缓存图片，已本地化的引用不会列出。预演不创建锁、不下载、不写文件。只有主动调用命令才会抓取图片；采集、渲染、构建、CI 和定时任务均不执行抓取。
@@ -62,7 +62,7 @@ npm run fetch:clippings -- --all --max-mib 64 --config feedgarden.jsonc
 
 一篇文章的所有图片都成功后，才会修改正文。失败文章保留原始字节，其他文章继续处理，命令最终以非零状态退出并列出原因。重复 URL 和已有本地图片会复用。清单不记录或校验 `size`、`sha256`；复用时检查本地路径、普通文件类型、配置的字节上限及图片类型。新下载仍以 SHA-256 命名以便去重。已经本地化的引用不会自动刷新，无人引用的附件也不会自动删除。对未修改的文章重复执行，不会重新下载或改写文件。
 
-命令与渲染共用 runner 文件锁，不打开 SQLite。如果存在尚未完成的内容交换日志，应先运行 `npm run feedgarden -- render` 恢复。下载先写入暂存目录，完整附件安装后，再原子更新清单和文章。替换前会重新检查文章身份和原始字节；检测到编辑、重命名或删除时，放弃该篇提交。命令退出前请避免编辑选中的笔记：最后一次内容检查与文件替换是两个独立的文件系统操作。中断可能留下完整但未被引用的附件、清单条目或 `.fetch-*` 暂存目录，重新执行是安全的。确认没有 runner 运行后，可检查并手工移除保留的暂存目录。
+命令与渲染共用 runner 文件锁，不打开 SQLite。如果存在尚未完成的内容交换日志，应先运行 `fdg export --target site --rebuild` 恢复。下载先写入暂存目录，完整附件安装后，再原子更新清单和文章。替换前会重新检查文章身份和原始字节；检测到编辑、重命名或删除时，放弃该篇提交。命令退出前请避免编辑选中的笔记：最后一次内容检查与文件替换是两个独立的文件系统操作。中断可能留下完整但未被引用的附件、清单条目或 `.fetch-*` 暂存目录，重新执行是安全的。确认没有 runner 运行后，可检查并手工移除保留的暂存目录。
 
 请将改写后的 Markdown、附件和清单一起提交。本地主题修复会在“复制页面”和归档导出中，将图片引用映射为实际发布地址：配置了站点 URL 时使用绝对地址，否则使用含 `baseurl` 的根相对地址。两种语言界面共用附件，磁盘原稿仍保留相对路径。
 
@@ -70,7 +70,7 @@ npm run fetch:clippings -- --all --max-mib 64 --config feedgarden.jsonc
 
 ```powershell
 npm run typecheck
-node --import tsx --test --test-concurrency=1 tests/fetch-clippings.test.ts tests/clippings.test.ts
+node --import tsx --test --test-concurrency=1 tests/ui/fetch-clippings.test.ts tests/ui/clippings.test.ts
 # 在 .references/jekyll-obsidian/website 中运行：
 bundle exec ruby -Itest test/compiler/published_markdown_test.rb
 ```

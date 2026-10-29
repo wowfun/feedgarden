@@ -17,14 +17,14 @@ HN 使用 `0.75 * ln(1 + max(score, 0)) + 0.25 * ln(1 + max(comments, 0))`，不
 ## 命令与恢复
 
 ```sh
-npm run feedgarden -- rank
-npm run feedgarden -- rank --history --dry-run
-npm run feedgarden -- rank --history --source hackernews
+fdg rank
+fdg rank --history --dry-run
+fdg rank --history --source hackernews
 ```
 
 `rank` 更新最近窗口内的候选排名，`--history` 包含更早日期；两者都保留已发布内容。`--dry-run` 使用隔离数据库，不修改真实数据库、队列、锁或内容。普通排名命令会在本地重新渲染中英文内容，不部署网站。报告中的 kept IDs 是当前入选候选，不代表完整已发布列表。
 
-首次导入已有文章前，会在 `<storage.root>/backups/archives/`（默认为 `.local/feedgarden/backups/archives/`）保存数据库和完整内容备份。SQLite 持久保存候选、排名证据、已发布记录和归档正文，请保留其在线备份。发布记录随内容目录替换的恢复流程提交，中断后不会丢失已经落地的文章，也不会将放弃的暂存内容误记为已发布。数据库丢失时可从现有 `content/` 重新导入已发布文件；私有候选需要数据库备份恢复。
+首次导入已有文章前，会在 `<storage.dataDir>/backups/archives/`（默认为 `.local/feedgarden/data/backups/archives/`）保存数据库和完整内容备份。SQLite 持久保存候选、排名证据、已发布记录和归档正文，请保留其在线备份。发布记录随内容目录替换的恢复流程提交，中断后不会丢失已经落地的文章，也不会将放弃的暂存内容误记为已发布。数据库丢失时可从现有 `content/` 重新导入已发布文件；私有候选需要数据库备份恢复。
 
 - [English](ranking.md)
 - [归档维护](archives.md)

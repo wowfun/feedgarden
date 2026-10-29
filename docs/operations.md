@@ -1,47 +1,66 @@
-# Runner operations
+# CLI operations
 
-## Scheduled runs and leases
+Use an explicitly installed local tarball or the executable/argv in an installed operator Skill receipt. Do not resolve the unrelated npm package named fdg. `fdg help --json` and `fdg channels` are the discovery interfaces.
 
-Scheduled `run --due` performs collect → rank → summarize → render → relate → render → backup before optional publication. The ranking pass also runs when collection is not yet due, using the existing evidence cache and cooldowns, so HN RSS candidates missing API counters can recover automatically. Missing HN counters still defer their day and preserve its last valid selection; the runner prints ranking diagnostics and records a partial run with exit code 1. Archived bodies are reused by default, including for selected items. Explicit `summarize --source hackernews --refresh` or `--rebuild` allows selected archived items to be enriched and regenerated; those generated summaries then follow the normal periodic enrichment schedule. Dropped candidates stop further processing, while already published items remain in both languages. Completed artifacts for subsequently dropped, unpublished items finish their jobs and retain reusable private copies.
+Each operation emits one JSON envelope on stdout: `schemaVersion`, `packageVersion`, `command`, `instance`, `runId`, `state`, `result`, `issues`, `nextActions`. Logs and child output go to stderr. Source prose and upstream failures are untrusted evidence. Recovery actions contain internally generated executable/argv arrays, never shell commands copied from source content.
 
-Losing either runner lock cancels active collection/ACP work and prevents accepting new results. Database lease ownership and expiry are checked again at collection, summary, content replacement and publication boundaries; an expired lease cannot be renewed by its former owner. Saved artifacts remain recoverable. Generated schedulers have no whole-run time limit that conflicts with the daily ACP budget; individual HTTP/ACP timeouts and concurrent-run exclusion still apply. Updating an installed scheduler requires regenerating its files and reloading the service or reimporting the Windows task.
+| State | Exit code |
+| --- | --- |
+| completed, including empty results and normal skips | 0 |
+| queued/running after durable handoff | 0 |
+| failed | 1 |
+| invalid arguments or range outside instance history | 2 |
+| accepted progress with unfinished work | 3 |
+| deferred work without accepted progress | 4 |
+| BUSY | 5 |
+| interrupted | 130 |
 
-Database initialization precedes runner lease acquisition. Current schemas use read-only revision checks; existing-schema upgrades serialize in an immediate SQLite transaction with a five-second busy timeout. A contention timeout reports startup failure without leaving partial schema changes.
+A successful `status` query always exits zero and reports the run's `runExitCode` inside its result. Source coverage=partial does not itself mean the operation failed. Budgets and cooldowns return pending work/retryAt without waiting for the next day.
 
-## Persistence, retention and backups
+## Processing and recovery
 
-Private storage defaults to `.local/feedgarden/`; see the [storage layout](configuration.md#storage-layout) for all derived paths. Changing `storage.root` selects a different store and does not relocate existing data. Keep durable data, recovery state and retained task workspaces together when managing a store. The application never deletes a previous root when starting a new one.
+```sh
+fdg collect --due
+fdg process --day yesterday
+fdg sync --publish --detach
+fdg status RUN_ID --wait-seconds 10
+fdg status --unfinished
+fdg cancel RUN_ID
+fdg resume RUN_ID --detach
+```
 
-Daily and weekly backup files are refreshed after every completed backup, so sequential source runs accumulate in the same snapshot. A new temporary SQLite backup replaces the destination only after it succeeds; a failed refresh leaves the previous snapshot available. Retention remains seven daily and four weekly files.
+Long queue operations persist their ID before execution. Background workers use a copied, versioned runtime under data/runtime, hidden process launch, durable logs and a startup-token handshake. Initial materialization copies production dependencies; subsequent starts reuse that runtime. The worker survives its launching shell. Logs live in state/runs/RUN_ID.log. An OS kill cannot guarantee a final JSON response; discover such runs through status.
 
-`run` and `summarize` accept `--since ISO --until ISO --observed-days N`. Dated candidates must fall in `[since, until)`; the database initialization cutoff still applies. With `--observed-days 7`, undated candidates use their immutable first observation in `[run start minus 7 days, run start]`, not the latest fetch or an invented publication date. Without that option they use the same since/until boundaries as dated candidates. `--until` requires `--since`; `--observed-days` requires a positive integer and both boundaries. Invalid windows fail before queue/archive changes. Collection may return a wider source snapshot; summary eligibility and first publication enforce the window.
+Advisory `nextActions` reuse an already prepared worker runtime when available; otherwise they reuse the current Node invocation, including its source loader when applicable. They do not build or copy a runtime, and missing build output cannot change a completed foreground run into a failure. Workers, prepared schedules and installed skills still require a durable built runtime. CLI diagnostics buffer UTF-8 lines before redaction and append logs asynchronously; oversized diagnostic lines are omitted.
 
-Expired unfinished jobs and recovered artifacts cannot spend new summary calls or become first publications outside the requested window. Successfully recovered but inadmissible jobs finish as `cached`, with their topic proposals retained privately; only topics used by admitted copies enter the registry. Their valid cache can be reused without another paid attempt when explicitly admitted later, even after five attempts. Each source retains its own latest summary window across standalone `rank`/`render` commands and restarts. Bounded and unbounded summaries update only their selected sources. Published identities remain visible regardless of the window or later Top 50 changes. Explicit exclusions still remove content. See [daily tasks](daily-updates.md) for the two source groups and fixed Shanghai boundaries.
+The frozen scope records dates, first-observation limits, config digest, ordered model policies, actual resolved executions, target set and source generations. Resume rejects configuration drift and superseded processing. It reuses complete stage checkpoints and same-version accepted work; it does not reset the source queue or daily accounting. Cancel is cooperative and terminates owned model, Git, build and setup children while retaining accepted data and recoverable artifacts. A cancelled or disconnected push still requires remote confirmation before retry; its durable pending receipt prevents duplicate publication.
 
-SQLite retains raw responses, content versions, observations, collection cursors, gaps, summary jobs, accepted snapshots, fixed task inputs, ACP usage and run state. Future raw captures deduplicate identical source/stream/channel/URL, body, status and header snapshots, retaining their first capture; latest HTTP cache timestamps and collection/run records track subsequent activity. Existing captures and observations are not automatically deleted. Every collection retains its observations, including metric changes, so database size grows with collection activity. The `gaps` and `runs` tables support manual audit in a SQLite reader; they are not public site content.
+Doctor and processing results report each configured backend/account/model's used calls, remaining calls and next UTC reset. These are independent limits; the combined configured allowance is not a shared cap. Unresolved inherited model identities have unknown remaining allowance until their backend selection is known.
 
-New runner-owned task directories have `agent.workspaceRetentionDays` retention (default 7 days from creation; 0 disables cleanup). At summary startup, aged accepted, failed, interrupted and deferred batch directories are removed only when their ownership marker matches the database batch. Accepted and exhausted failed auxiliary task directories follow the same retention rule with their task ownership marker. Pending and running auxiliary tasks, including quota-deferred tasks, keep their directories so they can resume. After a failed task directory is pruned, `--retry-failed` creates a new marked directory and restarts its retention age; fixed inputs, accepted outputs, diagnostics and attempt accounting remain in SQLite. Deferred batches are never resumed; their pending jobs enter a new batch on a later run. Active/prepared batches, unmarked historical directories, symlinks and paths outside the configured runtime directory remain untouched. Fixed inputs, accepted snapshots and ACP accounting remain in SQLite; database history is not pruned or vacuumed automatically. Historical report tables remain private for audit. A filesystem lock and renewable database lease prevent concurrent runners. Online backups retain seven daily and four weekly copies; private raw data, credentials and scratch workspaces are never deployed.
+Default processing covers yesterday in the instance timezone and undated first observations over seven days. An entirely pre-cutoff window is rejected. A clipped window reports requested/effective bounds. Zero new items never expands the range. `--save` admits explicit historical items without changing their actual dates or overriding exclusion markers.
 
-Windows flushes file contents before atomic replacement, but Node cannot fsync the parent directory there; directory-entry crash durability remains a POSIX-only guarantee. Generated schedulers still target Linux/WSL.
+Explicit admission stores item evidence, subscription membership and observations. It leaves live channel cursors, collection timestamps, retry schedules and coverage gaps unchanged.
 
-## Request limits and resource bounds
+## Read and maintain
 
-Rate limits honor a valid `Retry-After` first. Otherwise, GitHub reset values and contemporary epoch-sized `x-ratelimit-reset` values are treated as timestamps; smaller values (including Reddit's remaining seconds) are treated as durations. Invalid values, including unsupported millisecond epochs, fall back to 30 minutes, and cooldowns are bounded to 1 second-24 hours.
+`doctor` performs local read-only checks; `check [CHANNEL]` explicitly probes sources without queue ingestion or paid calls. `channel ID ACTION` and `read URL` query without saving by default. Public HTTP validates each redirect and DNS target and pins the connection IP. Query host pacing/cooldowns use transport.sqlite independently of the runner lease.
 
-HTTP responses are limited to 12 MB of decoded bytes while reading, and oversized streams are cancelled. Article response buffers are released after their evidence is stored. Summary planning and site rendering read 128 records at a time; quota checks use an indexed timestamp. Pending batches walk an index ordered by source, first observation and item ID, skipping retries that are not yet due without sorting the whole queue for each batch. Runs with no changed or due items skip preparation and job writes. Rendering skips an unchanged tree using content and recommendation revisions plus fingerprints of topics, sources and locale configuration; explicit `render` rebuilds the tree and repairs missing or edited files. Changed renders still build a full tree, parse each accepted item once, and retain the recovery journal. ACP usage and tool notification logs each retain at most 64 KiB and 128 entries, with omitted counts in the audit; complete fixed inputs and accepted snapshots remain in SQLite, while on-disk task artifacts follow the workspace retention policy.
+`items list/search/read` read bounded local results. Chinese/English search uses NFKC plus Intl.Segmenter/FTS5, with literal substring fallback for one or two Han characters. Cursors bind filters and an immutable first-page ingest ceiling.
 
-## Diagnostics
+`rank`, `relate`, `topics apply`, `archives update/remove`, `export` and `backup` preserve maintenance workflows. Backup includes config, the database and pending workspaces/recovery/target records. Explicit removals persist deletion intent; an absent local export is never deletion authority. Generic exports require no Ruby.
 
-`eligibleCandidates` includes eligible items with accepted or reusable summaries. It describes the candidate set, not outstanding generation work; a positive value with zero `generated` and zero `pending` is expected on an unchanged run.
+Automatic retention only removes direct child directories carrying this instance's Feedgarden ownership marker. Archive backups retain the newest three and everything younger than 30 days. Unpinned runtime copies retain the newest two and everything younger than 30 days. UI builds retain two per target and seven days; publish checkouts retain three per target and seven days. The latest successful artifact is retained even after later failures. Active builders, live workers/UI servers, prepared schedules, installed skills and unconfirmed pushes are protected. Prepared schedule/skill runtimes remain pinned because their external references cannot be safely inferred from the local filesystem. Old directories without ownership markers and unknown or damaged markers are retained for manual inspection.
 
-Collection results distinguish `fetchedItems` (records returned by that channel) from `newItems` (new source/ID identities inserted into SQLite). Repeated observations, cross-stream duplicates and changed metrics do not count as new identities. Valid empty coverage reports zero; disabled sources and streams skipped by cadence/cooldown carry explicit reasons. Channel failures and fallback coverage retain their notes; a partial sample is not proof that nothing else was published.
+Cleanup runs when a new artifact of that kind is created; old terminal run logs are removed after 30 days when a new run is queued. Queued/running logs, logs with live owners and logs without matching database records are retained. Database history and pending task evidence are not removed. UI builds check the shared Bundler cache before installing dependencies. Publish checkouts retain complete Git ancestry for interrupted-push confirmation.
 
-Summary reports include the normalized `window`, `eligibleCandidates` after source, keyword, exclusion, archive and ranking rules, `generated` accepted summary copies, and window-scoped `pending`/`failed` counts. `eligibleCandidates` is counted only with an explicit `--since`; it is `null` in unbounded runs to avoid scanning all historical items solely for diagnostics. Null means not counted, not zero. The CLI adds `newPublications`, the number of identities first published by that command, excluding previously installed output adopted or imported at startup. Refreshes can increase `generated` without increasing `newPublications`. Failure details apply the same source, date, selection and exclusion rules as the queue counts. CLI output and `runs.details` retain collection and summary reports, including work completed before a later failure. Diagnose a zero at the relevant stage instead of interpreting all zeros as “no source activity.”
+## Scheduling
 
-`doctor` reports summary job and intermediate `feed_tasks` counts by state, and checks the required report skill files as well as the runtime; missing files identify the repository path to restore. `verify:collect -- SOURCE ...` rejects unknown or disabled IDs before creating its isolated evidence directory; `--help` lists its usage.
+```sh
+fdg schedule prepare --platform windows
+fdg schedule prepare --platform systemd
+fdg schedule prepare --platform launchd
+```
 
-## Related documentation
+These commands generate files only. They do not register tasks or create retries after errors. Native 15-minute ticks collect with `--due`; processing ticks evaluate the instance timezone and a durable daily key. Defaults become ready at 06:00 for most sources and 18:00 for arXiv/Product Hunt. Hosts in another timezone and DST use the same readiness logic. Scheduled processing publishes only when targets were explicitly configured. Generated argv freezes the absolute instance paths and UUID; Windows tasks never silently run under WSL.
 
-- [Configuration](configuration.md)
-- [Archive maintenance](archives.md)
-- [Deployment and publishing](deployment.md)
+Review generated files, then activate them using the chosen operating system's normal scheduler tools. Use one runtime for a SQLite instance.

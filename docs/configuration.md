@@ -1,116 +1,76 @@
 # Configuration
 
-## Configuration discovery
+JSONC is the only editable source of desired subscriptions, models, time policy and targets. SQLite owns observed state, the queue, accepted content, budgets and run checkpoints. `subscriptions` makes atomic, comment-preserving edits and validates the complete document. `setup` writes a versioned schema beside the config.
 
-All commands discover `feedgarden.jsonc` or `feedgarden.json` in the working directory. If both exist, pass `--config FILE` explicitly.
+## Instance selection and storage layout
 
-## Storage layout
+With no selector, fdg uses the user instance. The current directory never changes that choice. `--workspace PATH` selects `PATH/feedgarden.jsonc`; `--config FILE` selects that file and its parent as the workspace base. These selectors are mutually exclusive. Selecting the standard user config retains user directories.
 
-`storage.root` is the only private storage setting. It defaults to `.local/feedgarden`; relative paths resolve against the working directory, so run commands from the repository root even when selecting a config elsewhere. Absolute paths and paths containing spaces are supported.
+| Category | Linux/macOS (XDG) | Windows |
+| --- | --- | --- |
+| Config | `$XDG_CONFIG_HOME/feedgarden`, default `~/.config/feedgarden` | `%APPDATA%/Feedgarden` |
+| Data | `$XDG_DATA_HOME/feedgarden`, default `~/.local/share/feedgarden` | `%LOCALAPPDATA%/Feedgarden/Data` |
+| State | `$XDG_STATE_HOME/feedgarden`, default `~/.local/state/feedgarden` | `%LOCALAPPDATA%/Feedgarden/State` |
+| Cache | `$XDG_CACHE_HOME/feedgarden`, default `~/.cache/feedgarden` | `%LOCALAPPDATA%/Feedgarden/Cache` |
 
-```json
-"storage": { "root": ".local/feedgarden" }
-```
+Empty or relative XDG variables use the specification defaults. Invalid Windows environment paths fall back to native KnownFolder queries in hidden, noninteractive PowerShell; failure returns `DIRECTORY_UNAVAILABLE`. WSL is a separate Linux instance.
 
-| Path below the root | Purpose |
-| --- | --- |
-| `data/feedgarden.sqlite` | Durable database, with SQLite WAL/SHM beside it |
-| `state/runner` | Shared filesystem lock target for runners and clipping image maintenance |
-| `state/content-journal.json` | Interrupted content replacement recovery |
-| `state/topic-remote-base.json`, `state/publish-conflict.json` | Topic merge baseline and publication conflict details |
-| `workspaces/agents/` | Agent task and configuration-probe workspaces |
-| `workspaces/publish-*/` | Temporary publication worktrees |
-| `backups/daily/`, `backups/weekly/` | Seven daily and four weekly SQLite backups |
-| `backups/archives/` | Database/content snapshots before archive import or maintenance |
-| `tools/twitter-cli/`, `tools/twitter-cli-source/` | Installed Twitter environment and pinned source |
-| `scheduler/` | Generated scheduler files and optional private `runner.env` |
-| `validation/` | Validation evidence, screenshots and isolated previews |
+An explicit workspace uses `.local/feedgarden/{data,state,cache}` beneath its config directory. `storage.dataDir` or `--data-dir` overrides data only; relative values resolve against the config directory. An override neither moves nor initializes data. Config and database instance UUIDs must match.
 
-The resolver only computes paths. Each operation creates its own directories as needed; help and rejected commands do not initialize storage. HTTP caches remain in SQLite. Public `feed.directory` and `feed.topics` stay independent of private storage. Keep private storage outside published content. The root is private local state, not a portable export: task and recovery records can contain absolute paths.
+- Data: SQLite, raw evidence, topics, budgets, `workspaces/agents`, `recovery`, `targets`, `backups`, `tools`, `runtime`, and `secrets/runner.env`.
+- State: run logs, diagnostics, generated scheduler files and validation evidence.
+- Cache: temporary downloads, publish checkouts and isolated UI builds. Recovery never depends on cache alone.
+- Core output defaults to `data/exports/core`; target outputs default to `data/exports/TARGET`. Explicit output paths resolve against the config directory. Published trees must never be a private data directory.
 
-`storage.database`, `storage.directory` and `agent.runtimeDirectory` are rejected. There is no old-path fallback, automatic relocation, or `migrate` / `rollback` command. Starting with a new root creates a fresh database on the first runner command; it does not inherit private candidates, jobs or history. Existing public content remains available to the static-site build and the normal archive-import workflow. Deleting old state is a separate, deliberate operation, never a startup action.
+`instance paths` only computes paths. `doctor`, `status` and `items` use read-only SQLite connections; they never initialize or migrate a store. `runner.env` is parsed as KEY=value data, never executed as a shell script. Existing process environment values take precedence. Credentials remain local and are redacted from logs/results.
 
-`setup:twitter`, `schedule:prepare` and the verification scripts accept `--config FILE`. Generated scheduler scripts pass that exact config and load `<storage.root>/scheduler/runner.env` if present. `schedule:prepare --output DIR` overrides only the generated file destination. `FEEDGARDEN_VALIDATION_DIR` overrides the verification evidence directory; otherwise it follows the selected root. For example:
+## New and existing instances
+
+`setup` creates a UUID, four subscriptions (Hacker News, OpenAI, Anthropic, GitHub), timezone `Asia/Shanghai`, observedDays=7 and no targets. The collection cutoff is today at local midnight minus seven calendar days. Setup refuses an existing config or database.
+
+The repository's `feedgarden.jsonc` deliberately remains the existing site's v2 migration input. `feedgarden.development.jsonc` is a separate v3 developer-validation configuration. Do not replace an existing private config with a template.
 
 ```sh
-npm run setup:twitter -- --config feedgarden.jsonc
-npm run schedule:prepare -- --config feedgarden.jsonc
-npm run verify:opencode -- --config feedgarden.jsonc
+fdg instance upgrade --workspace /absolute/workspace --dry-run
+fdg instance upgrade --workspace /absolute/workspace
 ```
 
-Theme caches/build output remain in `.jekyll-obsidian-cache/`. Content and image atomic-write staging stays beside its destination. Short-lived HTTP files, rank previews and unit-test fixtures use isolated system temporary directories. OpenCode's own profile and provider credentials retain their native locations.
+Upgrade reads the actual old `storage.root`, including custom absolute roots. Supply `--legacy-base` if the old relative root was resolved elsewhere. It locks maintenance, checks leases, backs up the original config/database/content, copies and verifies durable files, rewrites recovery paths, validates ownership, migrates provably equivalent semantic caches, and atomically replaces the config. A durable journal supports retry from the original backup; originals are retained. No ordinary command performs this migration.
+
+## Channels and subscriptions
+
+A channel is a platform (`hackernews`, `reddit`, `openai`, `anthropic`, `github`, `arxiv`, `producthunt`, `x`, `podcast`, `rss`). Each source group contains named `streams`, each with ordered `routes`. Routes replace the old ambiguous `channels` field. Streams have independent enablement; removing a subscription retains history and stable item IDs.
+
+```sh
+fdg subscriptions list
+fdg subscriptions add reddit LocalLLaMA
+fdg subscriptions add rss research --url https://example.org/feed.xml
+fdg subscriptions disable reddit/LocalLLaMA
+fdg collect --subscription research
+```
+
+`--subscription` selects membership, not a duplicate copy of the item. Generic RSS identities include the feed URL so identical GUIDs from different feeds do not collide. `channels ID` describes available actions, limits and dependencies. `read URL` uses the public HTML reader; authenticated text and full comment coverage are not implied.
 
 ## Agent execution
 
-`agent.backend` selects `opencode` (default) or `dsh`. `command` defaults to the backend name; `args` defaults to `["acp"]` and is the complete argument list before runner-managed options. Use an executable or JavaScript entrypoint rather than a shell command. On Windows, literal npm/pnpm `.cmd`, `.bat` and `.ps1` launchers resolve to their declared native executable or JavaScript entrypoint without a shell. Opaque launchers, unresolved variables and launchers requiring fixed extra arguments need an explicit entrypoint path. `version`, when supplied, requires an exact CLI version. OpenCode 2 is required; acceptance uses 2.0.31.
+OpenCode is configured separately; its model/effort can be inherited. `agent.model` and `agent.effort` override defaults, a source's `agent` overrides the instance, and explicit CLI flags override both. The optional pinned DSH runtime is installed only by `backend setup dsh`. X tooling is installed only by `channel x setup` and requires explicit cookie environment variables.
 
 ```json
-"agent": {
+{
   "backend": "opencode",
-  "command": "opencode",
-  "args": ["acp"]
+  "model": "provider/primary",
+  "maxDailyCalls": 80,
+  "inheritEnvironment": ["PROVIDER_API_KEY"],
+  "candidates": [
+    {"model": "provider/alternate", "effort": "low", "account": "default", "maxDailyCalls": 80}
+  ]
 }
 ```
 
-Configure OpenCode providers and credentials using its normal local configuration. Optional `model` is a provider/model ID; optional `effort` is an advertised reasoning variant. With neither supplied, Feedgarden reads OpenCode's normalized configuration through a temporary authenticated local server, then validates and pins the inherited selection through ACP without calling a model. This preserves configured default variants even when ACP initially reports `default`. An explicit model uses its own defaults; a configured default variant is inherited only when that model matches. Unsupported selections and versions fail before generation; they never fall back silently. `source.agent` may override only `model` and `effort`, with precedence over the global values. OpenCode's internal agent/mode is managed by Feedgarden.
+Budgets are independent per backend/account/model and reset at UTC midnight. Effort does not create another budget. Summary, transcript, relation and repair calls share that model's budget; no global 80-call cap exists. Candidates are tried in order only with `--fallback`. Typed quota, model unavailability, model-call timeout and provider 429 may advance candidates. Authentication, configuration, artifact, storage, lease and unknown errors cannot. Account-wide 429 suppresses sibling models for that provider/account.
 
-After setting the ACP options, the runner reloads the persisted session and verifies its model, effort and dedicated agent before prompting. This avoids mistaking an older selection event for a failed setting change; a persisted mismatch still stops generation.
+Every real call gets an isolated attempt directory, execution identity and input hash. Candidate switches and the single artifact-repair opportunity consume the existing five attempts per content version. Skipped quota/cooldown checks do not. Accepted caches depend on semantic input and trusted instructions; changing routing or budgets does not force regeneration. Use `--rebuild` explicitly for rewriting.
 
-The temporary config server follows OpenCode 2's native `serve --stdio` protocol. The runner accepts only a loopback HTTP announcement without embedded credentials, refuses redirects and validates the document/model/provider response shape before opening an ACP session. Authentication uses OpenCode's supported random `OPENCODE_PASSWORD` environment variable; the server submits no model request and closes after config retrieval. Local provider plugins run with the same user's process permissions. Generation APIs require a fixed input object and cannot implicitly become configuration probes.
+An effort-only candidate resolves its own execution identity while sharing the model's budget. Exhausted routes stop preparing further uncached batches for that run; reusable cached output and other model budgets remain available. Authentication or invalid execution configuration during a paid call stops further calls. Retention also removes old superseded attempt directories when their ownership is proven and no current task references them.
 
-Each run shares in-flight and successful resolutions for identical configurations; failed probes are evicted so later work can retry. A source whose configuration cannot be resolved is reported in `sourceErrors`, keeps its queued work, and does not block healthy sources. Relation resolution failures appear as `configurationError` with the candidate count, without spending model quota. The CLI records these as partial failures and exits 1 after completing the remaining renders and scheduled backup/publication decision. Cancellation and lost ownership still stop the run immediately; a later hard failure retains the earlier phase diagnostics in the run record.
-
-Summary sources without eligible items and relation runs without candidate pairs skip agent probing. When eligible accepted copies or relation candidates exist, the runner still resolves the current selection before checking caches so inherited settings cannot go stale. Resolutions are not persisted across runs based on an incomplete config-file fingerprint.
-
-OpenCode persists ACP sessions outside the task directory. Normally completed probes delete only their own new session through ACP when deletion is advertised; generation sessions retain their audit history. Interrupted probes or backends without deletion support may leave empty native sessions. OpenCode probes omit unused skill/input files; DSH probes retain them because DSH initializes its fixed plugin during the handshake.
-
-OpenCode runs a dedicated Feedgarden agent in each task workspace. A local stdio MCP server exposes only `feedgarden_input` and `feedgarden_result`, with Code Mode disabled. A local readiness plugin observes OpenCode's final tool registry; the runner waits until both direct tools are registered before submitting the prompt. This wait shares the task timeout and cancellation scope. Its permissions deny other actions; additional ACP permission requests are rejected. Inputs, schemas, result validation and atomic writes are shared with DSH. No provider credentials are written into generated task configuration. Private workspaces and local OpenCode session state must not be published.
-
-The stdio server names its tools `input` and `result`; OpenCode adds the `feedgarden_` server namespace, yielding the same effective names used by DSH and the permission allowlist.
-
-Agent children receive an allowlisted environment for version checks, configuration probes and ACP execution. It includes the base OS/path/locale/temp variables, proxy variables and certificate paths (`NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`, `SSL_CERT_DIR`). OpenCode additionally receives its profile/state paths (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME`, `XDG_CACHE_HOME`), configuration selectors (`OPENCODE_CONFIG`, `OPENCODE_CONFIG_DIR`, `OPENCODE_CONFIG_CONTENT`) and `OPENCODE_DISABLE_AUTOUPDATE`. Unrelated runner credentials and `NODE_OPTIONS` are omitted. OpenCode's saved provider authentication continues to work through those profile paths. If a provider config uses an environment credential, name it explicitly; values remain outside Feedgarden configuration and are redacted from agent errors:
-
-```json
-"agent": {
-  "backend": "opencode",
-  "inheritEnvironment": ["DEEPSEEK_API_KEY"]
-}
-```
-
-`inheritEnvironment` defaults to an empty list, applies to both backends, and is not a source override. Listed variables are trusted process inputs, so include only those required by the configured provider or launcher. The local MCP server inherits the restricted OpenCode environment. This is process environment isolation; local provider plugins still have the same user's file permissions.
-
-DSH remains pinned by the local dependency and default version constraint:
-
-```json
-"agent": {
-  "backend": "dsh",
-  "model": "deepseek/deepseek-flash",
-  "effort": "off",
-  "version": "0.1.7-rc.2"
-}
-```
-
-DSH requires an explicit DeepSeek model and reads `FEEDGARDEN_AGENT_API_KEY`, then `DEEPSEEK_API_KEY`, then local DSH credentials. OpenCode uses its own provider authentication instead. Both backends use the agent workspace directory derived from `storage.root`.
-
-Shared budgets remain configurable: `timeoutSeconds` (default 300), `maxBatchItems` (10), `maxInputChars` (24000), `maxItemChars` (4000), `maxDailyCalls` (80), `workspaceRetentionDays` (7), and `maxTranscriptChunks` (64). New workspaces default to `.local/feedgarden/workspaces/agents`. Model-call accounting excludes configuration probes. Execution audit records the backend, version, resolved model/effort and original usage updates. Cache and planning identities include the backend, actual agent version, resolved selection and a fingerprint of relevant OpenCode provider/model configuration; inherited configuration changes and backend upgrades cannot reuse stale entries. Existing historical content remains governed by the normal refresh/rebuild policy.
-
-`doctor` uses this same resolver and submits no generation prompt. `npm run verify:agent -- --config FILE` uses the selected configuration for a paid live run in isolated storage. `npm run verify:opencode` instead uses a temporary profile and local simulated provider, exercising the installed OpenCode without paid model calls. Pass `-- --command PATH` to test a specific OpenCode executable.
-
-The OpenCode provider fingerprint is conservative: edits or additions to any provider document can invalidate all model-dependent caches, even when the selected model ID is unchanged. This favors recomputation over reusing results after an endpoint or provider setting changes.
-
-## Sources and channels
-
-Configuration v2 uses `feed.directory`, `feed.topics` and `collection.backfillDays`. `collection.enrichmentRefreshDays` defaults to 7 (0-30), measured from each item’s first observation. Sources retain their streams and ordered fallback channels. A valid empty response stops fallback; unavailable or stale channels permit the next channel. A successful collection round sets the stream cadence. After a failed round, each enabled channel keeps its own retry time, so a failed fallback cannot postpone a due primary. Sources collected in one run share host pacing and robots policy. `source.agent` overrides model/effort. arXiv `includeKeywords` retains lexical relevance filtering; X reposts are excluded. There is no report frequency or seal period; daily selection is optional per source. GitHub collection is enabled in the checked-in configuration, using Trending with repository search as its fallback. See [daily update windows and task prompts](daily-updates.md) for collecting yesterday's dated items and recent first observations.
-
-Channel kinds select collection transports. Source-specific enrichment, filtering and summary contracts use the built-in source IDs `hackernews`, `producthunt`, `openai`, `anthropic`, `arxiv`, `podcast` and `x`. Keep those IDs when changing their channels; use `name` to change their displayed labels. Custom source IDs use generic collection and summary behavior, so an `hn-api` channel alone does not enable the Hacker News article/discussion contract. Configuration rejects `podcast-rss` channels outside the `podcast` source and requires both `url` and `podcastName`.
-
-Locale manifests can provide explicit `tag_labels` overrides for source names. Topic labels continue to come from the canonical bilingual topic registry.
-
-`channel.limit` applies to `hn-api` and `arxiv-api`. Other channel kinds use the supplied feed window or their adapter's own bounds; setting `limit` does not truncate those results.
-
-Feed and X CLI channels keep valid entries when individual rows are malformed, mark coverage partial and record the skipped count. An entirely malformed nonempty response fails, allowing fallback; a valid empty response still stops fallback. arXiv pages remain strict so a bad entry cannot advance their pagination checkpoint.
-
-## Related documentation
-
-- [Sources](sources.md)
-- [Summaries and content](summaries.md)
+Collection honors `transport: "curl"` on public requests. Both transports validate and pin each destination and redirect. The curl adapter uses manual redirects and pins proxy CONNECT destinations while retaining the original HTTP Host and TLS identity; it does not load user curl configuration.

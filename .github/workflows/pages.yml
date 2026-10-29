@@ -50,7 +50,7 @@ jobs:
         with:
           ruby-version: '4.0.6'
           bundler-cache: true
-      - run: npm run site:build
+      - run: npm run dev:site:build
         if: steps.changes.outputs.mode != 'docs'
       - run: npx playwright install --with-deps --only-shell chromium
         if: steps.changes.outputs.mode != 'docs'
@@ -64,19 +64,19 @@ jobs:
         run: npm run verify:footer
       - run: npm run verify:scale
         if: steps.changes.outputs.mode == 'full'
-      - run: FEEDGARDEN_VISUAL_ROOT=.local/feedgarden/validation/fixture/.jekyll-obsidian-cache/site FEEDGARDEN_VISUAL_FIXTURE=1 npm run test:visual
+      - run: FEEDGARDEN_VISUAL_ROOT=.local/feedgarden/state/validation/fixture/.jekyll-obsidian-cache/site FEEDGARDEN_VISUAL_FIXTURE=1 npm run test:visual
         if: steps.changes.outputs.mode == 'full'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always() && steps.changes.outputs.mode != 'docs'
         with:
           name: visual-validation
           path: |
-            .local/feedgarden/validation/visual
-            .local/feedgarden/validation/clippings/run-*/results.json
-            .local/feedgarden/validation/clippings/run-*/*-browser/
-            .local/feedgarden/validation/clippings/run-*/production-regression/
-            .local/feedgarden/validation/footer/run-*/results.json
-            .local/feedgarden/validation/footer/run-*/*.png
+            .local/feedgarden/state/validation/visual
+            .local/feedgarden/state/validation/clippings/run-*/results.json
+            .local/feedgarden/state/validation/clippings/run-*/*-browser/
+            .local/feedgarden/state/validation/clippings/run-*/production-regression/
+            .local/feedgarden/state/validation/footer/run-*/results.json
+            .local/feedgarden/state/validation/footer/run-*/*.png
           retention-days: 7
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
         id: pages

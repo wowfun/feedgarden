@@ -1,0 +1,46 @@
+import { readFile } from 'node:fs/promises';
+import type { Registry, Topic } from '../contracts/registry.js';
+import { normalizedName, validateRegistry } from '../contracts/topics.mjs';
+import { atomicWrite } from '../platform/files.js';
+import { hash } from '../platform/hash.js';
+export async function loadTopics(path: string): Promise<Registry> { return validateRegistry(JSON.parse(await readFile(path, 'utf8'))) as Registry; }
+export function topicTagAliases(registry: Registry): Record<string, string> {
+  return Object.fromEntries(registry.topics.flatMap(topic => {
+    const target = 'topics/' + (topic.replacedBy ?? topic.id);
+    return [[topic.id, target], ...(topic.replacedBy ? [['topics/' + topic.id, target]] : [])];
+  }));
+}
+export function assertTopicUpdate(previous: Registry, next: Registry): Registry {
+  const valid = validateRegistry(next) as Registry;
+  for (const old of previous.topics) {
+    const current = valid.topics.find(topic => topic.id === old.id);
+    if (!current) throw new Error('Topic IDs cannot be removed: ' + old.id);
+    // Retain old labels as aliases so saved links and future classifications remain recognizable.
+    const retained = new Set([current.name.en, current.name['zh-CN'], ...current.aliases].map(normalizedName));
+    for (const label of [old.name.en, old.name['zh-CN'], ...old.aliases]) if (!retained.has(normalizedName(label))) throw new Error('Retain previous topic labels as aliases: ' + old.id);
+  }
+  return valid;
+}
+export async function applyTopics(path: string, next: Registry, expectedHash?: string, signal?: AbortSignal): Promise<void> {
+  const previous = await loadTopics(path);
+  if (expectedHash && hash(previous) !== expectedHash) throw new Error('Topic registry changed while a task was running');
+  signal?.throwIfAborted();
+  const valid = assertTopicUpdate(previous, next);
+  if (hash(previous) === hash(valid)) return;
+  await atomicWrite(path, JSON.stringify(valid, null, 2) + '\n', signal);
+}
+export function mergeTopics(base: Registry, local: Registry, remote: Registry): Registry {
+  const indexed = [base, local, remote].map(registry => new Map(validateRegistry(registry).topics.map(topic => [topic.id, topic])));
+  const ids = new Set([...base.topics, ...local.topics, ...remote.topics].map(topic => topic.id));
+  const topics: Topic[] = [], conflicts: string[] = [];
+  for (const id of ids) {
+    const b = indexed[0]!.get(id), l = indexed[1]!.get(id), r = indexed[2]!.get(id);
+    if (b && (!l || !r)) { conflicts.push(id); continue; }
+    const hb = hash(b ?? null), hl = hash(l ?? null), hr = hash(r ?? null);
+    if (hl !== hb && hr !== hb && hl !== hr) { conflicts.push(id); continue; }
+    const next = hl === hb ? r : l;
+    if (next) topics.push(next);
+  }
+  if (conflicts.length) throw new Error('Topic merge conflicts: ' + conflicts.join(', '));
+  return assertTopicUpdate(base, { version: 1, topics });
+}

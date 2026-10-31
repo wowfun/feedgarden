@@ -344,7 +344,7 @@ test('a locally edited image is reused without recording or comparing size and s
   await writeFile(join(f.clips, asset.path), edited);
   await writeFile(f.article, original);
   const result = await fetchClippings(f.config, { all: true, fetch: unreachable });
-  assert.equal(result[0]!.status, 'updated', result[0]!.error);
+  assert.equal(result[0]!.status, 'updated', result[0]!.error ?? 'Expected the locally edited image to be reused');
   assert.equal(await readFile(f.article, 'utf8'), `![a](${asset.path})`);
   assert.deepEqual(await readFile(join(f.clips, asset.path)), edited);
   assert.deepEqual(JSON.parse(await readFile(manifestPath, 'utf8')).images[url], {

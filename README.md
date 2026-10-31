@@ -6,7 +6,7 @@ Feedgarden gives agents a local information feed: collect subscriptions, query c
 
 ## Run the local package
 
-Use Node **24.12+ on 24.x, or 26.x**. This change delivers a local tarball; it does not publish to npm. The executable is `fdg`, but the npm package named `fdg` belongs to another project. Always supply the tarball explicitly:
+Use **Node 26.x**, the development and CI baseline. Node 24.12+ on 24.x remains best-effort, without dedicated tests or CI. This change delivers a local tarball; it does not publish to npm. The executable is `fdg`, but the npm package named `fdg` belongs to another project. Always supply the tarball explicitly:
 
 ```sh
 npm ci

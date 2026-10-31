@@ -15,7 +15,7 @@ test('recognizes supported direct files and provider originals without mistaking
     ['https://cdn.example/image.GIF?token=signed', 'image'], ['https://cdn.example/a.ogg', 'audio'], ['https://cdn.example/a.webm', 'video'], ['https://cdn.example/a.PDF', 'pdf'],
     ['https://arxiv.org/pdf/2609.12345v2', 'pdf'], ['https://www.youtube.com/watch?v=NnTvZWp5Q7o&t=1m30s', 'video'], ['https://youtu.be/NnTvZWp5Q7o', 'video'],
     ['https://www.bilibili.com/video/BV1E7411e7hC?p=2', 'video'], ['https://vimeo.com/212731897', 'video'], ['https://x.com/obsdmd/status/1580548874246443010', 'post'],
-  ]) assert.equal(embedKind(url!), kind, url);
+  ] as const) assert.equal(embedKind(url), kind, url);
   for (const url of ['https://example.test/article', 'https://arxiv.org/abs/2609.12345', 'http://cdn.example/a.png', 'https://cdn.example:444/a.mp4', 'https://user:pass@cdn.example/a.pdf', 'https://www.youtube.com/watch?v=bad', 'https://www.youtube.com/watch?v=NnTvZWp5Q7o&v=duplicate', 'https://b23.tv/short', 'https://www.bilibili.com/video/BV1E7411e7hC?p=']) assert.equal(embedKind(url), undefined, url);
   assert.equal(embedKind('https://cdn.example/render?id=figure', true), 'image');
 });

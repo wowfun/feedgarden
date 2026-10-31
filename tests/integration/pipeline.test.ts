@@ -273,7 +273,7 @@ test('Product Hunt long ranges are bounded and resume their fixed dates without 
   const context={source,stream,channel,store,http,now:'2026-10-10T14:00:00Z',since:'2026-09-01T07:00:00Z'};
   let result=await adapters['ph-html'](context);
   assert.equal(urls.length,7);assert.match(result.coverage.notes.join(' '),/continues/);
-  while(result.cursor){store.saveCollection(source.id,stream.id,channel.id,result,'');const count=urls.length;result=await adapters['ph-html']({...context,now:'2026-10-11T14:00:00Z'});assert.ok(urls.length-count<=7);assert.equal(result.coverage.to,context.now);}
+  while(result.cursor){store.saveCollection(source.id,stream.id,channel.id,result,'');const count:number=urls.length;result=await adapters['ph-html']({...context,now:'2026-10-11T14:00:00Z'});assert.ok(urls.length-count<=7);assert.equal(result.coverage.to,context.now);}
   assert.equal(urls.length,40);assert.equal(new Set(urls).size,40);
   assert.ok(urls.at(-1)?.endsWith('/2026/10/10'));
   assert.ok(!result.coverage.notes.join(' ').includes('current source-local day'),'the original range ended before the resumed current day');

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +22,11 @@ try {
     run(process.execPath, [npm, 'pack', '--json', '--pack-destination', root], project),
   )[0];
   assert.ok(packed.files.some((f) => f.path === 'dist/src/cli.js'));
+  const skillFiles = (await readdir(join(project, 'skills'), { recursive: true, withFileTypes: true }))
+    .filter(entry => entry.isFile())
+    .map(entry => relative(project, join(entry.parentPath, entry.name)).replaceAll('\\', '/'))
+    .sort();
+  for (const file of skillFiles) assert.ok(packed.files.some(f => f.path === file), file);
   assert.ok(packed.files.every((f) => !/^(content|tests|scripts|\.local|\.agents)\//.test(f.path)));
   const tarball = join(root, packed.filename),
     install = join(root, 'installed'),
@@ -65,8 +70,11 @@ try {
     status = JSON.parse(run(next.executable, [...next.argv, '--wait-seconds', '20'], root, env));
   assert.equal(status.result.runs[0].state, 'completed');
   const skill = join(root, 'agent-skills/feedgarden');
-  assert.equal(cli('skill', 'install', skill).state, 'completed');
+  const installedSkill = cli('skill', 'install', skill);
+  assert.equal(installedSkill.state, 'completed');
   assert.equal(cli('skill', 'status', skill).result.verified, true);
+  const runtimeRoot = resolve(dirname(installedSkill.result.receipt.argv[0]), '../..');
+  for (const file of skillFiles) assert.equal(await readFile(join(runtimeRoot, file), 'utf8'), await readFile(join(project, file), 'utf8'));
   // A clean npm exec cache and the public Windows shim both preserve literal URL metacharacters.
   const version = JSON.parse(
     run(

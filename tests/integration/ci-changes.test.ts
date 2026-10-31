@@ -31,7 +31,7 @@ test('CI scopes restrict the fast paths to documentation and public content', ()
   assert.equal(classifyPaths([]), 'docs');
   assert.equal(classifyPaths(['docs/site.md', 'docs/nested/image.svg', 'README.md', 'README.zh-CN.md', 'AGENTS.md', 'THIRD_PARTY_NOTICES.md']), 'docs');
   assert.equal(classifyPaths(['content/article.md', 'content/_translations/zh-CN/article.md', 'docs/site.md']), 'site');
-  for (const file of ['config/topics.json', 'config/locales/en.json', '.github/jekyll-obsidian.yml', 'Gemfile', 'Gemfile.lock', 'package.json', 'package-lock.json', '.nvmrc', 'tsconfig.json', 'feedgarden.jsonc', 'src/main.ts', 'scripts/ci-changes.mjs', 'tests/example.test.ts', '.github/workflows/pages.yml', 'resources/feedgarden-report/SKILL.md', 'unknown.md', 'content-other/item.md']) {
+  for (const file of ['config/topics.json', 'config/locales/en.json', '.github/jekyll-obsidian.yml', 'Gemfile', 'Gemfile.lock', 'package.json', 'package-lock.json', '.nvmrc', 'tsconfig.json', 'feedgarden.jsonc', 'src/main.ts', 'scripts/ci-changes.mjs', 'tests/example.test.ts', '.github/workflows/pages.yml', 'skills/feedgarden-report/SKILL.md', 'skills/feedgarden/SKILL.md', 'unknown.md', 'content-other/item.md']) {
     assert.equal(classifyPaths(['docs/site.md', 'content/article.md', file]), 'full', file);
   }
 });

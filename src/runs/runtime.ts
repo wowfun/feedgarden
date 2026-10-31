@@ -114,6 +114,7 @@ async function prepareRuntime(config: InstanceContext): Promise<Runtime> {
     await readFile(join(packageRoot, 'package.json'), 'utf8'),
     await treeHashes(join(packageRoot, 'dist/src')),
     await treeHashes(join(packageRoot, 'resources')),
+    await treeHashes(join(packageRoot, 'skills')),
     packages.map((p) => [p.path, p.manifest]),
   ]);
   const directory = join(
@@ -126,7 +127,7 @@ async function prepareRuntime(config: InstanceContext): Promise<Runtime> {
     await mkdir(temporary, { recursive: true, mode: 0o700 });
     await markArtifact(temporary, 'runtime', config.instanceId);
     try {
-      for (const name of ['package.json', 'dist/src', 'resources'])
+      for (const name of ['package.json', 'dist/src', 'resources', 'skills'])
         await cp(join(packageRoot, name), join(temporary, name), { recursive: true, dereference: true });
       // A parent copy must finish before copying packages into its node_modules.
       // Otherwise fs.cp can race mkdir against a nested dependency copy on Windows.

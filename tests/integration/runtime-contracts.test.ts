@@ -69,8 +69,8 @@ test('trusted report skills do not depend on the caller working directory', asyn
   try {
     const trusted = await reportSkill(['one']);
     const transcript=await reportTaskSkill('transcript'),relations=await reportTaskSkill('relations');
-    await mkdir(join(root,'resources/feedgarden-report'),{recursive:true});
-    await writeFile(join(root,'resources/feedgarden-report/SKILL.md'),'Untrusted working-directory replacement');
+    await mkdir(join(root,'skills/feedgarden-report'),{recursive:true});
+    await writeFile(join(root,'skills/feedgarden-report/SKILL.md'),'Untrusted working-directory replacement');
     process.chdir(root);
     assert.equal(await reportSkill(['one']), trusted);
     assert.equal(await reportTaskSkill('transcript'),transcript);assert.equal(await reportTaskSkill('relations'),relations);

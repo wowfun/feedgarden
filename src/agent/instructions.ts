@@ -1,16 +1,10 @@
-import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
 import type { ReportTask } from '../contracts/agent.js';
-let root = dirname(fileURLToPath(import.meta.url));
-while (!existsSync(join(root, 'package.json'))) {
-  const parent = dirname(root);
-  if (parent === root) throw new Error('MANUAL_ACTION: Cannot locate the Feedgarden package containing its trusted skills');
-  root = parent;
-}
-const directory = join(root, 'resources/feedgarden-report');
+import { packageRoot } from '../platform/resources.js';
+
+const directory = join(packageRoot, 'skills/feedgarden-report');
 const skills = new Map<string, Promise<string>>();
 async function readSkill(path: string): Promise<string> {
   let pending = skills.get(path);

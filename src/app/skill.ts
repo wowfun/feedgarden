@@ -6,12 +6,12 @@ import type { InstanceContext } from '../instance/index.js';
 import { FdgError } from '../contracts/errors.js';
 import { atomicWrite } from '../platform/files.js';
 import { fileDigest, hash } from '../platform/hash.js';
-import { packageVersion, resource } from '../platform/resources.js';
+import { packageRoot, packageVersion } from '../platform/resources.js';
 import { invocation, pinRuntime, stableRuntime } from '../runs/index.js';
 export async function installSkill(config: InstanceContext, directory: string) {
   if (!directory) throw new FdgError('BAD_INPUT', 'An explicit Skill directory is required');
   const destination = resolve(directory),
-    body = await readFile(resource('operator', 'SKILL.md'), 'utf8'),
+    body = await readFile(join(packageRoot, 'skills/feedgarden/SKILL.md'), 'utf8'),
     runtime = await stableRuntime(config);
   if (existsSync(join(destination, 'SKILL.md')) && !existsSync(join(destination, 'invocation.json')))
     throw new FdgError('PATH_CONFLICT', 'Destination contains an unmanaged Skill');

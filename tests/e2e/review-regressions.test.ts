@@ -32,7 +32,7 @@ test('explicit admission preserves the live channel checkpoint, schedule and gap
 test('a source checkout without dist completes work without preparing an advisory runtime', async () => {
   const root = await mkdtemp(join(tmpdir(), 'fdg-no-build-')), checkout = join(root, 'checkout'), workspace = join(root, 'instance');
   try {
-    for (const path of ['src', 'resources', 'package.json']) await cp(resolve(path), join(checkout, path), { recursive: true });
+    for (const path of ['src', 'resources', 'skills', 'package.json']) await cp(resolve(path), join(checkout, path), { recursive: true });
     await symlink(resolve('node_modules'), join(checkout, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
     await setup({ workspace });
     const { paths } = loadInstance({ workspace });

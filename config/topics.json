@@ -11,7 +11,8 @@
       "aliases": [
         "agentic systems"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "coding",
@@ -23,7 +24,8 @@
       "aliases": [
         "code generation"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "models",
@@ -35,7 +37,8 @@
       "aliases": [
         "language models"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "inference",
@@ -45,7 +48,8 @@
       },
       "description": "Model serving, runtime efficiency, hardware and deployment.",
       "aliases": [],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "evaluation",
@@ -57,7 +61,8 @@
       "aliases": [
         "evals"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "research",
@@ -78,7 +83,8 @@
       },
       "description": "Product launches, applications and user-facing AI services.",
       "aliases": [],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "industry",
@@ -99,7 +105,8 @@
       },
       "description": "Electricity generation, storage, grids and the economics of power infrastructure.",
       "aliases": [],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "security-privacy",
@@ -109,7 +116,8 @@
       },
       "description": "Device and system security, surveillance capabilities, exploits and privacy protection.",
       "aliases": [],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "content-provenance",
@@ -130,7 +138,8 @@
       },
       "description": "Physical devices, electronics, components and do-it-yourself hardware builds.",
       "aliases": [],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "communication",
@@ -154,7 +163,8 @@
         "medicine",
         "clinical research"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "culture-society",
@@ -167,7 +177,8 @@
         "society",
         "culture"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "history",
@@ -193,7 +204,8 @@
         "space science",
         "planetary science"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "generative-media",
@@ -207,7 +219,8 @@
         "AI music",
         "AI-generated content"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "open-source",
@@ -248,7 +261,8 @@
         "farming",
         "crop production"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "system-dynamics",
@@ -362,7 +376,8 @@
         "linux distributions",
         "linux desktop"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "ai-code-policy",
@@ -420,7 +435,8 @@
         "LLM agent memory",
         "experience memory"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "image-compression",
@@ -461,7 +477,8 @@
         "real-time rendering",
         "shaders"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "biodiversity",
@@ -489,7 +506,8 @@
         "faithfulness detection",
         "factual consistency"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "ontologies",
@@ -502,7 +520,8 @@
         "ontology engineering",
         "knowledge graphs"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "immigration",
@@ -529,7 +548,8 @@
         "recursive self-improvement",
         "self-evolving agents"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "web-archiving",
@@ -598,7 +618,8 @@
         "money management",
         "cash-flow tracking"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "public-safety",
@@ -654,7 +675,8 @@
         "cloud services",
         "SaaS"
       ],
-      "deprecated": false
+      "deprecated": false,
+      "hidden": false
     },
     {
       "id": "electric-vehicles",
@@ -669,6 +691,83 @@
       ],
       "deprecated": false,
       "hidden": true
+    },
+    {
+      "id": "fluid-dynamics",
+      "name": {
+        "en": "Fluid Dynamics",
+        "zh-CN": "流体动力学"
+      },
+      "description": "Fluid dynamics, hydrodynamics, flow phenomena and fluid-based physical systems.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": false
+    },
+    {
+      "id": "forecasting",
+      "name": {
+        "en": "Forecasting",
+        "zh-CN": "预测"
+      },
+      "description": "Demand and sales forecasting, cold-start prediction and time-series methods.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": false
+    },
+    {
+      "id": "digital-taxation",
+      "name": {
+        "en": "Digital Taxation",
+        "zh-CN": "数字税收"
+      },
+      "description": "Taxes, levies and fiscal policy targeting digital services, data transmission and technology companies.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": false
+    },
+    {
+      "id": "compilers",
+      "name": {
+        "en": "Compilers",
+        "zh-CN": "编译器"
+      },
+      "description": "Compiler design, optimization passes, code generation and lowering of language constructs.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": false
+    },
+    {
+      "id": "neuroscience",
+      "name": {
+        "en": "Neuroscience",
+        "zh-CN": "神经科学"
+      },
+      "description": "Brain, cognition, sleep and dreaming research and related findings.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": false
+    },
+    {
+      "id": "databases",
+      "name": {
+        "en": "Databases",
+        "zh-CN": "数据库"
+      },
+      "description": "Database systems, storage engines, transactional correctness, query processing and data infrastructure.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": false
+    },
+    {
+      "id": "environment",
+      "name": {
+        "en": "Environment",
+        "zh-CN": "环境"
+      },
+      "description": "Environmental issues, pollution, ecosystems and conservation.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": false
     }
   ]
 }

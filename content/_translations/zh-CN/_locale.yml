@@ -8,11 +8,11 @@
     "source/anthropic": "Anthropic",
     "source/openai": "OpenAI",
     "source/github": "GitHub",
-    "source/x": "X",
     "source/reddit": "Reddit",
+    "source/x": "X",
+    "source/podcast": "播客",
     "source/arxiv": "arXiv",
     "source/producthunt": "Product Hunt",
-    "source/podcast": "播客",
     "topics/agents": "智能体",
     "topics/coding": "编程",
     "topics/models": "模型",
@@ -63,7 +63,14 @@
     "topics/game-engines": "游戏引擎",
     "topics/invasive-species": "入侵物种",
     "topics/cloud-computing": "云计算",
-    "topics/electric-vehicles": "电动汽车"
+    "topics/electric-vehicles": "电动汽车",
+    "topics/fluid-dynamics": "流体动力学",
+    "topics/forecasting": "预测",
+    "topics/digital-taxation": "数字税收",
+    "topics/compilers": "编译器",
+    "topics/neuroscience": "神经科学",
+    "topics/databases": "数据库",
+    "topics/environment": "环境"
   },
   "messages": {
     "footer_sites": "站点",
@@ -375,6 +382,13 @@
     "game-engines": "topics/game-engines",
     "invasive-species": "topics/invasive-species",
     "cloud-computing": "topics/cloud-computing",
-    "electric-vehicles": "topics/electric-vehicles"
+    "electric-vehicles": "topics/electric-vehicles",
+    "fluid-dynamics": "topics/fluid-dynamics",
+    "forecasting": "topics/forecasting",
+    "digital-taxation": "topics/digital-taxation",
+    "compilers": "topics/compilers",
+    "neuroscience": "topics/neuroscience",
+    "databases": "topics/databases",
+    "environment": "topics/environment"
   }
 }

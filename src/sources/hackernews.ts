@@ -1,5 +1,4 @@
 import { Readability } from '@mozilla/readability';
-import { load } from 'cheerio';
 import { createRequire } from 'node:module';
 import type { Comment, Discussion, Item, Media, RawResponse } from '../contracts/items.js';
 import { mapLimit } from '../platform/concurrency.js';
@@ -7,20 +6,19 @@ import { errorText } from '../platform/errors.js';
 import { hash } from '../platform/hash.js';
 import { Http } from '../platform/http/client.js';
 import { type Storage } from '../storage/index.js';
+import { htmlFragment, readableText } from './html.js';
 
 const API = 'https://hacker-news.firebaseio.com/v0/item/';
 const require = createRequire(import.meta.url);
 const flatten = (html: string): string => {
-  const $ = load(html); $('script,style,nav,footer,aside,form').remove();
-  $('br').replaceWith(' ');
-  $('p,li,h1,h2,h3,div,pre,blockquote').prepend(' ').append(' ');
-  return $.text().replace(/\s+/g, ' ').trim();
+  const document = htmlFragment(html);
+  for (const node of document.querySelectorAll('script,style,nav,footer,aside,form')) node.remove();
+  return readableText(document);
 };
 
 export function readHnArticle(html: string, url: string): { text: string; content: string } | undefined {
   if (html.length > 2_000_000) return undefined;
-  // Load the DOM only when extracting an article. Keeping this CJS dependency
-  // out of the concurrent ESM graph also avoids mixed parse5-version linking.
+  // Allocate a full DOM window only for Readability's article extraction.
   const { JSDOM } = require('jsdom') as typeof import('jsdom');
   const dom = new JSDOM(html, { url });
   try {

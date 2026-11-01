@@ -9,6 +9,7 @@ import { Http } from '../platform/http/client.js';
 import { nowIso } from '../platform/time.js';
 import { safeUrl } from '../platform/url.js';
 import { type Storage } from '../storage/index.js';
+import { normalizeText } from './html.js';
 import { mediaForUrl } from './media.js';
 
 
@@ -29,7 +30,7 @@ export function parsePodcastFeed(body: string, context: ParseContext, name: stri
   let failures = 0;
   for (const row of rows) {
     try {
-      const title = plain(text(row.title ?? row['itunes:title']));
+      const title = normalizeText(text(row.title ?? row['itunes:title']));
       const enclosure = array(row.enclosure).find((e: any) => String(e?.['@type']).startsWith('audio/')) as any;
       const audio = enclosure?.['@url'];
       const link = array(row.link).map(text).find(Boolean);
@@ -41,7 +42,7 @@ export function parsePodcastFeed(body: string, context: ParseContext, name: stri
       const media = audio ? mediaForUrl('audio', audio, name + ': ' + title, url) : undefined;
       result.push({
         ...context, id: context.stream + ':' + guid, title, url,
-        author: plain(text(row['itunes:author'] ?? document.rss.channel['itunes:author'])) || name,
+        author: normalizeText(text(row['itunes:author'] ?? document.rss.channel['itunes:author'])) || name,
         text: plain(text(row['content:encoded'] ?? row.description ?? row['itunes:summary'])),
         publishedAt: publishedAt ?? context.observedAt, basis: publishedAt ? 'published' : 'observed', metrics: {},
         media: media ? [media] : [], metadata: {

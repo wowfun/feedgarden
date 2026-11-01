@@ -1,5 +1,5 @@
 import { chromium,expect } from '@playwright/test';
-import { load } from 'cheerio';
+import { JSDOM } from 'jsdom';
 import assert from 'node:assert/strict';
 import { cp,mkdir,mkdtemp,readFile,stat,writeFile } from 'node:fs/promises';
 import { join,resolve } from 'node:path';
@@ -62,23 +62,26 @@ try {
       audits.push({ site: site.name, theme, checkedPages: pages.length, exemptions });
       const articleRoutes: Record<string, string> = {}, archiveRoutes: Record<string, string> = {};
       for (const { file, relative, locale, article } of pages) {
-        const $ = load(await readFile(file, 'utf8'));
-        const route = site.baseurl + '/' + relative.replace(/index\.html$/, '');
-        if (article && !articleRoutes[locale]) articleRoutes[locale] = route;
-        const home = site.baseurl + '/' + (locale === (config.lang ?? 'en') ? '' : locale + '/');
-        if (route !== home && $('[data-paged-archive]').length && !archiveRoutes[locale]) archiveRoutes[locale] = route;
-        // Only the copied preview output maps configured site origins/base paths
-        // to local ports. The input configuration and authored files stay intact.
-        $('.site-footer a[href]').each((_, node) => {
-          const href = $(node).attr('href')!;
-          if (!/^https?:\/\//.test(href)) return;
-          const url = new URL(href);
-          const target = [...sites].sort((a, b) => b.baseurl.length - a.baseurl.length).find(candidate =>
-            candidate.config.url && new URL(candidate.config.url).origin === url.origin &&
-            (url.pathname === candidate.baseurl || url.pathname.startsWith(candidate.baseurl + '/')));
-          if (target) $(node).attr('href', `http://127.0.0.1:${target.port}${url.pathname}${url.search}${url.hash}`);
-        });
-        await writeFile(file, $.html());
+        const dom = new JSDOM(await readFile(file, 'utf8'));
+        try {
+          const document = dom.window.document;
+          const route = site.baseurl + '/' + relative.replace(/index\.html$/, '');
+          if (article && !articleRoutes[locale]) articleRoutes[locale] = route;
+          const home = site.baseurl + '/' + (locale === (config.lang ?? 'en') ? '' : locale + '/');
+          if (route !== home && document.querySelector('[data-paged-archive]') && !archiveRoutes[locale]) archiveRoutes[locale] = route;
+          // Only the copied preview output maps configured site origins/base paths
+          // to local ports. The input configuration and authored files stay intact.
+          for (const node of document.querySelectorAll('.site-footer a[href]')) {
+            const href = node.getAttribute('href')!;
+            if (!/^https?:\/\//.test(href)) continue;
+            const url = new URL(href);
+            const target = [...sites].sort((a, b) => b.baseurl.length - a.baseurl.length).find(candidate =>
+              candidate.config.url && new URL(candidate.config.url).origin === url.origin &&
+              (url.pathname === candidate.baseurl || url.pathname.startsWith(candidate.baseurl + '/')));
+            if (target) node.setAttribute('href', `http://127.0.0.1:${target.port}${url.pathname}${url.search}${url.hash}`);
+          }
+          await writeFile(file, dom.serialize());
+        } finally { dom.window.close(); }
       }
       const casesBefore = evidence.length;
       const server = staticServer(output, site.baseurl);
@@ -104,8 +107,9 @@ try {
             await expect(page.locator('.site-header')).toHaveCount(1);
             await expect(page.locator('footer.site-footer')).toHaveCount(1);
             if (kind === 'not-found') {
-              const errorPage = load(await readFile(join(output, locale === (config.lang ?? 'en') ? '' : locale, '404.html'), 'utf8'));
-              await expect(page.locator('h1')).toHaveText(errorPage('h1').text());
+              const errorPage = new JSDOM(await readFile(join(output, locale === (config.lang ?? 'en') ? '' : locale, '404.html'), 'utf8'));
+              try { await expect(page.locator('h1')).toHaveText(errorPage.window.document.querySelector('h1')?.textContent ?? ''); }
+              finally { errorPage.window.close(); }
             }
             await expect(page.locator('html')).toHaveAttribute('data-color-scheme', scheme);
             if (await page.locator('[data-paged-archive]').count()) {

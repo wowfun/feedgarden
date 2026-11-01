@@ -1,4 +1,4 @@
-import { load } from 'cheerio';
+import { JSDOM } from 'jsdom';
 import assert from 'node:assert/strict';
 import { readFile,readdir } from 'node:fs/promises';
 import { join,relative,sep } from 'node:path';
@@ -12,35 +12,38 @@ export interface FooterConfig {
 }
 
 export function inspectFooter(html: string, file: string, config: FooterConfig) {
-  const $ = load(html), footer = $('footer.site-footer');
-  const refresh = $('meta[http-equiv]').filter((_, node) => $(node).attr('http-equiv')?.toLowerCase() === 'refresh');
-  // Only the theme's bare redirect document is exempt; a themed page with a
-  // refresh tag must still have its footer. Raw HTML is allowlisted separately.
-  if (!footer.length && !$('body[class], .site-header, .note-header').length &&
-      /^0;\s*url=.+/.test(refresh.attr('content') ?? '') && $('meta[name="robots"]').attr('content') === 'noindex' &&
-      $('link[rel="canonical"]').length === 1 && $('body > main > p > a[href]').length === 1) return { kind: 'redirect' as const };
-  assert.equal(footer.length, 1, 'Expected one theme footer: ' + file);
-  const contacts = config.website.contacts ?? [], links = config.website.footer?.links ?? [];
-  const locale = $('html').attr('lang');
-  assert.ok(locale, 'Missing page language: ' + file);
-  assert.equal($('.site-footer__contacts').length, contacts.length ? 1 : 0, file);
-  assert.equal(footer.find('.site-footer__contacts a').length, contacts.length, file);
-  footer.find('.site-footer__contacts a').each((index, node) => {
-    assert.equal($(node).attr('href'), contacts[index]!.url, file);
-    assert.equal($(node).attr('aria-label') ?? $(node).text(), contacts[index]!.label, file);
-  });
-  assert.equal(footer.find('.site-footer__links a').length, links.length, file);
-  if (links.length && ['en', 'zh-CN'].includes(locale)) assert.equal(footer.find('#footer-sites-title').text(), locale === 'en' ? 'Sites' : '站点', file);
-  footer.find('.site-footer__links a').each((index, node) => {
-    const expected = links[index]!, localized = Object.entries(expected.locale_urls ?? {}).find(([key]) => key.toLowerCase() === locale.toLowerCase())?.[1];
-    assert.equal($(node).text(), expected.label, file);
-    assert.equal($(node).attr('href'), localized ?? expected.url, file);
-    assert.equal($(node).attr('target'), undefined, file);
-  });
-  assert.equal(footer.find('.site-footer__github').length, 1, file);
-  assert.equal(footer.find('.site-footer__github').attr('href'), 'https://github.com/wowfun/jekyll-obsidian', file);
-  assert.equal($('[class*="minimal-contact"]').length, 0, file);
-  return { kind: 'page' as const, locale, article: $('.note-header').length > 0 };
+  const dom = new JSDOM(html);
+  try {
+    const document = dom.window.document, footers = document.querySelectorAll('footer.site-footer');
+    const refresh = [...document.querySelectorAll('meta[http-equiv]')].find(node => node.getAttribute('http-equiv')?.toLowerCase() === 'refresh');
+    // Only the theme's bare redirect document is exempt; a themed page with a
+    // refresh tag must still have its footer. Raw HTML is allowlisted separately.
+    if (!footers.length && !document.querySelector('body[class], .site-header, .note-header') &&
+        /^0;\s*url=.+/.test(refresh?.getAttribute('content') ?? '') && document.querySelector('meta[name="robots"]')?.getAttribute('content') === 'noindex' &&
+        document.querySelectorAll('link[rel="canonical"]').length === 1 && document.querySelectorAll('body > main > p > a[href]').length === 1) return { kind: 'redirect' as const };
+    assert.equal(footers.length, 1, 'Expected one theme footer: ' + file);
+    const footer = footers[0]!, contacts = config.website.contacts ?? [], links = config.website.footer?.links ?? [];
+    const locale = document.documentElement.getAttribute('lang');
+    assert.ok(locale, 'Missing page language: ' + file);
+    assert.equal(document.querySelectorAll('.site-footer__contacts').length, contacts.length ? 1 : 0, file);
+    assert.equal(footer.querySelectorAll('.site-footer__contacts a').length, contacts.length, file);
+    [...footer.querySelectorAll('.site-footer__contacts a')].forEach((node, index) => {
+      assert.equal(node.getAttribute('href'), contacts[index]!.url, file);
+      assert.equal(node.getAttribute('aria-label') ?? node.textContent, contacts[index]!.label, file);
+    });
+    assert.equal(footer.querySelectorAll('.site-footer__links a').length, links.length, file);
+    if (links.length && ['en', 'zh-CN'].includes(locale)) assert.equal(footer.querySelector('#footer-sites-title')?.textContent, locale === 'en' ? 'Sites' : '站点', file);
+    [...footer.querySelectorAll('.site-footer__links a')].forEach((node, index) => {
+      const expected = links[index]!, localized = Object.entries(expected.locale_urls ?? {}).find(([key]) => key.toLowerCase() === locale.toLowerCase())?.[1];
+      assert.equal(node.textContent, expected.label, file);
+      assert.equal(node.getAttribute('href'), localized ?? expected.url, file);
+      assert.equal(node.getAttribute('target'), null, file);
+    });
+    assert.equal(footer.querySelectorAll('.site-footer__github').length, 1, file);
+    assert.equal(footer.querySelector('.site-footer__github')?.getAttribute('href'), 'https://github.com/wowfun/jekyll-obsidian', file);
+    assert.equal(document.querySelectorAll('[class*="minimal-contact"]').length, 0, file);
+    return { kind: 'page' as const, locale, article: !!document.querySelector('.note-header') };
+  } finally { dom.window.close(); }
 }
 
 const rawManifest = z.object({ schema_version: z.literal(1), files: z.array(z.string()), documents: z.array(z.object({ route: z.string(), output: z.string() }).strict()) }).strict();

@@ -1,4 +1,3 @@
-import { load } from 'cheerio';
 import type { Item, Media } from '../contracts/items.js';
 import { errorText } from '../platform/errors.js';
 import { hash } from '../platform/hash.js';
@@ -6,6 +5,7 @@ import { Http } from '../platform/http/client.js';
 import { nowIso } from '../platform/time.js';
 import { type Storage } from '../storage/index.js';
 import { enrichHackerNews } from './hackernews.js';
+import { htmlFragment } from './html.js';
 import { extractMedia } from './media.js';
 import { enrichPodcast } from './podcasts.js';
 import { parseProductHuntRepository, productHuntPage, repositoryUrl } from './producthunt.js';
@@ -28,13 +28,13 @@ export function enrichmentInterval(item: Item): number {
 }
 
 export function parseArticle(html: string, url: string): { text: string; media: Media[] } | undefined {
-  const $ = load(html);
-  $('script,style,nav,footer,aside,form,[aria-hidden="true"],[data-testid="related-content"]').remove();
-  const root = $('article').first().length ? $('article').first() : $('main').first();
-  if (!root.length || !root.find('p').length) return undefined;
-  const text = root.find('h1,h2,h3,p,li').toArray().filter(element => !$(element).parents('li').length)
-    .map(element => $(element).text().replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n\n').slice(0, 100000);
-  return text.length >= 200 ? { text, media: extractMedia(root.html() ?? '', url) } : undefined;
+  const document = htmlFragment(html);
+  for (const node of document.querySelectorAll('script,style,nav,footer,aside,form,[aria-hidden="true"],[data-testid="related-content"]')) node.remove();
+  const root = document.querySelector('article') ?? document.querySelector('main');
+  if (!root?.querySelector('p')) return undefined;
+  const text = [...root.querySelectorAll('h1,h2,h3,p,li')].filter(element => !element.parentElement?.closest('li'))
+    .map(element => (element.textContent ?? '').replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n\n').slice(0, 100000);
+  return text.length >= 200 ? { text, media: extractMedia(root.innerHTML, url) } : undefined;
 }
 
 function saveEnrichmentResponses(item: Item, store: Storage, http: Http, start: number, channel: string): void {

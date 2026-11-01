@@ -2,6 +2,10 @@
 
 Run all commands from the repository root.
 
+Fragment parsing keeps descendant elements such as metadata, articles and headings, but drops the `html`, `head` and `body` wrappers and their attributes. Nested `template.content` is a separate tree outside descendant queries and text extraction. Adapters must query descendant elements and confine mutations to their returned fragment. A caller needing document-level structure must use a full `JSDOM` window and close it after use. Known plain text from JSON, XML or DOM `textContent` receives whitespace normalization without HTML reparsing; HTML snippets are parsed separately. Readable text extraction walks the DOM without cloning or mutating it, retaining spaces between text blocks. Hacker News JSON `title` and `text` fields contain HTML under the [official API contract](https://github.com/HackerNews/API#items), so they are decoded once as HTML.
+
+RSS titles and untyped Atom text retain literal markup characters. Atom HTML and XHTML constructs are decoded according to their declared type; XHTML preserves mixed text order, namespace-prefixed elements and literal escaped markup.
+
 Source module boundaries are documented in [Architecture](architecture.md) and enforced by `npm run check:architecture`. Each module exposes named public entries; new cross-module dependencies must satisfy `src/modules.json`. The worker handshake has a separate small dependency budget.
 
 Tests mirror the source modules under `tests/agent/`, `tests/content/`, `tests/instance/`, `tests/platform/`, `tests/publishing/`, `tests/runs/`, `tests/sources/`, `tests/storage/` and `tests/ui/`. Cross-module and CLI behavior lives in `tests/integration/` and `tests/e2e/`; reusable fixtures and deliberate raw database access belong in `tests/support/`. `npm test` discovers test files recursively. To select cases across the suite, use `npm test -- --test-name-pattern="pattern"`.

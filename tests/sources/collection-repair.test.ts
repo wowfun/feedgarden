@@ -29,6 +29,19 @@ function fixture(streamId: string, kind = 'anthropic-html') {
   return {source,stream,channel,store,http,now:at,since:at};
 }
 
+test('official discovery preserves paragraph boundaries and decoded DOM text', async () => {
+  const c = fixture('news');
+  c.http.page = async url => ({ url, status: 200, headers: {}, fetchedAt: at, body: url === c.channel.url
+    ? '<main><a href="/news/comparisons">Article</a></main>'
+    : '<!doctype html><html><head><meta property="og:type" content="article"><meta property="article:published_time" content="2026-10-20"></head><body data-layout="article"><article><header><h1>Check x&lt;y then z</h1></header><p>First <em>paragraph</em>.</p><p>Second x&lt;y then z.<br>Third line.</p></article></body></html>' });
+  try {
+    const { items } = await adapters['anthropic-html'](c);
+    assert.equal(items[0]?.title, 'Check x<y then z');
+    assert.equal(items[0]?.text, 'First paragraph. Second x<y then z. Third line.');
+    assert.equal(items[0]?.publishedAt, '2026-10-19T16:00:00.000Z');
+  } finally { c.store.close(); }
+});
+
 for (const reason of ['non-article','outside-engineering']) test('discovery rechecks '+reason+' after seven days and accepts newly valid articles',async()=>{
  const c=fixture(reason==='outside-engineering'?'engineering':'news','sitemap');let valid=false,requests=0;
  const url='https://www.anthropic.com/'+(reason==='outside-engineering'?'research':'news')+'/changing';

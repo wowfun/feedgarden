@@ -1,4 +1,3 @@
-import { load } from 'cheerio';
 import { DateTime } from 'luxon';
 import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -16,6 +15,7 @@ import { pythonExecutable } from '../../platform/process/command.js';
 import { validationEnvironment } from '../../platform/process/execute.js';
 import { safeUrl } from '../../platform/url.js';
 import { type Storage } from '../../storage/index.js';
+import { htmlFragment, normalizeText, readableText, selectedText } from '../html.js';
 import { parsePodcastFeed } from '../podcasts.js';
 import { array, date, parseFeed, parseFeedDocument, parseFollowBuilders, parseProductHunt, parseTrending, parseXTimeline, plain, text, xml, type ParseContext } from './parsers.js';
 
@@ -62,6 +62,7 @@ async function hn(c: ChannelContext): Promise<Collection> {
       const raw = await c.http.get(`${url}/item/${id}.json`); const row = JSON.parse(raw.body);
       if (!row || row.deleted || row.dead || row.type !== 'story') return undefined;
       if (!row.title || !Number.isFinite(row.time)) throw new Error('Malformed HN story');
+      // The HN API defines both title and text as HTML despite the JSON envelope.
       return {
         ...base(c), id: String(id), title: plain(row.title), url: safeUrl(row.url ?? `https://news.ycombinator.com/item?id=${id}`),
         publishedAt: new Date(row.time * 1000).toISOString(), author: row.by, text: plain(row.text ?? ''),
@@ -191,12 +192,12 @@ async function officialPages(c: ChannelContext): Promise<Collection> {
       if (articlePath(path)) urls.add(url);
     }
   } else {
-    const $ = load(first.body);
-    $('nav,footer,header:not(main header)').remove();
-    $('a[href]').each((_index, element) => {
-      const href = $(element).attr('href'); if (!href) return;
+    const document = htmlFragment(first.body);
+    for (const node of document.querySelectorAll('nav,footer,header:not(main header)')) node.remove();
+    for (const element of document.querySelectorAll('a[href]')) {
+      const href = element.getAttribute('href'); if (!href) continue;
       const url = new URL(href, origin); if (url.origin === origin && articlePath(url.pathname)) urls.add(url.href);
-    });
+    }
   }
   if (!urls.size) throw new Error('Official list/sitemap contained no recognizable article links');
   const items: Item[] = []; let failures = 0, nonArticles = 0, outsideEngineering = 0;
@@ -220,29 +221,29 @@ async function officialPages(c: ChannelContext): Promise<Collection> {
   const unseen = [...due.slice(0, 10), ...fresh, ...due.slice(10)];
   for (const url of unseen.slice(0, 50)) {
     try {
-      const raw = await c.http.page(url); const $ = load(raw.body);
+      const raw = await c.http.page(url); const document = htmlFragment(raw.body);
       const objects: any[] = [];
-      $('script[type="application/ld+json"]').each((_i, element) => { try { objects.push(JSON.parse($(element).text())); } catch { } });
+      for (const element of document.querySelectorAll('script[type="application/ld+json"]')) { try { objects.push(JSON.parse(element.textContent ?? '')); } catch { } }
       const entities = objects.flatMap(object => array<any>(object['@graph'] ?? object));
       const article = entities.find(object => array(object?.['@type']).some(type => ['Article', 'BlogPosting', 'NewsArticle'].includes(String(type)))
         && (!object.url || new URL(String(object.url), url).href === url));
       // Category pages also use <article>/<h1>. Require page-level article
       // metadata before allowing an undated page to become a first observation.
-      const pageType = $('meta[property="og:type"]').attr('content')?.toLowerCase();
+      const pageType = document.querySelector('meta[property="og:type"]')?.getAttribute('content')?.toLowerCase();
       if (!article && pageType !== 'article') { if (pageType === 'website') { nonArticles++; skip(url, 'non-article'); } else failures++; continue; }
       if (c.stream.id === 'engineering' && c.channel.kind === 'sitemap'
         && !/engineering/i.test(text(article?.articleSection))
-        && !$('article header a[href]').toArray().some(element => new URL($(element).attr('href')!, url).pathname.replace(/\/$/, '') === '/engineering')) { outsideEngineering++; skip(url, 'outside-engineering'); continue; }
-      const published = date(article?.datePublished ?? $('meta[property="article:published_time"]').attr('content') ?? $('time[datetime]').first().attr('datetime'), c.source.timezone);
-      const title = plain(article?.headline ?? $('h1').first().text());
-      $('script,style,nav,footer,header').remove();
-      const body = plain($('article').first().find('p').text() || $('main').first().find('p').text());
-      if (!title || !body) { failures++; continue; }
+        && ![...document.querySelectorAll('article header a[href]')].some(element => new URL(element.getAttribute('href')!, url).pathname.replace(/\/$/, '') === '/engineering')) { outsideEngineering++; skip(url, 'outside-engineering'); continue; }
+      const published = date(article?.datePublished ?? document.querySelector('meta[property="article:published_time"]')?.getAttribute('content') ?? document.querySelector('time[datetime]')?.getAttribute('datetime'), c.source.timezone);
+      const title = normalizeText(article?.headline ?? document.querySelector('h1')?.textContent);
+      for (const node of document.querySelectorAll('script,style,nav,footer,header')) node.remove();
+      const root = [document.querySelector('article'), document.querySelector('main')].find(node => node && normalizeText(selectedText(node, 'p')));
+      if (!title || !root) { failures++; continue; }
       c.store.assertLease();
       c.store.sources.forgetDiscovery(c.source.id, c.stream.id, safeUrl(url));
       items.push({
         ...base(c), id: safeUrl(url), title, url: safeUrl(url), publishedAt: published ?? c.now, basis: published ? 'published' : 'observed', metrics: {},
-        text: plain($('article').first().text() || $('main').first().text()).slice(0, 100000),
+        text: readableText(root).slice(0, 100000),
       });
     } catch { failures++; }
   }

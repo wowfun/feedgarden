@@ -1,12 +1,12 @@
-import { load } from 'cheerio';
 import { safeUrl } from '../platform/url.js';
+import { htmlFragment } from './html.js';
 
 // Decode Apollo's data transport without executing any of the page's JavaScript.
 export function* productHuntObjects(body: string): Generator<Record<string, any>> {
-  const $ = load(body);
+  const document = htmlFragment(body);
   let visited = 0;
-  for (const element of $('script').toArray()) {
-    const script = $(element).text();
+  for (const element of document.querySelectorAll('script')) {
+    const script = element.textContent ?? '';
     if (!script.startsWith('(window[Symbol.for("ApolloSSRDataTransport")]')) continue;
     const payload = script.match(/\.push\((\{[\s\S]*\})\)\s*;?$/)?.[1];
     if (!payload) continue;

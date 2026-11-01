@@ -19,7 +19,7 @@ Before each ordinary push the expected remote head and lease are rechecked. Ther
 
 ## Optional Jekyll UI
 
-Jekyll targets require Git, Ruby 4.0.x and Bundler. Bundled Gemfile/Gemfile.lock and a fixed theme template are the trust source; target dependency files must match. Build uses frozen bundle settings and an isolated cache/ui staging directory. Target plugins, hooks, scripts and custom build commands are never executed.
+Jekyll targets require Git, Ruby 4.0.x and Bundler. Builds use the bundled Gemfile/Gemfile.lock and a fixed theme template, with frozen bundle settings in an isolated cache/ui staging directory. Target dependency files may differ and are preserved. Target plugins, hooks, scripts and custom build commands are never executed.
 
 The target's optional `ui` object supports `title`, `description`, `lang` (`en` or `zh-CN`), an HTTP(S) `url`, `baseurl` and boolean `features` (`search`, `feed`, `tags`, `graph`, `relations`, `previews`, `outline`, `favorites`). These presentation settings overlay the bundled template. Arbitrary Jekyll configuration, plugin lists and executable hooks are rejected. The template includes bilingual routes, feed facets and shared Clippings content.
 

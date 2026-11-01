@@ -420,7 +420,6 @@ try {
                 'AUTH_REQUIRED',
                 'CONFIG_INVALID',
                 'TARGET_ADOPTION_REQUIRED',
-                'UNTRUSTED_UI_DEPENDENCIES',
                 'UNSAFE_PATH',
                 'PATH_CONFLICT',
               ].includes(i.code),

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdir,mkdtemp,rm,writeFile } from 'node:fs/promises';
+import { chmod,copyFile,mkdir,mkdtemp,readFile,rm,writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter,join } from 'node:path';
 import test from 'node:test';
 import { editConfig,setup } from '../../src/app/index.js';
 import { targetSchema } from '../../src/contracts/configuration.js';
@@ -77,6 +77,55 @@ test('nonempty target requires adoption and retains opaque history and unrelated
     const other = { ...f.config, instanceId: '00000000-0000-4000-8000-000000000002' };
     await assert.rejects(publish(other, f.store, f.target), /adopt/);
   } finally {
+    await f.cleanup();
+  }
+});
+
+test('Jekyll publication builds from bundled dependencies and pushes without changing target dependencies', async () => {
+  const f = await fixture(true);
+  const previousPath = process.env.PATH;
+  try {
+    const gemfile = 'raise "Target Gemfile must never execute during publication"\n';
+    await writeFile(join(f.seed, 'Gemfile'), gemfile);
+    await writeFile(join(f.seed, 'Gemfile.lock'), 'Existing site dependency lock\n');
+    git(f.seed, 'add', '.');
+    git(f.seed, 'commit', '-m', 'Existing UI version');
+    git(f.seed, 'push', 'origin', 'main');
+    // Stub only the external Bundler process. The real builder must stage its
+    // trusted files, and publication must still commit and push to the fixture.
+    const toolchain = join(f.root, 'toolchain'), log = join(f.root, 'build-calls.jsonl');
+    await mkdir(toolchain);
+    const expected = Object.fromEntries(await Promise.all(['Gemfile', 'Gemfile.lock'].map(async name =>
+      [name, await readFile(new URL('../../resources/ui/' + name, import.meta.url), 'utf8')])));
+    await writeFile(join(toolchain, 'bundle'), `#!${process.execPath}
+const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
+for (const [name, body] of Object.entries(${JSON.stringify(expected)})) assert.equal(fs.readFileSync(name, 'utf8'), body);
+assert.equal(process.env.BUNDLE_GEMFILE, path.join(process.cwd(), 'Gemfile'));
+assert.equal(process.env.BUNDLE_FROZEN, 'true');
+assert.equal(fs.readFileSync('content/history.md', 'utf8'), 'Historical content');
+assert.ok(fs.existsSync('.github/jekyll-obsidian.yml'));
+fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd() }) + '\\n');
+`);
+    if (process.platform === 'win32') await copyFile(process.execPath, join(toolchain, 'ruby.exe'));
+    else await chmod(join(toolchain, 'bundle'), 0o755);
+    process.env.PATH = toolchain + delimiter + (previousPath ?? '');
+    const target = { ...f.target, format: 'jekyll' as const, ui: { url: 'https://example.com', baseurl: '/feed' } };
+    const inspected = await inspectTarget(f.config, target);
+    await adoptTarget(f.config, f.store, target, inspected.head!);
+    const before = git(f.remote, 'rev-parse', 'main');
+    const published = await publish(f.config, f.store, target);
+    assert.equal(published.confirmed, true);
+    assert.notEqual(published.commit, before);
+    assert.equal(git(f.remote, 'rev-parse', 'main'), published.commit);
+    const builds = (await readFile(log, 'utf8')).trim().split('\n').map(line => JSON.parse(line));
+    assert.deepEqual(builds.map(call => call.args), [['check'], ['exec', 'jekyll-obsidian', 'build']]);
+    assert.ok(builds.every(call => call.cwd.startsWith(join(f.config.paths.cache, 'ui'))));
+    assert.ok(git(f.remote, 'diff', '--name-only', before, 'main').split('\n').every(path => path.startsWith('feed/')));
+    assert.equal(git(f.remote, 'show', 'main:Gemfile'), gemfile.trim());
+    assert.equal(git(f.remote, 'show', 'main:Gemfile.lock'), 'Existing site dependency lock');
+    assert.equal(git(f.remote, 'show', 'main:feed/history.md'), 'Historical content');
+  } finally {
+    if (previousPath === undefined) delete process.env.PATH; else process.env.PATH = previousPath;
     await f.cleanup();
   }
 });

@@ -6,8 +6,6 @@ import { FdgError } from '../contracts/errors.js';
 import type { Target } from '../contracts/publishing.js';
 import type { InstanceContext } from '../instance/index.js';
 import { configureGitDns, git } from '../platform/git.js';
-import { hash } from '../platform/hash.js';
-import { resource } from '../platform/resources.js';
 import { completeArtifact, markArtifact, pruneArtifacts } from '../platform/retention.js';
 import { ensureSafe, tree } from './filesystem.js';
 import type { Manifest } from './targets.js';
@@ -61,15 +59,8 @@ export async function checkout(config: InstanceContext, target: Target, signal?:
       const full = await ensureSafe(root, path);
       if (existsSync(full)) files['@/' + path] = await readFile(full);
     }
-    if (target.format === 'jekyll')
-      for (const name of ['Gemfile', 'Gemfile.lock']) {
-        const file = await ensureSafe(root, name);
-        if (existsSync(file) && hash(await readFile(file)) !== hash(await readFile(resource('ui', name))))
-          throw new FdgError(
-            'UNTRUSTED_UI_DEPENDENCIES',
-            'Target ' + name + ' differs from the bundled UI dependencies',
-          );
-      }
+    // Publication only reads managed content. Remote UI code and dependency
+    // files remain untouched; local UI builds use the package's trusted bundle.
     return { root, prefix, head, files, manifest, dispose };
   } catch (error) { await dispose(false); throw error; }
 }

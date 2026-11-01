@@ -6,12 +6,36 @@ Feedgarden 为 agent 提供本地信息流：订阅采集、渠道实时查询�
 
 ## 使用本地安装包
 
-开发和 CI 基线为 **Node 26.x**。Node 24.x 的 24.12 及以上版本仅尽力兼容（best-effort），不再安排专门测试或 CI。本次交付本地 tarball，不向 npm 发布。可执行名是 `fdg`，但 npm 上的同名包属于其他项目，调用时必须明确指定本地包：
+开发和 CI 默认使用 **Node 26.x 和 pnpm 11.18.0**。仓库通过 `package.json` 固定 pnpm 版本；尚未安装时可运行 `npm install --global pnpm@11.18.0`。Node 24.x 的 24.12 及以上版本仅尽力兼容（best-effort），不再安排专门测试或 CI。本次交付本地 tarball，不向 npm 发布。可执行名是 `fdg`，但 npm 上的同名包属于其他项目，调用时必须明确指定本地包：
 
 ```sh
-npm ci
-npm run build
-npm pack
+pnpm install --frozen-lockfile
+pnpm run build
+pnpm pack
+pnpm --package /absolute/feedgarden-0.1.0.tgz dlx fdg setup
+pnpm --package /absolute/feedgarden-0.1.0.tgz dlx fdg doctor
+```
+
+`dlx` 只在本次调用中提供 `fdg`。要安装可长期使用的命令，先配置 pnpm 全局目录：
+
+```sh
+pnpm setup
+```
+
+关闭并重新打开终端，再安装 tarball：
+
+```sh
+pnpm add --global /absolute/feedgarden-0.1.0.tgz
+command -v fdg
+fdg version
+fdg channels
+```
+
+Windows Git Bash 可使用 `/d/Projects/feedgarden/feedgarden-0.1.0.tgz` 这样的路径。若全局 bin 目录没有进入 PATH，按 [Git Bash PATH 配置说明](docs/operations.md#global-installation-and-git-bash)处理。新实例只需运行一次 `fdg setup`；已有实例直接运行 `fdg doctor`。安装或更新程序包会保留实例数据。
+
+同一个 tarball 也支持通过 npm/npx 安装和运行：
+
+```sh
 npx --yes --strict-allow-scripts --package /absolute/feedgarden-0.1.0.tgz -- fdg setup
 npx --yes --strict-allow-scripts --package /absolute/feedgarden-0.1.0.tgz -- fdg doctor
 ```
@@ -52,4 +76,4 @@ fdg sync --publish --detach --workspace /absolute/workspace
 - [来源](docs/sources.md)、[摘要](docs/summaries.md)、[播客](docs/podcasts.md)、[排名](docs/ranking.zh-CN.md)、[归档](docs/archives.md)、[主题](docs/topics.zh-CN.md)
 - [Clippings](docs/clippings.zh-CN.md)、[关联内容](docs/related-items.md)、[站点功能](docs/site.md)
 
-现有站点：[英文](https://sinputer.top/feedgarden/)／[中文](https://sinputer.top/feedgarden/zh-CN/)。开发时可用 `npm run dev:site:build` 构建已提交内容；该命令不初始化实例或加工文章。
+现有站点：[英文](https://sinputer.top/feedgarden/)／[中文](https://sinputer.top/feedgarden/zh-CN/)。开发时可用 `pnpm run dev:site:build` 构建已提交内容；该命令不初始化实例或加工文章。

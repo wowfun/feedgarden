@@ -6,12 +6,36 @@ Feedgarden gives agents a local information feed: collect subscriptions, query c
 
 ## Run the local package
 
-Use **Node 26.x**, the development and CI baseline. Node 24.12+ on 24.x remains best-effort, without dedicated tests or CI. This change delivers a local tarball; it does not publish to npm. The executable is `fdg`, but the npm package named `fdg` belongs to another project. Always supply the tarball explicitly:
+Use **Node 26.x and pnpm 11.18.0**, the development and CI baseline. The repository pins pnpm in `package.json`; install it if needed with `npm install --global pnpm@11.18.0`. Node 24.12+ on 24.x remains best-effort, without dedicated tests or CI. This change delivers a local tarball; it does not publish to npm. The executable is `fdg`, but the npm package named `fdg` belongs to another project. Always supply the tarball explicitly:
 
 ```sh
-npm ci
-npm run build
-npm pack
+pnpm install --frozen-lockfile
+pnpm run build
+pnpm pack
+pnpm --package /absolute/feedgarden-0.1.0.tgz dlx fdg setup
+pnpm --package /absolute/feedgarden-0.1.0.tgz dlx fdg doctor
+```
+
+`dlx` exposes `fdg` for that invocation. To install a persistent command, configure pnpm's global directory:
+
+```sh
+pnpm setup
+```
+
+Close and reopen the terminal, then install the tarball:
+
+```sh
+pnpm add --global /absolute/feedgarden-0.1.0.tgz
+command -v fdg
+fdg version
+fdg channels
+```
+
+In Windows Git Bash, use a path such as `/d/Projects/feedgarden/feedgarden-0.1.0.tgz`. If the global bin directory is missing from PATH, follow [Git Bash PATH configuration](docs/operations.md#global-installation-and-git-bash). Run `fdg setup` once for a new instance; an existing instance can use `fdg doctor` directly. Installing or updating the package preserves instance data.
+
+npm/npx remain supported for installing and running the same tarball:
+
+```sh
 npx --yes --strict-allow-scripts --package /absolute/feedgarden-0.1.0.tgz -- fdg setup
 npx --yes --strict-allow-scripts --package /absolute/feedgarden-0.1.0.tgz -- fdg doctor
 ```
@@ -52,4 +76,4 @@ Publication uses an isolated checkout and a target owner manifest. Nonempty unow
 - [Sources](docs/sources.md), [summaries](docs/summaries.md), [podcasts](docs/podcasts.md), [ranking](docs/ranking.md), [archives](docs/archives.md), [topics](docs/topics.md)
 - [Clippings](docs/clippings.md), [related items](docs/related-items.md), [site features](docs/site.md)
 
-The existing site remains available in [English](https://sinputer.top/feedgarden/) and [Chinese](https://sinputer.top/feedgarden/zh-CN/). To preview its checked-in content during development, use `npm run dev:site:build`; this does not initialize an instance or process articles.
+The existing site remains available in [English](https://sinputer.top/feedgarden/) and [Chinese](https://sinputer.top/feedgarden/zh-CN/). To preview its checked-in content during development, use `pnpm run dev:site:build`; this does not initialize an instance or process articles.

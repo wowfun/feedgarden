@@ -10,7 +10,7 @@ import { developmentConfig } from './development-config.js';
 import { validationDirectory as resolveValidationDirectory } from './validation-paths.js';
 async function main(): Promise<void> {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: { config: { type: 'string' }, help: { type: 'boolean', short: 'h' } } });
-  if (values.help) { console.log('Usage: npm run verify:collect -- [--config FILE] [SOURCE ...]\nWithout sources, checks enabled sources except OpenAI in an isolated database.'); return; }
+  if (values.help) { console.log('Usage: pnpm run verify:collect [--config FILE] [SOURCE ...]\nWithout sources, checks enabled sources except OpenAI in an isolated database.'); return; }
   const config = developmentConfig(values.config);
   const validationDirectory = resolveValidationDirectory(config);
   // Reuse the selected installation; only collected evidence belongs to the fixture.

@@ -13,7 +13,7 @@ import { validationTheme } from './validation-theme.js';
 
 const { values } = parseArgs({ options: { config: { type: 'string' }, gem: { type: 'string' }, 'personal-site': { type: 'string' }, port: { type: 'string' }, 'personal-port': { type: 'string' }, help: { type: 'boolean' } } });
 if (values.help) {
-  console.log('Usage: npm run verify:footer -- [--config FILE] [--gem PATH] [--personal-site PATH] [--port 58002] [--personal-port 58000]\nVerify isolated content copies with the frozen published theme by default, or an explicit local gem. Optional second site enables paired previews. No database or publication access.');
+  console.log('Usage: pnpm run verify:footer [--config FILE] [--gem PATH] [--personal-site PATH] [--port 58002] [--personal-port 58000]\nVerify isolated content copies with the frozen published theme by default, or an explicit local gem. Optional second site enables paired previews. No database or publication access.');
   process.exit(0);
 }
 function port(value: string | undefined, fallback: number): number {

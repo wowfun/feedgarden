@@ -22,7 +22,7 @@ async function treeHashes(root: string, prefix = ''): Promise<[string, string][]
   }
   return result;
 }
-/** Resolve production dependencies from the installed layout, including npm hoisting. */
+/** Resolve production dependencies through pnpm links and npm's hoisted layout. */
 async function dependencies() {
   const packages: { source: string; path: string; manifest: string }[] = [],
     hoisted = new Map<string, string>();

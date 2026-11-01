@@ -32,7 +32,7 @@ flowchart TD
   Content --> Storage
 ```
 
-Cross-module consumers use named exports from `index.ts`. The small leaf APIs in `contracts/` and `platform/` have explicit entries in [the dependency policy](../src/modules.json). Internal files import their siblings directly. There are no forwarding files at the old flat paths and no wildcard public exports. `npm run check:architecture` checks static, dynamic and type imports, public entrypoints, dependency directions, raw database access, runtime cycles and literal runtime resource paths. It also checks the worker's small startup dependency graph. The build runs this gate before compiling.
+Cross-module consumers use named exports from `index.ts`. The small leaf APIs in `contracts/` and `platform/` have explicit entries in [the dependency policy](../src/modules.json). Internal files import their siblings directly. There are no forwarding files at the old flat paths and no wildcard public exports. `pnpm run check:architecture` checks static, dynamic and type imports, public entrypoints, dependency directions, raw database access, runtime cycles and literal runtime resource paths. It also checks the worker's small startup dependency graph. The build runs this gate before compiling.
 
 ## Instance context
 
@@ -56,4 +56,4 @@ Model transport and attempt accounting are separate modules. Typed model errors 
 
 Publication operates in an owned checkout. Inspection, export, adoption, diffing, push confirmation and topic merging have separate implementations. Owner manifests, generations, identity reservations, hashes and deletion intents still determine the diff. Uncertain pushes retain their durable receipts; confirmation checks fetched history before retrying. UI builds use bundled trusted dependencies in isolated staging.
 
-The root worker acknowledges its launch through `storage/worker.ts` before importing the CLI. Its handshake closure contains only that module and the SQLite adapter. Moving sources does not change copied durable runtimes, packaged skills, model tool resources or configuration locations. Package smoke tests exercise installation, npm execution, detached startup and skill registration.
+The root worker acknowledges its launch through `storage/worker.ts` before importing the CLI. Its handshake closure contains only that module and the SQLite adapter. Moving sources does not change copied durable runtimes, packaged skills, model tool resources or configuration locations. Package smoke tests exercise pnpm/npm installation and execution, detached startup and skill registration.

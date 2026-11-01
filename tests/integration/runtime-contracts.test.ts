@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir,mkdtemp,readFile,rm,stat,writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { apply as plugin,reportSkill,reportTaskSkill } from '../../src/agent/index.js';
@@ -26,6 +26,79 @@ test('Windows npm entrypoints use the running Node even when the shim directory 
     assert.equal(program, process.execPath);
     assert.deepEqual(JSON.parse(execFileSync(program, args, { encoding: 'utf8' })), ['a b', 'x&y']);
     assert.throws(() => processCommand('npm', [], { PATH: '' }), /PATH/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('Windows pnpm Corepack shims preserve literal arguments without a shell', { skip: process.platform !== 'win32' }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'feedgarden-pnpm-shim-'));
+  try {
+    await mkdir(join(root, 'node_modules/corepack/dist'), { recursive: true });
+    await writeFile(join(root, 'node_modules/corepack/dist/pnpm.js'), 'console.log(JSON.stringify(process.argv.slice(2)))');
+    await writeFile(join(root, 'pnpm.cmd'), '@node "%~dp0\\node_modules\\corepack\\dist\\pnpm.js" %*\r\n');
+    const [program, args] = processCommand('pnpm', ['a b', 'https://example.test/?x=1&y=%25^literal'], { PATH: root });
+    assert.equal(program, process.execPath);
+    assert.deepEqual(JSON.parse(execFileSync(program, args, { encoding: 'utf8' })), ['a b', 'https://example.test/?x=1&y=%25^literal']);
+    assert.throws(() => processCommand('pnpm', [], { PATH: '' }), /PATH/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('Windows npm-installed pnpm uses its CLI with literal arguments and no adjacent node.exe', { skip: process.platform !== 'win32' }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'feedgarden pnpm npm shim '));
+  try {
+    const entry = join(root, 'node_modules/pnpm/bin/pnpm.mjs');
+    await mkdir(join(root, 'node_modules/pnpm/bin'), { recursive: true });
+    await writeFile(join(root, 'node_modules/pnpm/package.json'), JSON.stringify({ name: 'pnpm', bin: { pnpm: 'bin/pnpm.mjs' } }));
+    await writeFile(entry, 'console.log(JSON.stringify(process.argv.slice(2)))');
+    await writeFile(join(root, 'pnpm.cmd'), '@ECHO off\r\nSET "_prog=node"\r\n"%_prog%"  "%dp0%\\node_modules\\pnpm\\bin\\pnpm.mjs" %*\r\n');
+    const literal = ['a b', 'https://example.test/?x=1&y=%25^literal'];
+    const [program, args] = processCommand('pnpm', literal, { PATH: root });
+    assert.equal(program, process.execPath);
+    assert.equal(args[0], entry);
+    assert.deepEqual(JSON.parse(execFileSync(program, args, { encoding: 'utf8' })), literal);
+    await mkdir(join(root, 'node_modules/.bin'));
+    await writeFile(join(root, 'node_modules/.bin/pnpm.cmd'), '"%_prog%" "%dp0%\\..\\pnpm\\bin\\pnpm.mjs" %*\r\n');
+    assert.deepEqual(processCommand('pnpm', literal, { PATH: join(root, 'node_modules/.bin') }), [process.execPath, [entry, ...literal]]);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('Windows pnpm respects PATH order before an npm-installed fallback', { skip: process.platform !== 'win32' }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'feedgarden-pnpm-order-'));
+  try {
+    const first = join(root, 'first'), second = join(root, 'second');
+    await mkdir(first);
+    await mkdir(join(second, 'node_modules/pnpm/bin'), { recursive: true });
+    await writeFile(join(first, 'pnpm.exe'), 'native fixture');
+    await writeFile(join(second, 'pnpm.cmd'), '"%_prog%" "%dp0%\\node_modules\\pnpm\\bin\\pnpm.mjs" %*\r\n');
+    await writeFile(join(second, 'node_modules/pnpm/package.json'), JSON.stringify({ name: 'pnpm', bin: { pnpm: 'bin/pnpm.mjs' } }));
+    await writeFile(join(second, 'node_modules/pnpm/bin/pnpm.mjs'), 'fixture');
+    const env = { PATH: [first, second].join(delimiter) };
+    assert.deepEqual(processCommand('pnpm', ['--version'], env), [join(first, 'pnpm.exe'), ['--version']]);
+    await rm(join(first, 'pnpm.exe'));
+    await mkdir(join(first, 'node_modules/corepack/dist'), { recursive: true });
+    const corepack = join(first, 'node_modules/corepack/dist/pnpm.js');
+    await writeFile(corepack, 'fixture');
+    await writeFile(join(first, 'pnpm.cmd'), '@node "%~dp0\\node_modules\\corepack\\dist\\pnpm.js" %*\r\n');
+    assert.deepEqual(processCommand('pnpm', ['--version'], env), [process.execPath, [corepack, '--version']]);
+    await mkdir(join(first, 'node_modules/pnpm/bin'), { recursive: true });
+    await writeFile(join(first, 'node_modules/pnpm/package.json'), JSON.stringify({ name: 'pnpm', bin: { pnpm: 'bin/pnpm.mjs' } }));
+    await writeFile(join(first, 'node_modules/pnpm/bin/pnpm.mjs'), 'co-located fixture');
+    assert.deepEqual(processCommand('pnpm', ['--version'], env), [process.execPath, [corepack, '--version']]);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('Windows pnpm skips a malformed fallback manifest and retains actionable failure diagnostics', { skip: process.platform !== 'win32' }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'feedgarden-pnpm-manifest-'));
+  try {
+    const bin = join(root, 'node_modules/.bin'), entry = join(root, 'node_modules/pnpm/bin/pnpm.mjs');
+    await mkdir(join(bin, 'node_modules/pnpm'), { recursive: true });
+    await mkdir(join(root, 'node_modules/pnpm/bin'), { recursive: true });
+    await writeFile(join(bin, 'pnpm.cmd'), '"%_prog%" "%dp0%\\..\\pnpm\\bin\\pnpm.mjs" %*\r\n');
+    await writeFile(join(bin, 'node_modules/pnpm/package.json'), '{broken');
+    await writeFile(join(root, 'node_modules/pnpm/package.json'), JSON.stringify({ name: 'pnpm', bin: { pnpm: 'bin/pnpm.mjs' } }));
+    await writeFile(entry, 'console.log(JSON.stringify(process.argv.slice(2)))');
+    assert.deepEqual(processCommand('pnpm', ['--version'], { PATH: bin }), [process.execPath, [entry, '--version']]);
+    await writeFile(join(root, 'node_modules/pnpm/package.json'), 'null');
+    assert.throws(() => processCommand('pnpm', [], { PATH: bin }), /MANUAL_ACTION.*entrypoint/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 

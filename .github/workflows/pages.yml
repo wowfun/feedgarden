@@ -30,41 +30,47 @@ jobs:
         if: steps.changes.outputs.mode != 'docs'
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        if: steps.changes.outputs.mode != 'docs'
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
         if: steps.changes.outputs.mode != 'docs'
       - name: Compile and typecheck
         if: steps.changes.outputs.mode == 'full'
-        run: npm run build
+        run: pnpm run build
       - name: Run tests
         if: steps.changes.outputs.mode == 'full'
-        run: npm test
+        run: pnpm test
       - name: Install the OpenCode acceptance baseline
         if: steps.changes.outputs.mode == 'full'
-        run: npm install --prefix "$RUNNER_TEMP/feedgarden-opencode" --no-save --ignore-scripts @opencode/cli-linux-x64@2.0.31
+        run: |
+          mkdir -p "$RUNNER_TEMP/feedgarden-opencode"
+          printf '{"private":true}\n' > "$RUNNER_TEMP/feedgarden-opencode/package.json"
+          pnpm --dir "$RUNNER_TEMP/feedgarden-opencode" add --ignore-scripts --ignore-workspace --save-exact @opencode/cli-linux-x64@2.0.31
       - name: Verify ACP against a local simulated model
         if: steps.changes.outputs.mode == 'full'
-        run: npm run verify:opencode -- --command "$RUNNER_TEMP/feedgarden-opencode/node_modules/@opencode/cli-linux-x64/bin/opencode"
+        run: pnpm run verify:opencode --command "$RUNNER_TEMP/feedgarden-opencode/node_modules/@opencode/cli-linux-x64/bin/opencode"
       - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8
         if: steps.changes.outputs.mode != 'docs'
         with:
           ruby-version: '4.0.6'
           bundler-cache: true
-      - run: npm run dev:site:build
+      - run: pnpm run dev:site:build
         if: steps.changes.outputs.mode != 'docs'
-      - run: npx playwright install --with-deps --only-shell chromium
+      - run: pnpm exec playwright install --with-deps --only-shell chromium
         if: steps.changes.outputs.mode != 'docs'
-      - run: npm run test:visual
+      - run: pnpm run test:visual
         if: steps.changes.outputs.mode != 'docs'
       - name: Verify Clippings with the published theme
         if: steps.changes.outputs.mode != 'docs'
-        run: npm run verify:clippings
+        run: pnpm run verify:clippings
       - name: Verify page footers and 404 shells with the published theme
         if: steps.changes.outputs.mode != 'docs'
-        run: npm run verify:footer
-      - run: npm run verify:scale
+        run: pnpm run verify:footer
+      - run: pnpm run verify:scale
         if: steps.changes.outputs.mode == 'full'
-      - run: FEEDGARDEN_VISUAL_ROOT=.local/feedgarden/state/validation/fixture/.jekyll-obsidian-cache/site FEEDGARDEN_VISUAL_FIXTURE=1 npm run test:visual
+      - run: FEEDGARDEN_VISUAL_ROOT=.local/feedgarden/state/validation/fixture/.jekyll-obsidian-cache/site FEEDGARDEN_VISUAL_FIXTURE=1 pnpm run test:visual
         if: steps.changes.outputs.mode == 'full'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always() && steps.changes.outputs.mode != 'docs'

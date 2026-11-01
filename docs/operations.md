@@ -2,6 +2,51 @@
 
 Use an explicitly installed local tarball or the executable/argv in an installed operator Skill receipt. Do not resolve the unrelated npm package named fdg. `fdg help --json` and `fdg channels` are the discovery interfaces.
 
+## Global installation and Git Bash
+
+`pnpm --package /absolute/feedgarden-0.1.0.tgz dlx fdg ...` runs the CLI in a temporary package environment. For a persistent `fdg` command, run `pnpm setup` once, close and reopen the terminal, then install the local tarball:
+
+```sh
+pnpm add --global /absolute/feedgarden-0.1.0.tgz
+command -v fdg
+fdg version
+fdg channels
+```
+
+For Windows Git Bash, replace the tarball path with `/d/Projects/feedgarden/feedgarden-0.1.0.tgz` or the corresponding path on your drive. `pnpm bin -g` prints the global executable directory. With pnpm 11, that directory is `PNPM_HOME/bin`; Windows stores `PNPM_HOME` as a native path, while Git Bash needs a POSIX path in PATH.
+
+If `pnpm bin -g` reports that its directory is missing from PATH, or a terminal opened by an existing IDE still cannot find `fdg`, add this block once at the end of `~/.bashrc`:
+
+```sh
+export PNPM_HOME="$(cygpath -w "${PNPM_HOME:-$LOCALAPPDATA/pnpm}")"
+_pnpm_global_bin="$(cygpath -u "$PNPM_HOME")/bin"
+case ":$PATH:" in
+  *":$_pnpm_global_bin:"*) ;;
+  *) export PATH="$_pnpm_global_bin:$PATH" ;;
+esac
+unset _pnpm_global_bin
+```
+
+Git Bash login shells must load `~/.bashrc`. Keep an existing equivalent in `~/.bash_profile`; if none is present, add:
+
+```sh
+[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
+```
+
+Reload the current Git Bash window and check command resolution:
+
+```sh
+source ~/.bashrc
+hash -r
+pnpm bin -g
+command -v fdg
+fdg version
+```
+
+Installing the tarball makes the executable available. `fdg setup` creates a new instance and rejects an existing one with `ALREADY_INITIALIZED`; use `fdg doctor` for an initialized instance. Rebuilds do not update an installed copy automatically. To replace a tarball with the same package version, reinstall it with `pnpm add --global --force /absolute/feedgarden-0.1.0.tgz`.
+
+## Command output
+
 Each operation emits one JSON envelope on stdout: `schemaVersion`, `packageVersion`, `command`, `instance`, `runId`, `state`, `result`, `issues`, `nextActions`. Logs and child output go to stderr. Source prose and upstream failures are untrusted evidence. Recovery actions contain internally generated executable/argv arrays, never shell commands copied from source content.
 
 | State | Exit code |

@@ -10,7 +10,7 @@ import { validationDirectory } from './validation-paths.js';
 import { validationTheme } from './validation-theme.js';
 
 const { values } = parseArgs({ options: { config: { type: 'string' }, gem: { type: 'string' }, help: { type: 'boolean' } } });
-if (values.help) { console.log('Usage: npm run verify:clippings -- [--config FILE] [--gem PATH]\nBuild and check isolated content copies with the frozen published theme by default, or an explicit local gem. No database or publication access.'); process.exit(0); }
+if (values.help) { console.log('Usage: pnpm run verify:clippings [--config FILE] [--gem PATH]\nBuild and check isolated content copies with the frozen published theme by default, or an explicit local gem. No database or publication access.'); process.exit(0); }
 const project = process.cwd(), base = join(validationDirectory(developmentConfig(values.config)), 'clippings');
 await mkdir(base, { recursive: true });
 const root = await mkdtemp(join(base, 'run-'));

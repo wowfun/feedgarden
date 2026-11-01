@@ -1,7 +1,9 @@
 .local/
 .references/
 node_modules/
+/.pnpm-store/
 dist/
+/feedgarden-*.tgz
 .jekyll-obsidian-cache/
 .env
 *.sqlite*

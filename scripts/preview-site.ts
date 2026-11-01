@@ -8,7 +8,7 @@ const { values } = parseArgs({ options: { root: { type: 'string' }, baseurl: { t
 const config = values.baseurl === undefined ? parse(await readFile('.github/jekyll-obsidian.yml', 'utf8')) as { baseurl?: string } : {};
 const base = (values.baseurl ?? config.baseurl ?? '').replace(/\/$/, '');
 const root = resolve(values.root ?? '.jekyll-obsidian-cache/site');
-await stat(join(root, 'index.html')).catch(() => { throw new Error('Run npm run dev:site:build before starting the preview.'); });
+await stat(join(root, 'index.html')).catch(() => { throw new Error('Run pnpm run dev:site:build before starting the preview.'); });
 const server = staticServer(root, base);
 const portText = values.port ?? '58002', port = Number(portText);
 if (!/^\d+$/.test(portText) || !Number.isInteger(port) || port < 1 || port > 65535) throw new Error('--port must be an integer from 1 to 65535');

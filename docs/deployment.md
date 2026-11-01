@@ -30,4 +30,4 @@ fdg ui serve --target site --port 4000
 fdg ui clippings fetch --target site --all --dry-run
 ```
 
-The repository Pages workflow and `npm run dev:site:build` are developer validation/deployment paths for the existing checked-in site. They are not consumer runtime dependencies. Theme version changes remain separate from the CLI refactor.
+The repository Pages workflow and `pnpm run dev:site:build` are developer validation/deployment paths for the existing checked-in site. They are not consumer runtime dependencies. Theme version changes remain separate from the CLI refactor.

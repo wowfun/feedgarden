@@ -4,7 +4,29 @@ import { fileURLToPath } from 'node:url';
 
 /** Use interpreter entrypoints for package-manager shims on Windows, without a shell. */
 export function processCommand(program: string, args: string[], env = process.env): [string, string[]] {
-  if (process.platform !== 'win32' || !['npm', 'bundle'].includes(program)) return [program, args];
+  if (process.platform !== 'win32' || !['npm', 'pnpm', 'bundle'].includes(program)) return [program, args];
+  if (program === 'pnpm') {
+    const found = windowsCommand(program, env);
+    if (found) {
+      try { return agentCommand(found, args, env); }
+      catch (error) {
+        // npm-generated cmd shims dispatch through %_prog%. Read the installed
+        // package's bin declaration for both global and project-local layouts.
+        for (const manifest of [resolve(dirname(found), 'node_modules/pnpm/package.json'), resolve(dirname(found), '../pnpm/package.json')]) {
+          if (!existsSync(manifest)) continue;
+          let metadata;
+          try { metadata = JSON.parse(readFileSync(manifest, 'utf8')); }
+          catch { continue; }
+          const bin = metadata?.name === 'pnpm' && metadata.bin?.pnpm;
+          if (typeof bin !== 'string') continue;
+          const entry = resolve(dirname(manifest), bin);
+          if (/\.[cm]?js$/i.test(entry) && existsSync(entry)) return [process.execPath, [entry, ...args]];
+        }
+        throw error;
+      }
+    }
+    throw new Error('MANUAL_ACTION: Cannot locate pnpm on PATH. Install the packageManager version from package.json and reopen the terminal');
+  }
   const directories = (env.PATH ?? env.Path ?? '').split(delimiter).map(value => value.replace(/^"|"$/g, ''));
   if (program === 'npm') {
     const directory = directories.find(path => existsSync(join(path, 'node_modules/npm/bin/npm-cli.js')));
@@ -30,10 +52,8 @@ export function agentCommand(program: string, args: string[], env = process.env)
     }
   }
   if (process.platform === 'win32') {
-    const paths = (env.PATH ?? env.Path ?? '').split(delimiter).map(value => value.replace(/^"|"$/g, ''));
     const explicit = isAbsolute(program) || /[\\/]/.test(program);
-    const candidates = explicit ? [resolve(program)] : paths.flatMap(path => ['', '.exe', '.cmd', '.bat', '.ps1'].map(extension => join(path, program + extension)));
-    const found = candidates.find(path => existsSync(path) && /\.(exe|cmd|bat|ps1)$/i.test(path));
+    const found = windowsCommand(program, env);
     if (found) {
       if (extname(found).toLowerCase() === '.exe') return [found, args];
       // Read literal package-manager targets rather than executing shell syntax
@@ -59,6 +79,13 @@ export function agentCommand(program: string, args: string[], env = process.env)
     if (explicit) throw new Error('MANUAL_ACTION: Agent executable does not exist: ' + program);
   }
   return [program, args];
+}
+
+function windowsCommand(program: string, env: NodeJS.ProcessEnv): string | undefined {
+  const paths = (env.PATH ?? env.Path ?? '').split(delimiter).map(value => value.replace(/^"|"$/g, ''));
+  const explicit = isAbsolute(program) || /[\\/]/.test(program);
+  const candidates = explicit ? [resolve(program)] : paths.flatMap(path => ['', '.exe', '.cmd', '.bat', '.ps1'].map(extension => join(path, program + extension)));
+  return candidates.find(path => existsSync(path) && /\.(exe|cmd|bat|ps1)$/i.test(path));
 }
 
 export function pythonExecutable(environment: string, name = 'python'): string {

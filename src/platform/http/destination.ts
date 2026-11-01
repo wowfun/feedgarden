@@ -1,7 +1,7 @@
 import type { LookupAddress } from 'node:dns';
-import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
 import { safeUrl } from '../url.js';
+import { resolveHostname } from './dns.js';
 
 const blocked4 = new BlockList(), blocked6 = new BlockList(), global6 = new BlockList();
 global6.addSubnet('2000::', 3, 'ipv6');
@@ -15,12 +15,12 @@ export function publicAddress(address: string): boolean {
 }
 export type PublicResolver = (hostname: string) => Promise<LookupAddress[]>;
 export interface PublicTarget { readonly url: string; readonly address: string }
-export async function resolvePublicTarget(value: string, resolve: PublicResolver = hostname => lookup(hostname, { all: true }), options: { preserveQuery?: boolean } = {}): Promise<PublicTarget> {
+export async function resolvePublicTarget(value: string, resolve: PublicResolver = resolveHostname, options: { preserveQuery?: boolean } = {}): Promise<PublicTarget> {
   const normalized = safeUrl(value, undefined, options), url = new URL(normalized), hostname = url.hostname.replace(/^\[|\]$/g, '');
   if (url.port || !hostname.includes('.') && !isIP(hostname) || /(?:^|\.)(localhost|local|internal|test|invalid)$/.test(hostname)) throw new Error('Article URL is not a public web endpoint');
   const addresses = isIP(hostname) ? [{ address: hostname, family: isIP(hostname) }] : await resolve(hostname);
   if (!addresses.length || addresses.some(row => !publicAddress(row.address))) throw new Error('Article URL resolves to a non-public address');
-  // Prefer IPv4 when both families are available; each retry resolves afresh.
+  // Prefer IPv4 when both families are available; the connection pins this IP.
   return { url: normalized, address: (addresses.find(row => isIP(row.address) === 4) ?? addresses[0]!).address };
 }
 export async function assertPublicUrl(value: string, resolve?: PublicResolver): Promise<string> {

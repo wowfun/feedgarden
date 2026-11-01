@@ -1,8 +1,21 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { FdgError } from '../contracts/errors.js';
+import { resolvePublicTarget } from './http/destination.js';
 import { stopAgentProcess } from './process/lifecycle.js';
 export type GitTransport = (args: string[], cwd: string, signal?: AbortSignal) => string | Promise<string>;
+
+/** Each disposable checkout resolves HTTPS remotes once, without persistent IP overrides. */
+export async function configureGitDns(repository: string, cwd: string, signal?: AbortSignal): Promise<void> {
+  if (!process.env.FEEDGARDEN_DNS_OVER_HTTPS || !/^https?:\/\//i.test(repository)) return;
+  const url = new URL(repository), target = await resolvePublicTarget(url.origin);
+  signal?.throwIfAborted();
+  const address = target.address.includes(':') ? '[' + target.address + ']' : target.address;
+  // Git only pins this origin. Redirects to another host/port use Git's normal
+  // DNS/proxy route; this is not the HTTP collector's per-redirect validation.
+  await git(['config', 'http.curloptResolve', url.hostname + ':' + (url.port || (url.protocol === 'https:' ? '443' : '80')) + ':' + address], cwd, signal);
+}
+
 /** Keep heartbeats and cooperative cancellation live during Git/network work. */
 export async function git(args: string[], cwd: string, signal?: AbortSignal): Promise<string> {
   signal?.throwIfAborted();

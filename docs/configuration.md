@@ -74,3 +74,15 @@ Every real call gets an isolated attempt directory, execution identity and input
 An effort-only candidate resolves its own execution identity while sharing the model's budget. Exhausted routes stop preparing further uncached batches for that run; reusable cached output and other model budgets remain available. Authentication or invalid execution configuration during a paid call stops further calls. Retention also removes old superseded attempt directories when their ownership is proven and no current task references them.
 
 Collection honors `transport: "curl"` on public requests. Both transports validate and pin each destination and redirect. The curl adapter uses manual redirects and pins proxy CONNECT destinations while retaining the original HTTP Host and TLS identity; it does not load user curl configuration.
+
+If a VPN or proxy supplies Fake-IP DNS answers (for example `198.18.0.0/15` or `2001:2::/48`), configure a trusted DNS-over-HTTPS JSON endpoint for this instance in `data/secrets/runner.env`:
+
+```dotenv
+FEEDGARDEN_DNS_OVER_HTTPS=https://cloudflare-dns.com/dns-query
+```
+
+This optional setting replaces system DNS only for validated public HTTP destinations. The resolver request uses the existing HTTP(S) proxy environment, normal TLS verification and no redirects; A and AAAA results still undergo the same public-address checks before connections are pinned. It uses the [Cloudflare/Google JSON API](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-https/make-api-requests/dns-json/), with a ten-second timeout and a bounded cache no longer than the answer TTL or 60 seconds. Resolver failures do not fall back to system DNS. Leave the setting absent to use system DNS. Do not allow private/Fake-IP destinations or disable TLS to work around DNS interception.
+
+Disposable publication checkouts also resolve HTTP(S) remotes through this setting and pass the result to Git's checkout-local `http.curloptResolve`; the repository URL and TLS identity stay unchanged. Git's configured proxy policy still applies (an HTTP proxy may resolve its CONNECT destination itself). `targets inspect` loads the same instance environment as workers. For a network-specific Git override, `runner.env` may select an instance-local `GIT_CONFIG_GLOBAL` file that includes the user's existing Git configuration; do not modify the user's global file or persist resolved IP addresses there.
+
+Git's pin covers only the configured repository origin. Redirects or pack downloads using another host or port use Git's normal DNS/proxy route and may still encounter Fake-IP failures. Unlike source collection, Git transport does not perform Feedgarden's validation and pinning for every redirect.

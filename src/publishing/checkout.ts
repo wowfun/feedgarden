@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { FdgError } from '../contracts/errors.js';
 import type { Target } from '../contracts/publishing.js';
 import type { InstanceContext } from '../instance/index.js';
-import { git } from '../platform/git.js';
+import { configureGitDns, git } from '../platform/git.js';
 import { hash } from '../platform/hash.js';
 import { resource } from '../platform/resources.js';
 import { completeArtifact, markArtifact, pruneArtifacts } from '../platform/retention.js';
@@ -29,6 +29,7 @@ export async function checkout(config: InstanceContext, target: Target, signal?:
     await git(['config', 'core.autocrlf', 'false'], root, signal);
     await git(['config', 'core.eol', 'lf'], root, signal);
     await git(['remote', 'add', 'origin', target.repository], root, signal);
+    await configureGitDns(target.repository, root, signal);
     const head = await remoteHead(root, target, git, signal);
     if (head) {
       await git(['fetch', '--no-tags', 'origin', target.branch], root, signal);

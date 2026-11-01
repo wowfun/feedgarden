@@ -107,7 +107,7 @@ try {
         '_worker',
         '_scheduled',
         'resume',
-      ].includes(command)
+      ].includes(command) || (command === 'targets' && action === 'inspect')
     )
       await loadEnvironment(paths.runnerEnvironment);
     if (

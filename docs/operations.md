@@ -67,6 +67,7 @@ A successful `status` query always exits zero and reports the run's `runExitCode
 ```sh
 fdg collect --due
 fdg process --day yesterday
+fdg process --day yesterday --free-models
 fdg sync --publish --detach
 fdg status RUN_ID --wait-seconds 10
 fdg status --unfinished

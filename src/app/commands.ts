@@ -60,6 +60,7 @@ export const commands = [
           'model',
           'effort',
           'fallback',
+          'free-models',
           'refresh',
           'rebuild',
           'retry-failed',
@@ -114,7 +115,7 @@ export const commands = [
     path: 'relate',
     summary: 'Generate bounded relationships between recent accepted items.',
     detach: true,
-    options: ['model', 'effort', 'fallback', 'retry-failed', 'detach'],
+    options: ['model', 'effort', 'fallback', 'free-models', 'retry-failed', 'detach'],
   },
   { path: 'topics list', summary: 'Read the maintained topic registry.', options: [] },
   {
@@ -224,6 +225,7 @@ export function help(path = '') {
       refresh: 'Refresh source evidence; valid unchanged output remains reusable.',
       'retry-failed': 'Reopen failed retry rounds without resetting daily billing.',
       fallback: 'Explicitly try ordered candidates on typed model errors only.',
+      'free-models': 'Discover OpenCode models ending in free, skip models used today in the instance timezone, and try them in catalog order.',
       save: 'Persist explicit admission in the ingestion inbox.',
     },
     examples: [

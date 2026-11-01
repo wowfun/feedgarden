@@ -198,6 +198,13 @@ async function runSession(config: AgentRuntimeConfig, request: ProbeRequest | Su
       if (protocol?.status === 429) throw new ModelError('PROVIDER_RATE_LIMITED', message, protocol.retryAt, protocol.quotaScope === 'model' ? 'model' : 'account');
       if (protocol?.status === 401 || protocol?.status === 403) throw new ModelError('AUTH_REQUIRED', message);
       if (stage === 'generate' && protocol?.status === 503) throw new ModelError('MODEL_UNAVAILABLE', message);
+      // OpenCode 2 currently loses HTTP status for this specific provider error.
+      // Match only the protocol error, never stderr, artifact text or a generic
+      // "rate limited" substring. Its actual allowance reset time is unknown.
+      if (stage === 'generate' && config.backend === 'opencode' && error instanceof Error &&
+          'code' in error && error.code === -32603 &&
+          /^(?:Internal error: )?Free usage limit reached\. Connect a provider or subscribe to OpenCode Go to keep going, or switch models\.$/.test(error.message))
+        throw new ModelError('MODEL_FREE_QUOTA_EXHAUSTED', message, undefined, 'model');
       throw new Error(message);
     }
   } finally {

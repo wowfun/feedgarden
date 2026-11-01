@@ -5,6 +5,8 @@ export function modelsRepository(db: Database) {
   const statement = statements(db);
   return {
     dailyUsage: (day: string): { model: string; used: number }[] => statement("SELECT model,count(*) used FROM agent_calls WHERE at>=? GROUP BY model").all(day) as { model: string; used: number }[],
+    usedBetween: (since: string, until: string): { model: string }[] => statement('SELECT DISTINCT model FROM agent_calls WHERE at>=? AND at<?').all(since, until) as { model: string }[],
+    freeModelFailed: (model: string, since: string, until: string): boolean => !!statement("SELECT 1 FROM agent_calls WHERE model=? AND at>=? AND at<? AND status='failed' AND json_extract(usage,'$.freeModelFailure')=1 LIMIT 1").get(model, since, until),
     cooldown: (backend: string, account: string, model: string, now: string): { retry_at: string } | undefined => statement("SELECT retry_at FROM fdg_model_cooldowns WHERE backend=? AND account=? AND (model=? OR model='*') AND retry_at>? ORDER BY retry_at DESC LIMIT 1").get(backend, account, model, now) as { retry_at: string } | undefined,
     recordAttempt: (id: string, task: string, model: string, workspace: string, inputHash: string, state: string, createdAt: string) => statement("INSERT INTO fdg_attempts VALUES(?,?,?,?,?,?,?)").run(id, task, model, workspace, inputHash, state, createdAt),
     failAttempt: (id: string) => statement("UPDATE fdg_attempts SET state='failed' WHERE id=?").run(id),

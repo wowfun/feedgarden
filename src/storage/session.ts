@@ -2,7 +2,7 @@ import { DatabaseSession } from './database.js';
 /** Application-facing database capabilities. SQL is confined to storage internals. */
 export type Storage = Omit<DatabaseSession, 'db' | 'statement'>;
 export type ReadStorage = Pick<Storage, 'path' | 'meta' | 'states' | 'items' | 'cache' | 'cacheHeaders' | 'isSelected' | 'close' | 'quickCheck' | 'backup'> & {
-  readonly models: Pick<Storage['models'], 'dailyUsage' | 'cooldown' | 'findAttempt'>;
+  readonly models: Pick<Storage['models'], 'dailyUsage' | 'usedBetween' | 'cooldown' | 'findAttempt'>;
   readonly runs: Pick<Storage['runs'], 'find' | 'token' | 'listIds'>;
   readonly sources: Pick<Storage['sources'], 'findItem' | 'hasItem'>;
   readonly maintenance: Pick<Storage['maintenance'], 'scheduledRun' | 'activeLease'>;

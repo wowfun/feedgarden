@@ -2,6 +2,8 @@
 export { paidTask, recoverableAttempt } from './attempts.js';
 export { prepareBackend } from './backends.js';
 export { budgetReport } from './budgets.js';
+export { discoverFreeModels, useFreeModels } from './free-models.js';
+export type { FreeModelSelection } from './free-models.js';
 export { agentIdentity, artifactRepairFeedback, configuredAgent, createAgentResolver, generateBatch, generateTask, resolveAgent } from './client.js';
 export { reportSkill, reportTaskSkill } from './instructions.js';
 export { fixedTask, taskKey } from './tasks.js';

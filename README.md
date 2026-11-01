@@ -53,7 +53,7 @@ fdg status RUN_ID --wait-seconds 10
 
 The default instance uses XDG directories on Linux/macOS and native AppData directories on Windows. The current working directory never selects an instance. Use `--workspace /absolute/project` or `--config /absolute/config.jsonc` explicitly. Setup creates a stable instance UUID, a seven-calendar-day collection cutoff, four default subscriptions, and no publication targets. Query/read commands save only with `--save`.
 
-Processing defaults to yesterday in Asia/Shanghai and undated items first observed within seven days. Empty results do not widen the window. Explicitly saved historical items retain their dates. Model budgets are independent per backend/account/model, defaulting to 80 calls per model per UTC day. Alternate models require `--fallback`; accepted content remains reusable when model routing changes. Configure OpenCode separately, or explicitly install the pinned optional DSH backend with `backend setup dsh`.
+Processing defaults to yesterday in Asia/Shanghai and undated items first observed within seven days. Empty results do not widen the window. Explicitly saved historical items retain their dates. Model budgets are independent per backend/account/model, defaulting to 80 calls per model per UTC day. Alternate models require explicit `--fallback` or OpenCode's [`--free-models` policy](docs/configuration.md#agent-execution); accepted content remains reusable when model routing changes. Configure OpenCode separately, or explicitly install the pinned optional DSH backend with `backend setup dsh`.
 
 ## Existing workspace and publication
 

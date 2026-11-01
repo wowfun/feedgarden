@@ -53,7 +53,7 @@ fdg status RUN_ID --wait-seconds 10
 
 默认操作用户级实例：Linux/macOS 使用 XDG，Windows 使用原生 AppData 目录。当前目录不会自动选择实例；工作区必须显式传入 `--workspace /absolute/project` 或 `--config /absolute/config.jsonc`。`setup` 生成稳定 UUID、七个日历日的采集起点及四个默认订阅，不配置发布目标。实时查询和网页读取仅在传入 `--save` 时保存。
 
-默认加工上海时区的昨天，以及最近七天首次观察到的无日期条目。空结果不会扩大窗口；显式保存的历史条目保留实际日期。每个 backend/account/model 独立记账，默认每模型每天 80 次，UTC 零点重置。只有 `--fallback` 显式启用候补；模型路由变化不会使已接受内容自动重做。OpenCode 需要另行配置；DSH 通过 `backend setup dsh` 显式安装固定版本。
+默认加工上海时区的昨天，以及最近七天首次观察到的无日期条目。空结果不会扩大窗口；显式保存的历史条目保留实际日期。每个 backend/account/model 独立记账，默认每模型每天 80 次，UTC 零点重置。候补模型需显式启用 `--fallback` 或 OpenCode 的 [`--free-models` 策略](docs/configuration.md#agent-execution)；模型路由变化不会使已接受内容自动重做。OpenCode 需要另行配置；DSH 通过 `backend setup dsh` 显式安装固定版本。
 
 ## 现有工作区与发布
 

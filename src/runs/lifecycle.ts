@@ -107,6 +107,8 @@ function freeze(config: InstanceContext, store: Storage, options: RunOptions, po
   if (positionals[0] === 'topics' && positionals[1] === 'apply' && positionals[2]) positionals[2] = resolve(positionals[2]);
   if (positionals[0] === 'ui' && positionals[1] === 'clippings') positionals = [...positionals.slice(0, 3), ...positionals.slice(3).map(path => resolve(path))];
   const at = nowIso();
+  if (options['free-models'] && config.agent.backend !== 'opencode')
+    throw new FdgError('BAD_INPUT', '--free-models requires OpenCode');
   if (options.publish || positionals[0] === 'publish') {
     if (!config.targets.length) throw new FdgError('BAD_INPUT', 'No publication targets configured');
     if (options.target && !config.targets.some(target => target.id === options.target))
@@ -152,6 +154,7 @@ function freeze(config: InstanceContext, store: Storage, options: RunOptions, po
       agent: config.agent,
       sources: config.sources.map((s) => ({ id: s.id, agent: s.agent })),
       fallback: !!options.fallback,
+      freeModels: !!options['free-models'],
       targets: config.targets,
     },
     executions: {},

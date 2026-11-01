@@ -1,6 +1,6 @@
 import { cp, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { budgetReport, createAgentResolver, resolveAgent } from '../agent/index.js';
+import { budgetReport, createAgentResolver, discoverFreeModels, resolveAgent, useFreeModels } from '../agent/index.js';
 import { applyTopics, collect, maintainArchive, previewRank, rankItems, recoverContent, relate, writeSite } from '../content/index.js';
 import { type AgentResolver } from '../contracts/agent.js';
 import { FdgError, issue } from '../contracts/errors.js';
@@ -88,7 +88,17 @@ export const execute: Executor = async (config, ctx) => {
     }
     indexItems(store);
   }
-  if (['process', 'sync'].includes(command)) {
+  let noFreeModels = false;
+  if (options['free-models'] && ['process', 'sync', 'relate'].includes(command)) {
+    result.freeModels = await step('free-models', () => discoverFreeModels(selected, store, new Date().toISOString(), signal));
+    noFreeModels = result.freeModels.models.length === 0;
+    if (noFreeModels) {
+      deferred = true;
+      result.retryAt = result.freeModels.until;
+      skipped.push({ reason: 'no_unused_free_models', retryAt: result.freeModels.until });
+    } else selected = useFreeModels(selected, result.freeModels);
+  }
+  if (['process', 'sync'].includes(command) && !noFreeModels) {
     const processed = await processContent(config, selected, ctx, resolver, step);
     selected = processed.selected; Object.assign(result, processed.result); issues.push(...processed.issues); skipped.push(...processed.skipped); progress += processed.progress; deferred ||= processed.deferred;
   } else if (command === 'rank')
@@ -97,11 +107,11 @@ export const execute: Executor = async (config, ctx) => {
         ? previewRank(selected, { source: text('source'), history: !!options.history })
         : rankItems(selected, store, { source: text('source'), history: !!options.history, signal }),
     );
-  else if (command === 'relate')
+  else if (command === 'relate' && !noFreeModels) {
     result.relations = await step('relate', () =>
       relate(selected, store, { resolveAgent: resolver, signal, retryFailed: !!options['retry-failed'] }),
     );
-  else if (command === 'export')
+  } else if (command === 'export')
     result.export = await step('export', () =>
       exportTarget(selected, store, options.target ? targetFor(selected, text('target')) : undefined, {
         output: text('output'),
@@ -266,6 +276,8 @@ export const execute: Executor = async (config, ctx) => {
       });
   }
   const retries = [
+    ...(result.retryAt ? [{ retryAt: result.retryAt }] : []),
+    ...(deferred && result.freeModels ? [{ retryAt: result.freeModels.until }] : []),
     ...store.maintenance.retries(new Date().toISOString(), new Date().toISOString()),
     ...(result.collections ?? []).flatMap(row => 'retryAt' in row && row.retryAt ? [{ retryAt: row.retryAt }] : []),
   ];

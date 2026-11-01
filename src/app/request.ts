@@ -43,6 +43,7 @@ const booleanOptions = [
   'due',
   'publish',
   'fallback',
+  'free-models',
   'refresh',
   'rebuild',
   'retry-failed',
@@ -111,6 +112,8 @@ export function validateCommand({ command, positionals, options }: CommandReques
         throw new FdgError('BAD_INPUT', 'Unsupported option for ' + known.path + ': --' + key);
     if (options.format && !['json', 'markdown', 'jekyll'].includes(str('format')!))
       throw new FdgError('BAD_INPUT', '--format must be json, markdown or jekyll');
+    if (options['free-models'] && (options.model || options.effort))
+      throw new FdgError('BAD_INPUT', '--free-models is exclusive with --model and --effort');
     if (options['max-mib'] && (!Number.isFinite(number('max-mib')) || number('max-mib')! <= 0))
       throw new FdgError('BAD_INPUT', '--max-mib must be positive');
     if (

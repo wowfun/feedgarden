@@ -17,13 +17,14 @@ export function storagePaths(paths: InstancePaths) {
   };
 }
 export type StoragePaths = ReturnType<typeof storagePaths>;
-export type InstanceContext = Config & { readonly paths: StoragePaths; readonly executionPolicy: Readonly<{ fallbackEnabled: boolean }> };
-export function createInstanceContext(config: Config, paths: InstancePaths, policy: { fallbackEnabled?: boolean } = {}): InstanceContext {
-  return Object.freeze({ ...config, paths: Object.freeze(storagePaths(paths)), executionPolicy: Object.freeze({ fallbackEnabled: policy.fallbackEnabled ?? false }) });
+type ExecutionPolicy = { fallbackEnabled: boolean; freeModelRetrySince?: string; freeModelRetryUntil?: string };
+export type InstanceContext = Config & { readonly paths: StoragePaths; readonly executionPolicy: Readonly<ExecutionPolicy> };
+export function createInstanceContext(config: Config, paths: InstancePaths, policy: Partial<ExecutionPolicy> = {}): InstanceContext {
+  return Object.freeze({ ...config, paths: Object.freeze(storagePaths(paths)), executionPolicy: Object.freeze({ ...policy, fallbackEnabled: policy.fallbackEnabled ?? false }) });
 }
 /** Only persisted configuration participates in run hashes and configuration files. */
 export function configuration(context: InstanceContext): Config { const { paths, executionPolicy, ...config } = context; return config; }
-export function withExecutionPolicy(context: InstanceContext, policy: { fallbackEnabled: boolean }): InstanceContext { return createInstanceContext(configuration(context), context.paths, policy); }
+export function withExecutionPolicy(context: InstanceContext, policy: ExecutionPolicy): InstanceContext { return createInstanceContext(configuration(context), context.paths, policy); }
 export function agentRuntime(config: InstanceContext): AgentRuntimeConfig {
-  return { ...config.agent, ...(config.agent.backend === 'dsh' && !config.agent.command ? { command: join(config.paths.dataDir, 'tools', 'dsh', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js') } : {}), runtimeDirectory: config.paths.agents, fallbackEnabled: config.executionPolicy.fallbackEnabled };
+  return { ...config.agent, ...(config.agent.backend === 'dsh' && !config.agent.command ? { command: join(config.paths.dataDir, 'tools', 'dsh', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js') } : {}), runtimeDirectory: config.paths.agents, ...config.executionPolicy };
 }

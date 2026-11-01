@@ -1,10 +1,11 @@
-import type { budgetReport } from '../agent/index.js';
+import type { budgetReport, FreeModelSelection } from '../agent/index.js';
 import type { collect, rankItems, relate, summarize } from '../content/index.js';
 import type { adoptTarget, exportTarget, publish } from '../publishing/index.js';
 import type { RunScope } from '../runs/index.js';
 import type { setupTwitter } from '../sources/index.js';
 import type { fetchClippings } from '../ui/index.js';
 export interface OperationResult {
+  freeModels?: FreeModelSelection;
   collections?: Awaited<ReturnType<typeof collect>>; explicitItems?: number; rank?: Awaited<ReturnType<typeof rankItems>>;
   summary?: Awaited<ReturnType<typeof summarize>>; relations?: Awaited<ReturnType<typeof relate>>;
   export?: Awaited<ReturnType<typeof exportTarget>>; topics?: { applied: boolean }; archiveBackup?: string;

@@ -9,6 +9,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 if (process.env.FEEDGARDEN_PEER_ENV) appendFileSync(process.env.FEEDGARDEN_PEER_ENV, JSON.stringify({ stage: process.argv.includes('--version') ? 'version' : process.argv.includes('serve') ? 'config' : 'acp', values: Object.fromEntries(['TWITTER_AUTH_TOKEN', 'TWITTER_CT0', 'GITHUB_TOKEN', 'FEEDGARDEN_AGENT_API_KEY', 'DEEPSEEK_API_KEY', 'CUSTOM_PROVIDER_AUTH'].map(name => [name, process.env[name]])) }) + '\n');
 if (process.argv.includes('--version')) { console.log('opencode v2.0.31'); process.exit(0); }
 const settings = process.env.FEEDGARDEN_PEER_CONFIG ? JSON.parse(readFileSync(process.env.FEEDGARDEN_PEER_CONFIG, 'utf8')) : {};
+if (process.argv.includes('models')) { console.log((settings.models ?? ['fixture/paid', 'fixture/first-free', 'fixture/second-free']).join('\n')); process.exit(0); }
 if (process.argv.includes('serve')) {
   const server = createServer((_request, response) => { response.setHeader('content-type', 'application/json'); response.end(settings.responseText ?? JSON.stringify(settings.documents ?? [{ type: 'document', info: settings.native ?? {} }])); });
   server.listen(0, '127.0.0.1', () => console.log(settings.announcement ?? JSON.stringify({ url: 'http://127.0.0.1:' + server.address().port })));
@@ -50,6 +51,7 @@ reader.on('line', async line => {
     } else if (method === 'session/load') {
       send({ id, result: { configOptions: advertised() } });
     } else if (method === 'session/prompt') {
+      if (settings.promptError) { send({ id, error: settings.promptError }); return; }
       if (Date.now() < readyAt) throw new Error('Prompt submitted before direct MCP tools were registered');
       if (process.argv.includes('--timeout')) return;
       const denied = new Promise(done => { permission = done; });

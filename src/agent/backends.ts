@@ -54,6 +54,17 @@ export async function agentVersion(config: InstanceContext['agent'], signal?: Ab
   return version;
 }
 
+/** Read the installed backend's catalog without starting a paid session. */
+export async function openCodeModels(config: InstanceContext['agent'], directory: string, signal?: AbortSignal): Promise<string[]> {
+  if (config.backend !== 'opencode') throw new Error('Free model discovery requires OpenCode');
+  await agentVersion(config, signal);
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const [command, args] = agentCommand(config.command ?? config.backend, ['models']);
+  const { stdout } = await promisify(execFile)(command, args, { cwd: directory, env: agentEnvironment(config),
+    encoding: 'utf8', timeout: 30_000, maxBuffer: 2_000_000, windowsHide: true, signal });
+  return stdout.split(/\r?\n/).map(line => line.trim()).filter(line => /^[^\s/#]+\/[^\s#]+$/.test(line));
+}
+
 function modelRoute(model: string): [string, string] {
   const [provider, ...parts] = model.split('/');
   if (!parts.length || !['deepseek', 'deepseek-official'].includes(provider!)) throw new Error('DSH currently supports the configured DeepSeek API-key route');

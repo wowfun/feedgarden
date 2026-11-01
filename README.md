@@ -40,7 +40,7 @@ npx --yes --strict-allow-scripts --package /absolute/feedgarden-0.1.0.tgz -- fdg
 npx --yes --strict-allow-scripts --package /absolute/feedgarden-0.1.0.tgz -- fdg doctor
 ```
 
-After an explicit installation of that tarball, the following examples use its `fdg` executable. `help --json` is the machine-readable command contract. For agent use, `skill install /absolute/skills/feedgarden` installs the small operator Skill with a verified absolute invocation receipt.
+After an explicit installation of that tarball, the following examples use its `fdg` executable. `help --json` is the machine-readable command contract. An agent can read [skills/feedgarden/SKILL.md](skills/feedgarden/SKILL.md) directly without installing the Skill; see the [daily task prompt](docs/daily-updates.md). Optional `skill install /absolute/skills/feedgarden` binds an installed copy to a verified absolute runtime and instance invocation.
 
 ```sh
 fdg channels

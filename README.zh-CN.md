@@ -40,7 +40,7 @@ npx --yes --strict-allow-scripts --package /absolute/feedgarden-0.1.0.tgz -- fdg
 npx --yes --strict-allow-scripts --package /absolute/feedgarden-0.1.0.tgz -- fdg doctor
 ```
 
-显式安装该 tarball 后，可使用下面的 `fdg` 命令。`help --json` 提供机器可读的命令契约。给 agent 安装操作 Skill 时，执行 `skill install /absolute/skills/feedgarden`；安装回执包含已校验的绝对入口和实例路径。
+显式安装该 tarball 后，可使用下面的 `fdg` 命令。`help --json` 提供机器可读的命令契约。agent 可以直接读取 [skills/feedgarden/SKILL.md](skills/feedgarden/SKILL.md)，无需安装 Skill，参见[每日任务 prompt](docs/daily-updates.zh-CN.md)。也可选用 `skill install /absolute/skills/feedgarden`，将安装副本绑定到经过验证的绝对运行入口和实例。
 
 ```sh
 fdg channels
@@ -74,6 +74,6 @@ fdg sync --publish --detach --workspace /absolute/workspace
 - [配置与目录](docs/configuration.md)、[CLI 操作](docs/operations.md)、[架构](docs/architecture.md)
 - [每日任务](docs/daily-updates.zh-CN.md)、[发布](docs/deployment.md)、[开发与安装包验收](docs/development.md)
 - [来源](docs/sources.md)、[摘要](docs/summaries.md)、[播客](docs/podcasts.md)、[排名](docs/ranking.zh-CN.md)、[归档](docs/archives.md)、[主题](docs/topics.zh-CN.md)
-- [Clippings](docs/clippings.zh-CN.md)、[关联内容](docs/related-items.md)、[站点功能](docs/site.md)
+- [Clippings](docs/clippings.zh-CN.md)、[关联内容](docs/related-items.md)、[站点功能](docs/site.zh-CN.md)
 
 现有站点：[英文](https://sinputer.top/feedgarden/)／[中文](https://sinputer.top/feedgarden/zh-CN/)。开发时可用 `pnpm run dev:site:build` 构建已提交内容；该命令不初始化实例或加工文章。

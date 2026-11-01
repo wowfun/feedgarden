@@ -83,6 +83,8 @@ The frozen scope records dates, first-observation limits, config digest, ordered
 
 Doctor and processing results report each configured backend/account/model's used calls, remaining calls and next UTC reset. These are independent limits; the combined configured allowance is not a shared cap. Unresolved inherited model identities have unknown remaining allowance until their backend selection is known.
 
+`skill install DIR` copies the operator Skill and its supporting references. Its invocation receipt hashes the complete resource bundle; `skill status DIR` verifies those resources against the bound runtime as well as checking Node and the CLI entry. Missing, edited or unmanaged resources invalidate verification and are not silently overwritten by reinstalling. Receipts without a resource manifest are not accepted by this version; install into an empty directory and preserve any local edits separately.
+
 Default processing covers yesterday in the instance timezone and undated first observations over seven days. An entirely pre-cutoff window is rejected. A clipped window reports requested/effective bounds. Zero new items never expands the range. `--save` admits explicit historical items without changing their actual dates or overriding exclusion markers.
 
 Explicit admission stores item evidence, subscription membership and observations. It leaves live channel cursors, collection timestamps, retry schedules and coverage gaps unchanged.

@@ -53,7 +53,7 @@ fdg collect --subscription research
 
 ## Agent execution
 
-OpenCode is configured separately; its model/effort can be inherited. `agent.model` and `agent.effort` override defaults, a source's `agent` overrides the instance, and explicit CLI flags override both. The optional pinned DSH runtime is installed only by `backend setup dsh`. X tooling is installed only by `channel x setup` and requires explicit cookie environment variables.
+OpenCode is configured separately. Processing defaults to unused free models. Select configured routing with `--no-free-models` or `--fallback`, or supply `--model` or `--effort` for a run. With configured routing, the instance overrides backend defaults, a source's agent settings override the instance, and explicit CLI values override both. Install the optional pinned DSH runtime with `backend setup dsh`. X tooling requires `channel x setup` and explicit cookie environment variables.
 
 ```json
 {
@@ -67,11 +67,15 @@ OpenCode is configured separately; its model/effort can be inherited. `agent.mod
 }
 ```
 
-Budgets are independent per backend/account/model and reset at UTC midnight. Effort does not create another budget. Summary, transcript, relation and repair calls share that model's budget; no global 80-call cap exists. Candidates are tried in order only with `--fallback`. Typed quota, model unavailability, model-call timeout and provider 429 may advance candidates. Authentication, configuration, artifact, storage, lease and unknown errors cannot. Account-wide 429 suppresses sibling models for that provider/account.
+Budgets are independent per backend/account/model and reset at UTC midnight. Effort does not create another budget. Summary, transcript, relation and repair calls share that model's budget; no global 80-call cap exists. Configured candidates are tried in order only with `--fallback`. Typed quota, model unavailability, model-call timeout and provider 429 may advance candidates. Authentication, configuration, artifact, storage, lease and unknown errors cannot. Account-wide 429 suppresses sibling models for that provider/account.
 
-For OpenCode, `process`, `sync` and `relate` also accept `--free-models`. This explicitly replaces the run's configured model and candidates with the installed `opencode models` entries ending in `free`, preserving catalog order. Models with any recorded call today are excluded across accounts, including failed and interrupted calls. Here “today” uses the instance timezone; it does not change the UTC budget ledger. The ordered selection is checkpointed for resume and reported as `freeModels`. It leaves JSONC unchanged, clears configured model effort, and is exclusive with `--model` and `--effort`.
+For OpenCode, `process`, `sync` and `relate` default to the `--free-models` policy unless `--model`, `--effort`, `--fallback` or `--no-free-models` is supplied. The effective policy is frozen when the run is created, including scheduled runs; resume preserves it. Other backends retain configured routing, and explicit `--free-models` requires OpenCode. `--no-free-models` uses configured routing without catalog discovery. Supplying both free-model flags is rejected, as is explicit `--free-models` with `--model` or `--effort`.
 
-The first successful route continues serving the run. Retryable model failures suppress that route until the next instance midnight before trying the next candidate. That timestamp is the selection policy's boundary, not a provider quota-reset claim. OpenCode's exact free-allowance JSON-RPC error is recognized even when its HTTP status is missing; other unknown errors still cannot trigger fallback. Existing per-model budgets and five-attempt content limits remain in force. An empty unused list defers without prompting a model; after the instance day changes, start a new run to discover a fresh list.
+Feedgarden reads `opencode models` when a summary source has eligible items or a relation pair needs evaluation. It selects entries ending in `free` in catalog order and excludes models with any call during the current instance day, including failed and interrupted calls across accounts. Call budgets use the UTC day. The run reports its ordered selection in `freeModels` and records configured models, efforts or candidates it bypassed in `skipped` rows with reason `configured_routing_bypassed`.
+
+The first successful route continues serving the run. Retryable failures suppress that route until the next instance midnight and processing tries the next candidate. OpenCode's specific free-allowance JSON-RPC error is recognized even when its HTTP status is missing. Per-model budgets and five-attempt content limits still apply.
+
+An empty list defers pending work until `retryAt`. Use `fdg resume RUN_ID` when it is due. Same-day resume reuses the checkpointed selection, including an empty one. On a later instance day, resume discovers a fresh list for pending work in the original content window. A run that reaches midnight between model attempts defers before reserving another call. Instance midnight renews eligibility under this policy. Providers define their own quota resets.
 
 Every real call gets an isolated attempt directory, execution identity and input hash. Candidate switches and the single artifact-repair opportunity consume the existing five attempts per content version. Skipped quota/cooldown checks do not. Accepted caches depend on semantic input and trusted instructions; changing routing or budgets does not force regeneration. Use `--rebuild` explicitly for rewriting.
 

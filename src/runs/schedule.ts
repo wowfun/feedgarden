@@ -27,8 +27,14 @@ export function scheduledScope(
   try {
     const previous = store.maintenance.scheduledRun(key);
     if (local < due) return { skip: 'not_ready', dueAt: due.toUTC().toISO(), key };
-    if (previous && ['completed', 'queued', 'running'].includes(runStatus(store, previous.id).state))
-      return { skip: 'already_scheduled', runId: previous.id, key };
+    if (previous) {
+      const run = runStatus(store, previous.id);
+      if (['completed', 'queued', 'running'].includes(run.state))
+        return { skip: 'already_scheduled', runId: previous.id, key };
+      const retryAt = run.result?.result?.retryAt;
+      if (['deferred', 'partial'].includes(run.state) && typeof retryAt === 'string' && Date.parse(retryAt) > local.toMillis())
+        return { skip: 'retry_not_due', retryAt, runId: previous.id, key };
+    }
     return { key };
   } finally {
     store.close();

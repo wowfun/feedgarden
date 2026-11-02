@@ -1,4 +1,6 @@
 import { exitCodes } from '../contracts/outcomes.js';
+import { supportsModelRouting } from '../contracts/agent.js';
+const routingOptions = ['model', 'effort', 'fallback', 'free-models', 'no-free-models'];
 export const commands = [
   {
     path: 'setup',
@@ -57,10 +59,6 @@ export const commands = [
           'until',
           'observed-days',
           'day',
-          'model',
-          'effort',
-          'fallback',
-          'free-models',
           'refresh',
           'rebuild',
           'retry-failed',
@@ -114,7 +112,7 @@ export const commands = [
     path: 'relate',
     summary: 'Generate bounded relationships between recent accepted items.',
     detach: true,
-    options: ['model', 'effort', 'fallback', 'free-models', 'retry-failed', 'detach'],
+    options: ['retry-failed', 'detach'],
   },
   { path: 'topics list', summary: 'Read the maintained topic registry.', options: [] },
   {
@@ -170,7 +168,7 @@ export const commands = [
     options: [],
   },
   { path: 'skill status', summary: 'Verify the installed Skill and invocation receipt.', options: [] },
-];
+].map(command => supportsModelRouting(command.path) ? { ...command, options: [...command.options, ...routingOptions] } : command);
 export const globalOptions = ['workspace', 'config', 'data-dir', 'text'];
 export const positionalRanges: Record<string, [number, number, string]> = {
   channels: [0, 1, '[ID]'],
@@ -223,7 +221,8 @@ export function help(path = '') {
       refresh: 'Refresh source evidence; valid unchanged output remains reusable.',
       'retry-failed': 'Reopen failed retry rounds without resetting daily billing.',
       fallback: 'Explicitly try ordered candidates on typed model errors only.',
-      'free-models': 'Discover OpenCode models ending in free, skip models used today in the instance timezone, and try them in catalog order.',
+      'free-models': 'Default for OpenCode process/sync/relate without --model, --effort or --fallback: discover models ending in free, skip models used today in the instance timezone, and try them in catalog order.',
+      'no-free-models': 'Use configured model selection instead of the default unused-free-model policy.',
       save: 'Persist explicit admission in the ingestion inbox.',
     },
     examples: [

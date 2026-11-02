@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { chmod,copyFile,mkdir,mkdtemp,readFile,rename,rm,symlink,writeFile } from 'node:fs/promises';
+import { chmod,copyFile,mkdir,mkdtemp,readFile,realpath,rename,rm,symlink,writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { delimiter,join } from 'node:path';
+import { delimiter,dirname,join } from 'node:path';
 import test from 'node:test';
 import { editConfig,setup } from '../../src/app/index.js';
 import { targetSchema } from '../../src/contracts/configuration.js';
@@ -123,12 +123,12 @@ test('Jekyll publication builds from bundled dependencies and pushes without cha
     await writeFile(join(toolchain, 'bundle'), `#!${process.execPath}
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
 for (const [name, body] of Object.entries(${JSON.stringify(expected)})) assert.equal(fs.readFileSync(name, 'utf8'), body);
-assert.equal(process.env.BUNDLE_GEMFILE, path.join(process.cwd(), 'Gemfile'));
+assert.equal(fs.realpathSync.native(process.env.BUNDLE_GEMFILE), fs.realpathSync.native(path.join(process.cwd(), 'Gemfile')));
 assert.equal(process.env.BUNDLE_FROZEN, 'true');
 assert.equal(fs.readFileSync('content/history.md', 'utf8'), 'Historical content');
 assert.ok(fs.existsSync('.github/jekyll-obsidian.yml'));
 if (process.argv.includes('build')) fs.writeFileSync(${JSON.stringify(join(f.config.paths.dataDir, 'repositories/test/feed/new.md'))}, 'Edited during validation');
-fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd() }) + '\\n');
+fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args: process.argv.slice(2), cwd: fs.realpathSync.native('.') }) + '\\n');
 `);
     if (process.platform === 'win32') await copyFile(process.execPath, join(toolchain, 'ruby.exe'));
     else await chmod(join(toolchain, 'bundle'), 0o755);
@@ -147,7 +147,8 @@ fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args: process.argv.sl
     assert.equal(git(f.remote, 'rev-parse', 'main'), published.commit);
     const builds = (await readFile(log, 'utf8')).trim().split('\n').map(line => JSON.parse(line));
     assert.deepEqual(builds.map(call => call.args), [['check'], ['exec', 'jekyll-obsidian', 'build']]);
-    assert.ok(builds.every(call => call.cwd.startsWith(join(f.config.paths.cache, 'ui'))));
+    const uiCache = await realpath(join(f.config.paths.cache, 'ui'));
+    assert.ok(builds.every(call => dirname(call.cwd) === uiCache));
     assert.ok(git(f.remote, 'diff', '--name-only', before, 'main').split('\n').every(path => path.startsWith('feed/')));
     assert.equal(git(f.remote, 'show', 'main:Gemfile'), gemfile.trim());
     assert.equal(git(f.remote, 'show', 'main:Gemfile.lock'), 'Existing site dependency lock');

@@ -67,7 +67,7 @@ A successful `status` query always exits zero and reports the run's `runExitCode
 ```sh
 fdg collect --due
 fdg process --day yesterday
-fdg process --day yesterday --free-models
+fdg process --day yesterday --no-free-models
 fdg sync --publish --detach
 fdg status RUN_ID --wait-seconds 10
 fdg status --unfinished
@@ -80,6 +80,8 @@ Long queue operations persist their ID before execution. Background workers use 
 Advisory `nextActions` reuse an already prepared worker runtime when available; otherwise they reuse the current Node invocation, including its source loader when applicable. They do not build or copy a runtime, and missing build output cannot change a completed foreground run into a failure. Workers, prepared schedules and installed skills still require a durable built runtime. CLI diagnostics buffer UTF-8 lines before redaction and append logs asynchronously; oversized diagnostic lines are omitted.
 
 The frozen scope records dates, first-observation limits, config digest, ordered model policies, actual resolved executions, target set and source generations. Resume rejects configuration drift and superseded processing. It reuses complete stage checkpoints and same-version accepted work; it does not reset the source queue or daily accounting. Cancel is cooperative and terminates owned model, Git, build and setup children while retaining accepted data and recoverable artifacts. A cancelled or disconnected push still requires remote confirmation before retry; its durable pending receipt prevents duplicate publication.
+
+OpenCode discovers unused free models when eligible summaries or pending relation pairs require a route. `--model`, `--effort`, `--fallback` and `--no-free-models` select explicit or configured routing. The run scope freezes this choice. Resume a deferred run at its reported `retryAt`. Resume preserves the content window and refreshes the free selection when the instance day changes.
 
 Doctor and processing results report each configured backend/account/model's used calls, remaining calls and next UTC reset. These are independent limits; the combined configured allowance is not a shared cap. Unresolved inherited model identities have unknown remaining allowance until their backend selection is known.
 
@@ -112,3 +114,5 @@ fdg schedule prepare --platform launchd
 These commands generate files only. They do not register tasks or create retries after errors. Native 15-minute ticks collect with `--due`; processing ticks evaluate the instance timezone and a durable daily key. Defaults become ready at 06:00 for most sources and 18:00 for arXiv/Product Hunt. Hosts in another timezone and DST use the same readiness logic. Scheduled processing publishes only when targets were explicitly configured. Generated argv freezes the absolute instance paths and UUID; Windows tasks never silently run under WSL.
 
 Review generated files, then activate them using the chosen operating system's normal scheduler tools. Use one runtime for a SQLite instance.
+
+When the latest run for a source's daily key is partial or deferred with a future `retryAt`, ticks return `retry_not_due` and the existing run ID. The same daily key becomes eligible again at `retryAt`.

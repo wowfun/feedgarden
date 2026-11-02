@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { relative } from 'node:path';
 import type { AcceptedItem } from '../../contracts/content.js';
 import { git, gitBlobs, gitRecords } from '../../platform/git.js';
 import { parseFrontmatter, type Frontmatter } from '../frontmatter.js';
@@ -59,20 +58,19 @@ export function identifyItem(records: AcceptedItem[]) {
  * only needed when generation cannot already identify its inputs on disk. */
 export async function itemHistory(output: string, signal?: AbortSignal) {
   const paths = new Set<string>(), blobs = new Map<string, Set<string>>();
-  const root = await git(['rev-parse', '--show-toplevel'], output, signal).catch(() => undefined);
+  const inWorktree = await git(['rev-parse', '--is-inside-work-tree'], output, signal).catch(() => undefined) === 'true';
   signal?.throwIfAborted();
   let algorithm = 'sha1';
-  if (root) {
-    const prefix = relative(root, output).replaceAll('\\', '/');
+  if (inWorktree) {
     let header: RegExpExecArray | null = null;
-    await gitRecords(['log', '--all', '--format=', '--raw', '--no-abbrev', '--no-renames', '-z', '--', prefix || '.'], root, name => {
+    await gitRecords(['log', '--all', '--relative', '--format=', '--raw', '--no-abbrev', '--no-renames', '-z', '--', '.'], output, record => {
       if (!header) {
-        header = /^\s*:(\d+) (\d+) ([a-f0-9]+) ([a-f0-9]+) [A-Z]\d*$/.exec(name);
+        header = /^\s*:(\d+) (\d+) ([a-f0-9]+) ([a-f0-9]+) [A-Z]\d*$/.exec(record);
         return;
       }
       const modes = header;
       header = null;
-      const path = prefix ? name.slice(prefix.length + 1) : name;
+      const path = record;
       if (!/\.(md|json)$/.test(path) || canonical(path).split('/').some(part => part.startsWith('.') || part.startsWith('_')) || path.endsWith('/topics.json') || path === 'topics.json') return;
       paths.add(path);
       for (const [oid, mode] of [[modes[4]!, modes[2]!], [modes[3]!, modes[1]!]] as const) {
@@ -94,8 +92,8 @@ export async function itemHistory(output: string, signal?: AbortSignal) {
     if (names?.delete(path) && !names.size) blobs.delete(oid);
   }
   async function* items(): AsyncGenerator<[string, Buffer]> {
-    if (!root) return;
-    for await (const { oid, body } of gitBlobs([...blobs.keys()], root, signal))
+    if (!inWorktree) return;
+    for await (const { oid, body } of gitBlobs([...blobs.keys()], output, signal))
       for (const path of blobs.get(oid)!) yield [path, body];
   }
   return { paths, observed, items };

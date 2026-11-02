@@ -9,6 +9,7 @@ import { setup } from '../../src/app/index.js';
 import { loadInstance } from '../../src/instance/index.js';
 import { cancel,createRun,executeRun,status,type Executor } from '../../src/runs/index.js';
 import { openTestInstance as openInstance } from '../support/database.js';
+import { acknowledgeWorker } from '../../src/storage/worker.js';
 const done: Executor = async () => ({ state: 'completed', result: { ok: true }, issues: [] });
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'fdg-runs-'));
@@ -73,6 +74,28 @@ test('read-only status coexists with an active runner and detects a confirmed de
   } finally {
     await f.cleanup();
   }
+});
+
+test('a detached resume handshake exposes the new attempt before its worker claims the run', async () => {
+  const f = await fixture();
+  try {
+    const run = await createRun(f.config, {}, ['relate']);
+    await executeRun(f.config, run.id, run.token, async (_config, ctx) => {
+      ctx.saveCheckpoint('free-models', { complete: true, revision: 'previous-day' });
+      return { state: 'deferred', result: { retryAt: 'previous deadline' }, issues: [] };
+    });
+    const identity = { ...run, instanceId: f.config.instanceId, pid: process.pid, resume: true };
+    acknowledgeWorker(f.config.paths.database, identity, () => true);
+    const queued = (await status(f.config, run.id)).runs[0]!;
+    assert.equal(queued.state, 'queued');
+    assert.equal(queued.result, null);
+    assert.equal(queued.runExitCode, null);
+    assert.equal(queued.checkpoint['free-models'].revision, 'previous-day');
+    assert.throws(() => acknowledgeWorker(f.config.paths.database, { ...identity, pid: process.pid + 1 }, () => true), /live worker/);
+    assert.equal((await executeRun(f.config, run.id, undefined, done, true)).state, 'completed');
+    acknowledgeWorker(f.config.paths.database, identity, () => true);
+    assert.equal((await status(f.config, run.id)).runs[0]!.state, 'completed');
+  } finally { await f.cleanup(); }
 });
 
 for (const fault of ['lease', 'lock'] as const) test(`${fault} loss aborts active work, records interruption and releases ownership`, async t => {

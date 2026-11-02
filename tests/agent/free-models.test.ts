@@ -11,8 +11,9 @@ import { editConfig, setup } from '../../src/app/index.js';
 import { execute } from '../../src/app/operations.js';
 import { loadInstance } from '../../src/instance/index.js';
 import { createRun, executeRun, status } from '../../src/runs/index.js';
+import { saveItems } from '../../src/content/index.js';
 import { testContext } from '../support/context.js';
-import { TestDatabase } from '../support/database.js';
+import { openTestInstance, TestDatabase } from '../support/database.js';
 
 const context = (root: string) => testContext({ version: 3, instanceId: '00000000-0000-4000-8000-000000000001',
   storage: { dataDir: root }, timezone: 'Asia/Shanghai', agent: { model: 'fixture/paid', effort: 'high',
@@ -115,27 +116,29 @@ test('free selection expires at the instance day boundary, including between fal
     assert.equal((await paidTask(store, agent, 'before-boundary', {}, options)).deferred, false);
     for (const instant of [boundary, boundary + 1]) {
       now = instant;
-      await assert.rejects(paidTask(store, agent, 'expired', {}, options), { code: 'CONFIG_CHANGED' });
+      assert.equal((await paidTask(store, agent, 'expired', {}, options)).deferred, true);
     }
     assert.equal(begins, 1);
     now = boundary - 1;
-    await assert.rejects(paidTask(store, agent, 'cross-boundary', {}, { ...options,
+    const rollover = await paidTask(store, agent, 'cross-boundary', {}, { ...options,
       generate: async candidate => {
         called.push(candidate.model);
         now = boundary;
         throw new ModelError('MODEL_FREE_QUOTA_EXHAUSTED', 'fixture');
       },
-    }), { code: 'CONFIG_CHANGED' });
+    });
+    assert.equal(rollover.deferred, true);
     assert.deepEqual(called, ['fixture/first-free', 'fixture/first-free']);
     assert.equal(begins, 2, 'crossing midnight must not reserve another call');
     now = boundary - 1;
-    await assert.rejects(paidTask(store, agentRuntime(selected), 'slow-resolution', {}, { ...options,
+    const slowResolution = await paidTask(store, agentRuntime(selected), 'slow-resolution', {}, { ...options,
       resolver: async candidate => {
         const resolved = await configuredAgent(candidate);
         now = boundary;
         return resolved;
       },
-    }), { code: 'CONFIG_CHANGED' });
+    });
+    assert.equal(slowResolution.deferred, true);
     assert.equal(begins, 2, 'a resolution crossing midnight must not reserve a call');
   } finally { store.close(); await rm(root, { recursive: true, force: true }); }
 });
@@ -169,38 +172,130 @@ test('OpenCode free quota classification is restricted to its exact generation p
   }
 });
 
-test('free model policy is explicit and rejects contradictory CLI selections', () => {
-  for (const command of ['process', 'sync', 'relate']) assert.doesNotThrow(() => validateCommand(parseCommand([command, '--free-models'])));
-  for (const args of [['collect', '--free-models'], ['process', '--free-models', '--model', 'fixture/paid'], ['process', '--free-models', '--effort', 'high']])
+test('free model policy accepts an explicit opt-out and rejects contradictory CLI selections', () => {
+  for (const command of ['process', 'sync', 'relate']) {
+    assert.doesNotThrow(() => validateCommand(parseCommand([command, '--free-models'])));
+    const disabled = parseCommand([command, '--no-free-models']);
+    assert.doesNotThrow(() => validateCommand(disabled));
+    assert.equal(disabled.options['free-models'], false);
+  }
+  for (const args of [['collect', '--free-models'], ['collect', '--no-free-models'], ['process', '--free-models', '--no-free-models'], ['process', '--free-models', '--model', 'fixture/paid'], ['process', '--free-models', '--effort', 'high']])
     assert.throws(() => validateCommand(parseCommand(args)));
+  for (const command of ['collect', 'export'])
+    assert.throws(() => validateCommand(parseCommand([command, '--no-free-models'])), { message: 'Unsupported option for ' + command + ': --no-free-models' });
 });
 
-test('run resume preserves its ordered free catalog and an empty catalog defers without a prompt', async () => {
+test('run scope freezes the OpenCode default and honors explicit routing and other backends', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'fdg-default-free-'));
+  try {
+    await setup({ workspace: root });
+    const { config } = loadInstance({ workspace: root });
+    for (const command of ['process', 'sync', 'relate']) {
+      for (const [args, expected] of [
+        [[], true], [['--free-models'], true], [['--no-free-models'], false],
+        [['--model', 'fixture/paid'], false], [['--effort', 'high'], false], [['--fallback'], false],
+      ] as const) {
+        const request = parseCommand([command, ...args]);
+        validateCommand(request);
+        const run = await createRun(config, request.options, request.positionals);
+        const frozen = (await status(config, run.id)).runs[0]!.scope;
+        assert.equal(frozen.options['free-models'], expected, [command, ...args].join(' '));
+        assert.equal(frozen.policies.freeModels, expected);
+      }
+      const dsh = { ...config, agent: { ...config.agent, backend: 'dsh' as const, model: 'fixture/other' } };
+      const run = await createRun(dsh, {}, [command]);
+      assert.equal((await status(dsh, run.id)).runs[0]!.scope.options['free-models'], false);
+      await assert.rejects(createRun(dsh, { 'free-models': true }, [command]), /requires OpenCode/);
+    }
+    const collect = await createRun(config, {}, ['collect']);
+    assert.equal((await status(config, collect.id)).runs[0]!.scope.options['free-models'], undefined);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+async function withModelWork(command: 'process' | 'relate', runTest: (config: ReturnType<typeof loadInstance>['config'], catalog: string) => Promise<void>) {
   const root = await mkdtemp(join(tmpdir(), 'fdg-free-run-'));
   const prior = process.env.FEEDGARDEN_PEER_CONFIG;
   try {
     await setup({ workspace: root });
     const file = join(root, 'feedgarden.jsonc');
-    await editConfig(file, ['sources'], []);
+    await editConfig(file, ['sources'], context(root).sources);
     await editConfig(file, ['agent'], context(root).agent);
     const { config } = loadInstance({ workspace: root });
     process.env.FEEDGARDEN_PEER_CONFIG = join(root, 'catalog.json');
-    await writeFile(process.env.FEEDGARDEN_PEER_CONFIG, JSON.stringify({ models: ['fixture/z-free', 'fixture/a-free'] }));
-    const run = await createRun(config, { 'free-models': true }, ['relate']);
-    const first = await executeRun(config, run.id, run.token, async (config, ctx) => ({ ...await execute(config, ctx), state: 'deferred' }));
-    assert.deepEqual((first.result as any).freeModels.models, ['fixture/z-free', 'fixture/a-free']);
-    await writeFile(process.env.FEEDGARDEN_PEER_CONFIG, JSON.stringify({ models: [] }));
-    const resumed = await executeRun(config, run.id, undefined, execute, true);
-    assert.equal(resumed.state, 'completed');
-    assert.deepEqual((resumed.result as any).freeModels.models, ['fixture/z-free', 'fixture/a-free']);
-    const empty = await createRun(config, { 'free-models': true }, ['relate']);
-    const deferred = await executeRun(config, empty.id, empty.token, execute);
-    assert.equal(deferred.state, 'deferred');
-    assert.deepEqual((deferred.result as any).freeModels.models, []);
-    assert.equal((deferred.result as any).skipped[0].reason, 'no_unused_free_models');
-    assert.equal((await status(config, empty.id)).runs[0]?.runExitCode, 4);
+    const at = new Date().toISOString();
+    if (command === 'process') {
+      await saveItems(config, [{ source: 'one', id: 'saved', stream: 'explicit', channel: 'public-http', title: 'Saved evidence',
+        text: 'Supplied facts', url: 'https://example.invalid/saved', publishedAt: '2000-01-01T00:00:00Z', observedAt: at, basis: 'published', metrics: {} }]);
+    } else {
+      const store = openTestInstance(config);
+      try {
+        for (const id of ['one', 'two']) store.db.prepare('INSERT INTO feed_archive_files VALUES (?,?)').run(id + '.md',
+          Buffer.from(`---\npublish: true\ncontent_type: post\ntitle: Related article ${id}\ndate: "${at}"\n---\nShared evidence for a pending pair.\n`));
+      } finally { store.close(); }
+    }
+    await runTest(config, process.env.FEEDGARDEN_PEER_CONFIG);
   } finally {
     if (prior === undefined) delete process.env.FEEDGARDEN_PEER_CONFIG; else process.env.FEEDGARDEN_PEER_CONFIG = prior;
     await rm(root, { recursive: true, force: true });
   }
+}
+
+for (const command of ['relate', 'process'] as const) test(command + ' resumes an exhausted selection after instance midnight', async t => {
+  let clock = Date.now();
+  t.mock.method(Date, 'now', () => clock);
+  await withModelWork(command, async (config, catalog) => {
+    const run = await createRun(config, {}, [command]);
+    await writeFile(catalog, JSON.stringify({ models: [] }));
+    const first = await executeRun(config, run.id, run.token, execute);
+    const result = first.result as any;
+    assert.ok(['partial', 'deferred'].includes(first.state), JSON.stringify(first));
+    assert.deepEqual(result.freeModels.models, []);
+    assert.equal(result.retryAt, result.freeModels.until);
+    assert.ok(result.skipped.some((row: any) => row.reason === 'no_unused_free_models'));
+    assert.ok(result.skipped.some((row: any) => row.reason === 'configured_routing_bypassed' && row.model === 'fixture/paid'));
+    if (command === 'process') assert.ok(result.skipped.some((row: any) => row.source === 'one' && row.model === 'fixture/source'));
+    await writeFile(catalog, JSON.stringify({ models: ['fixture/next-free'] }));
+    const sameDay = await executeRun(config, run.id, undefined, execute, true);
+    assert.deepEqual((sameDay.result as any).freeModels, result.freeModels);
+    clock = Date.parse(result.retryAt);
+    if (command === 'relate') {
+      await writeFile(catalog, JSON.stringify({ models: [] }));
+      const stillEmpty = await executeRun(config, run.id, undefined, execute, true);
+      assert.equal(stillEmpty.state, 'deferred');
+      const retry = Date.parse((stillEmpty.result as any).retryAt);
+      assert.ok(retry > clock);
+      clock = retry;
+      await writeFile(catalog, JSON.stringify({ models: ['fixture/next-free'] }));
+    }
+    const resumed = await executeRun(config, run.id, undefined, execute, true);
+    assert.equal(resumed.state, 'completed', JSON.stringify(resumed));
+    const next = resumed.result as any;
+    assert.notEqual(next.freeModels.day, result.freeModels.day);
+    assert.equal(Date.parse(next.freeModels.since), clock);
+    assert.deepEqual(next.freeModels.models, ['fixture/next-free']);
+    assert.equal(command === 'process' ? next.summary.generated : next.relations.judged, 1);
+    assert.equal(next.retryAt, undefined);
+    const reader = openTestInstance(config, true);
+    try {
+      const calls = reader.modelCallRecords();
+      assert.ok(calls.length);
+      assert.ok(calls.every(row => JSON.parse(row.model)[2] === 'fixture/next-free'));
+    } finally { reader.close(); }
+  });
+});
+
+test('same-day resume retains a nonempty ordered selection after free-quota exhaustion', async () => {
+  await withModelWork('relate', async (config, catalog) => {
+    const models = ['fixture/z-free', 'fixture/a-free'];
+    await writeFile(catalog, JSON.stringify({ models, promptError: { code: -32603, message: 'Free usage limit reached. Connect a provider or subscribe to OpenCode Go to keep going, or switch models.' } }));
+    const run = await createRun(config, {}, ['relate']);
+    const first = await executeRun(config, run.id, run.token, execute);
+    assert.equal(first.state, 'deferred', JSON.stringify(first));
+    await writeFile(catalog, JSON.stringify({ models: [...models].reverse() }));
+    const resumed = await executeRun(config, run.id, undefined, execute, true);
+    assert.equal(resumed.state, 'deferred', JSON.stringify(resumed));
+    assert.deepEqual((resumed.result as any).freeModels.models, models);
+    const reader = openTestInstance(config, true);
+    try { assert.equal(reader.modelCallRecords().length, 2); } finally { reader.close(); }
+  });
 });

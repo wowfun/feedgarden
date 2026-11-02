@@ -36,10 +36,7 @@ export async function paidTask<T extends TaskResult>(
     owner?: 'batch' | 'task';
   },
 ): Promise<{ result?: T; agent?: ResolvedAgent; deferred: boolean; error?: unknown; workspace?: string }> {
-  const assertSelectionCurrent = () => {
-    if (primary.freeModelRetryUntil && Date.parse(primary.freeModelRetryUntil) <= Date.now())
-      throw new ModelError('CONFIG_CHANGED', 'Free model selection belongs to a previous instance day; start a new run');
-  };
+  const selectionExpired = () => primary.freeModelRetryUntil && Date.parse(primary.freeModelRetryUntil) <= Date.now();
   const routes = [
     primary,
     ...(primary.fallbackEnabled ? primary.candidates.map((candidate) => ({ ...primary, ...candidate })) : []),
@@ -54,7 +51,7 @@ export async function paidTask<T extends TaskResult>(
     repair = options.repair,
     repairs = 0;
   for (const route of unique) {
-    assertSelectionCurrent();
+    if (selectionExpired()) return { deferred: true };
     const model = route.model;
     if (!model) throw new ModelError('CONFIG_INVALID', 'Model must be resolved before a paid attempt');
     const accountKey = model.split('/')[0] + '/' + route.account;
@@ -102,7 +99,10 @@ export async function paidTask<T extends TaskResult>(
         store.assertLease();
         options.beforeAttempt?.();
         // Resolution, a prior call or artifact repair may have crossed midnight.
-        assertSelectionCurrent();
+        if (selectionExpired()) {
+          await rm(workspace, { recursive: true, force: true });
+          return { deferred: true };
+        }
         call = store.startCall(key, agent.model, agent.maxDailyCalls, agent.backend, agent.account);
       } catch (error) {
         // No paid attempt owns this directory yet, including quota and selection rejections.

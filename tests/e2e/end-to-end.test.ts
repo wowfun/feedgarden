@@ -54,6 +54,7 @@ test('one sync processes explicit history and reuses accepted work with inherite
       '--workspace',
       workspace,
       'sync',
+      '--no-free-models',
       '--publish',
       '--target',
       'local',

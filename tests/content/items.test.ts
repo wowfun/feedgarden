@@ -12,6 +12,8 @@ import { validateArtifact,validateRegistry } from '../../src/contracts/topics.mj
 import { resolveItemWindow } from '../../src/contracts/window.js';
 import { agentRuntime } from '../../src/instance/index.js';
 import { hash } from '../../src/platform/hash.js';
+import { resource } from '../../src/platform/resources.js';
+import { publicationScope, publicationSignature } from '../../src/content/publications.js';
 import { ModelError } from '../../src/contracts/model-errors.js';
 import { corePublications } from '../../src/content/index.js';
 import { assertManagedPaths } from '../../src/publishing/index.js';
@@ -31,6 +33,26 @@ async function fixture() {
  const store=new Store(config.paths.database);store.setMeta('cutoff','1970-01-01T00:00:00.000Z');
  return {root,config,store,cleanup:async()=>{store.close();await rm(root,{recursive:true,force:true});}};
 }
+
+test('private rendering invalidates the signature from before generation identity hints', async () => {
+ const f = await fixture();
+ try {
+  save(f.store, [item('a')]); await summarize(f.config, f.store, {}, generator, at);
+  await writeSite(f.config, f.store);
+  const path = join(f.config.feed.directory, itemPath('one', '2026-10-09', 1));
+  const stale = (await readFile(path, 'utf8')).replace(/^feed_source(?:_id)?:.*\n/gm, '');
+  await writeFile(path, stale);
+  const manifests = await Promise.all(['en', 'zh-CN'].map(locale => readFile(join(resource('locales'), locale + '.json'), 'utf8')));
+  f.store.setMeta('render_signature:' + f.config.feed.directory, hash({
+   contentVersion: f.store.meta('content_version'), admissions: publicationSignature(f.store, publicationScope(f.store)),
+   registry: await loadTopics(f.config.feed.topics), sources: f.config.sources.map(({ id, name, timezone, selection }) => ({ id, name, timezone, selection })),
+   manifests, renderRevision: 18
+  }));
+  assert.equal(await writeSite(f.config, f.store), true);
+  assert.match(await readFile(path, 'utf8'), /feed_source_id: "a"/);
+  assert.equal(await writeSite(f.config, f.store), false);
+ } finally { await f.cleanup(); }
+});
 
 test('deselection between artifact attempts prevents a second paid call', async () => {
  const f=await fixture();try {

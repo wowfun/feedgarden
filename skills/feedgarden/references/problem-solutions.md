@@ -65,3 +65,11 @@ If all authorized models are blocked, continue serial `collect --source ID --sin
 **Remedy:** inspect the run before deciding it failed. Resume status checks after the build, or use the internally generated `nextActions` invocation from the launch receipt, keeping its executable, instance paths and run ID unchanged. That runtime entry survives subsequent checkout rebuilds. Do not launch a duplicate job or repeat a push because only the monitor exited.
 
 **Verified:** monitoring resumed through the recorded runtime entry and observed the original publication complete successfully. A worker error or a missing immutable runtime requires its own diagnosis.
+
+## Generated source identifiers conflict with Jekyll properties
+
+**Symptom/cause:** the bundled UI reports `invalid_property` because `source` is not an absolute HTTP(S) URL. Jekyll Obsidian 0.3.3 reserves `source` and `source_url` for URLs; a collector ID such as `hackernews` cannot occupy those fields.
+
+**Remedy:** use `feed_source` and `feed_source_id` for generation identity hints, with `source_url` retaining the original link. Keep those identity hints hidden in the UI. For generated output, correct the renderer and verify a real isolated build before publishing; avoid rewriting historical articles merely to add hints.
+
+**Verified:** bilingual output from the package renderer passed the bundled UI build, site audit and URL checks without configured sources or database records. Existing content files retained their original bytes.

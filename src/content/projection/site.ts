@@ -64,7 +64,7 @@ export async function writeSite(config: InstanceContext, store: Storage, signal?
   const destination = resolve(config.feed.directory);
   const manifests = await Promise.all(['en', 'zh-CN'].map(locale => readFile(join(config.feed.locales ?? resource('locales'), locale + '.json'), 'utf8')));
   const scope = publicationScope(store);
-  const signature = () => hash({ contentVersion: store.meta('content_version'), admissions: publicationSignature(store, scope), registry, sources: config.sources.map(({ id, name, timezone, selection }) => ({ id, name, timezone, selection })), manifests, renderRevision: 18 });
+  const signature = () => hash({ contentVersion: store.meta('content_version'), admissions: publicationSignature(store, scope), registry, sources: config.sources.map(({ id, name, timezone, selection }) => ({ id, name, timezone, selection })), manifests, renderRevision: 19 });
   const signatureKey = 'render_signature:' + destination;
   const recommendationAt = nowIso(), relations = activeRelations(store, recommendationAt);
   const recommendationKey = 'recommendation_signature:' + destination;

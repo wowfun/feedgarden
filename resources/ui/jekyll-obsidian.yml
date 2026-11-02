@@ -14,7 +14,7 @@ website:
     directory_tags:
       clippings: [source/clippings]
   properties:
-    hidden: [first_seen, date_basis]
+    hidden: [first_seen, date_basis, feed_source, feed_source_id]
   i18n:
     enabled: true
     locales: [en, zh-CN]

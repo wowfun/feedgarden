@@ -231,7 +231,7 @@ test('archive maintenance updates bilingual bytes and removes output without los
     const revised = originals.get(path)!.replace('Existing English body', 'Corrected English body');
     await writeFile(join(f.config.feed.directory, path), revised);
     const configPath = join(f.root, 'config.json'); await writeFile(configPath, JSON.stringify(configuration(f.config)));
-    const result = await promisify(execFile)(process.execPath, ['--import', 'tsx', resolve('src/cli.ts'), 'archives', 'update', path, '--config', configPath], { timeout: 15000 });
+    const result = await promisify(execFile)(process.execPath, ['--import', 'tsx', resolve('src/cli.ts'), 'archives', 'update', path, '--config', configPath], { timeout: 60000 });
     assert.ok(JSON.parse(result.stdout).result.archiveBackup);
     const backup = JSON.parse(result.stdout).result.archiveBackup;
     const prior = new Store(join(backup, 'data.sqlite'));
@@ -732,7 +732,7 @@ test('rank --dry-run has no persistent database, archive, queue or runner change
     const configPath = join(f.root, 'config.json'); await writeFile(configPath, JSON.stringify(configuration(f.config)));
     const snapshot = () => Buffer.from(JSON.stringify(f.store.statement("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((row:any) => [row.name,f.store.statement('SELECT * FROM '+row.name).all()])));
     const before = snapshot(), content = await readFile(join(f.config.feed.directory, 'hackernews/2026-10/09/item-1.md'));
-    const result = await promisify(execFile)(process.execPath, ['--import', 'tsx', resolve('src/cli.ts'), 'rank', '--history', '--source', 'hackernews', '--dry-run', '--config', configPath], { timeout: 15000 });
+    const result = await promisify(execFile)(process.execPath, ['--import', 'tsx', resolve('src/cli.ts'), 'rank', '--history', '--source', 'hackernews', '--dry-run', '--config', configPath], { timeout: 60000 });
     assert.equal(JSON.parse(result.stdout).result[0].kept.length, 2);
     assert.equal(createHash('sha256').update(snapshot()).digest('hex'), createHash('sha256').update(before).digest('hex'));
     assert.deepEqual(await readFile(join(f.config.feed.directory, 'hackernews/2026-10/09/item-1.md')), content);

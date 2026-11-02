@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { lstat, mkdir, readdir } from 'node:fs/promises';
-import { join, relative, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { FdgError } from '../contracts/errors.js';
 import type { Target } from '../contracts/publishing.js';
 import type { InstanceContext } from '../instance/index.js';
@@ -29,7 +29,9 @@ export async function checkout(config: InstanceContext, target: Target, signal?:
     await git(['config', 'branch.' + target.branch + '.remote', 'origin'], root, signal);
     await git(['config', 'branch.' + target.branch + '.merge', 'refs/heads/' + target.branch], root, signal);
   }
-  if (relative(root, resolve(await git(['rev-parse', '--show-toplevel'], root, signal))))
+  // At the worktree root the Git prefix is empty, even when the configured
+  // path reaches that root through an OS alias or a Windows short name.
+  if (await git(['rev-parse', '--is-inside-work-tree', '--show-prefix'], root, signal) !== 'true')
     throw new FdgError('BAD_INPUT', 'Target worktree must be the Git checkout root');
   const branch = await git(['symbolic-ref', '--short', 'HEAD'], root, signal);
   if (branch !== target.branch) throw new FdgError('BAD_INPUT', 'Target worktree is on ' + branch + '; expected ' + target.branch);

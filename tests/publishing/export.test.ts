@@ -19,8 +19,8 @@ const topic = { id: 'coding', name: { en: 'Coding', 'zh-CN': '编程' }, descrip
 function record(id: string): AcceptedItem {
   return { item: { source: 'one', id, stream: 'main', channel: 'rss', title: id, text: 'Facts', url: 'https://example.com/' + id, publishedAt: at, observedAt: at, basis: 'published', metrics: {} }, copy: { source: 'one', id, topics: ['coding'], en: { title: id, summary: 'Summary ' + id }, 'zh-CN': { title: id, summary: '摘要' } }, firstSeen: at, date: at, dateBasis: 'published', updated: at };
 }
-async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), 'fdg-export-')), worktree = join(root, 'repo'), content = join(worktree, 'content');
+async function fixture(base = tmpdir()) {
+  const root = await mkdtemp(join(base, 'fdg-export-')), worktree = join(root, 'repo'), content = join(worktree, 'content');
   await mkdir(content, { recursive: true });
   git(worktree, 'init', '--initial-branch=main'); git(worktree, 'config', 'user.name', 'Fixture'); git(worktree, 'config', 'user.email', 'test@example.com'); git(worktree, 'config', 'core.autocrlf', 'false');
   git(worktree, 'remote', 'add', 'origin', 'https://example.invalid/repository');
@@ -35,6 +35,23 @@ async function fixture() {
   const legacy = (id: string) => '---\npublish: true\ncontent_type: post\ntitle: Historical\ndate: ' + at + '\nsource_url: https://example.com/' + id + '\ntags: [source/one]\n---\nHistorical prose\n';
   return { root, config, store, worktree, content, target, put, accept, legacy, cleanup: async () => { store.close(); await rm(root, { recursive: true, force: true }); } };
 }
+
+test('an aliased instance path exports with the repository’s historical numbers', async () => {
+  const base = await mkdtemp(join(tmpdir(), 'fdg-alias-')), physical = join(base, 'physical'), alias = join(base, 'alias');
+  try {
+    await mkdir(physical);
+    await fs.symlink(physical, alias, process.platform === 'win32' ? 'junction' : 'dir');
+    const f = await fixture(alias);
+    try {
+      const old = 'one/2026-10/31/item-50.md';
+      await f.put(old, 'Historical item');
+      git(f.worktree, 'add', '.'); git(f.worktree, 'commit', '-m', 'Historical number');
+      git(f.worktree, 'rm', 'content/' + old); git(f.worktree, 'commit', '-m', 'Delete item');
+      f.accept('new'); await exportTarget(f.config, f.store, f.target);
+      assert.match(await readFile(join(f.content, 'one/2026-10/31/item-51.md'), 'utf8'), /feed_source_id: "new"/);
+    } finally { await f.cleanup(); }
+  } finally { await rm(base, { recursive: true, force: true }); }
+});
 
 test('incremental generation preserves edits/deletions and rebuild keeps Git paths and numbering', async () => {
   const f = await fixture();

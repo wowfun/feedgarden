@@ -7,7 +7,31 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { setup } from '../../src/app/index.js';
 import { loadInstance } from '../../src/instance/index.js';
-import { prepareSchedule,scheduledScope } from '../../src/runs/index.js';
+import { createRun,prepareSchedule,scheduledScope } from '../../src/runs/index.js';
+import { openTestInstance } from '../support/database.js';
+
+test('scheduled ticks wait for pending work retryAt and retry when it is due', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'fdg-schedule-retry-'));
+  try {
+    await setup({ workspace: root });
+    const { config } = loadInstance({ workspace: root });
+    const at = DateTime.fromISO('2026-10-29T07:00:00+08:00');
+    const tick = (time: DateTime) => scheduledScope(config, 'hackernews', config.instanceId, time);
+    const { key } = tick(at);
+    const retryAt = at.plus({ minutes: 45 }).toUTC().toISO()!;
+    const run = await createRun(config, { source: 'hackernews', scheduledKey: key }, ['process']);
+    const store = openTestInstance(config);
+    try {
+      for (const state of ['deferred', 'partial']) {
+        store.statement('UPDATE fdg_runs SET state=?,result=? WHERE id=?').run(state, JSON.stringify({ state, result: { retryAt } }), run.id);
+        assert.deepEqual(tick(at.plus({ minutes: 15 })), { skip: 'retry_not_due', key, runId: run.id, retryAt });
+        assert.equal(tick(at.plus({ minutes: 45 })).skip, undefined);
+      }
+      store.statement("UPDATE fdg_runs SET state='failed' WHERE id=?").run(run.id);
+      assert.equal(tick(at).skip, undefined);
+    } finally { store.close(); }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
 test('native schedules use stable argv, no shell, and instance-local readiness across host timezones', async () => {
   const root = await mkdtemp(join(tmpdir(), 'fdg-schedules-'));
   try {

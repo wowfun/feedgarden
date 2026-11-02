@@ -112,3 +112,5 @@ fdg schedule prepare --platform launchd
 These commands generate files only. They do not register tasks or create retries after errors. Native 15-minute ticks collect with `--due`; processing ticks evaluate the instance timezone and a durable daily key. Defaults become ready at 06:00 for most sources and 18:00 for arXiv/Product Hunt. Hosts in another timezone and DST use the same readiness logic. Scheduled processing publishes only when targets were explicitly configured. Generated argv freezes the absolute instance paths and UUID; Windows tasks never silently run under WSL.
 
 Review generated files, then activate them using the chosen operating system's normal scheduler tools. Use one runtime for a SQLite instance.
+
+When the latest run for a source's daily key is partial or deferred with a future `retryAt`, ticks return `retry_not_due` and the existing run ID. The same daily key becomes eligible again at `retryAt`.

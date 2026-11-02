@@ -2,6 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, open, rename, rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
+/** Only untracked siblings created by atomicWrite are publication scratch files. */
+export function isAtomicWriteTemp(path: string): boolean {
+  return /\.[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}\.tmp$/.test(path);
+}
+
 export async function atomicWrite(path: string, content: string, signal?: AbortSignal): Promise<void> {
   signal?.throwIfAborted();
   await mkdir(dirname(path), { recursive: true });

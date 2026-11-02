@@ -42,7 +42,8 @@
         "http/client.ts",
         "http/contracts.ts",
         "http/destination.ts",
-        "http/images.ts"
+        "http/images.ts",
+        "tree.ts"
       ]
     },
     "instance": {

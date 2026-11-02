@@ -3,6 +3,7 @@
   "hreflang": "zh-Hans",
   "dir": "ltr",
   "tag_labels": {
+    "source/podcast": "播客",
     "source/clippings": "Clippings",
     "source/hackernews": "Hacker News",
     "source/anthropic": "Anthropic",
@@ -10,7 +11,6 @@
     "source/github": "GitHub",
     "source/reddit": "Reddit",
     "source/x": "X",
-    "source/podcast": "播客",
     "source/arxiv": "arXiv",
     "source/producthunt": "Product Hunt",
     "topics/agents": "智能体",

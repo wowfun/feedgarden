@@ -83,7 +83,7 @@ for(const fault of ['summary','relations'] as const) test(`${fault} configuratio
         store.saveCollection(source,'main','rss',{items:[item],raw:[],coverage:{status:'complete',to:at,notes:[]}},'');
       }
     }finally{store.close();}
-    const result=await invoke('process','--workspace',f.root,'--since',new Date(Date.parse(at)-3600000).toISOString(),'--until',new Date(Date.parse(at)+1000).toISOString());
+    const result=await invoke('process','--no-free-models','--workspace',f.root,'--since',new Date(Date.parse(at)-3600000).toISOString(),'--until',new Date(Date.parse(at)+1000).toISOString());
     assert.equal(result.code,3,JSON.stringify(result.json));assert.equal(result.json.state,'partial');
     assert.ok(result.json.issues.some((issue:any)=>issue.code===(fault==='summary'?'PROCESSING_FAILED':'RELATIONS_FAILED')));
     assert.ok(result.json.result.summary.generated>0);
@@ -95,12 +95,16 @@ for(const fault of ['summary','relations'] as const) test(`${fault} configuratio
     }finally{reader.close();}
   }finally{await f.cleanup();}
 });
-test('empty sync, persistent status and frozen default window complete without a model', async () => {
+test('empty sync completes without OpenCode discovery and persists its frozen window', async () => {
   const f = await fixture();
   try {
+    await editConfig(f.paths.configFile, ['agent', 'command'], join(f.root, 'missing-opencode'));
+    f.config = loadInstance({ workspace: f.root }).config;
     const run = await createRun(f.config, {}, ['sync']),
       outcome = await executeRun(f.config, run.id, run.token, execute);
     assert.equal(outcome.state, 'completed');
+    assert.equal((outcome.result as any).freeModels, undefined);
+    assert.equal((outcome.result as any).summary.generated, 0);
     const state = await status(f.config, run.id);
     assert.equal(state.runs[0]!.runExitCode, 0);
     assert.ok(state.runs[0]!.scope.window.until);

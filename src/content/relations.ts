@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseFrontmatter, type Frontmatter } from './frontmatter.js';
 import { configuredAgent, resolveAgent } from '../agent/index.js';
-import { type AgentResolver, type ResolvedAgent } from '../contracts/agent.js';
+import { type AgentResolver, type ModelRoute, type ResolvedAgent } from '../contracts/agent.js';
 import { FdgError } from '../contracts/errors.js';
 import type { InstanceContext } from '../instance/index.js';
 import { agentRuntime } from '../instance/index.js';
@@ -151,7 +151,7 @@ export function candidatePairs(posts: Publication[]): Pair[] {
   return [...pairs.values()].sort((a, b) => b.score - a.score || Math.max(b.left.date, b.right.date) - Math.max(a.left.date, a.right.date) || a.id.localeCompare(b.id));
 }
 
-export async function relate(config: InstanceContext, store: Storage, options: { signal?: AbortSignal; retryFailed?: boolean; generator?: TaskGenerator; resolveAgent?: AgentResolver; at?: string } = {}): Promise<{ candidates: number; judged: number; pending: number; deferred: boolean; configurationError?: string }> {
+export async function relate(config: InstanceContext, store: Storage, options: { signal?: AbortSignal; retryFailed?: boolean; generator?: TaskGenerator; resolveAgent?: AgentResolver; modelRoute?: ModelRoute; at?: string } = {}): Promise<{ candidates: number; judged: number; pending: number; deferred: boolean; configurationError?: string }> {
   const at = options.at ?? nowIso();
   options.signal?.throwIfAborted(); store.assertLease();
   const candidates = candidatePairs(corePublications(config, store, at));
@@ -163,8 +163,10 @@ export async function relate(config: InstanceContext, store: Storage, options: {
   const known = new Set((store.projections.relationKeys(at) as { key: string }[]).map(row => row.key));
   const pending = resolvedCandidates.filter(pair => !known.has(pair.id));
   if (!pending.length) return { candidates: candidates.length, judged: 0, pending: 0, deferred: false };
+  const route = options.modelRoute ? await options.modelRoute() : agentRuntime(config);
+  if (!route) return { candidates: candidates.length, judged: 0, pending: pending.length, deferred: true };
   let agent: ResolvedAgent;
-  try { agent = await (options.resolveAgent ?? (options.generator ? configuredAgent : resolveAgent))(agentRuntime(config), options.signal); }
+  try { agent = await (options.resolveAgent ?? (options.generator ? configuredAgent : resolveAgent))(route, options.signal); }
   catch (error) {
     options.signal?.throwIfAborted(); store.assertLease();
     if (error instanceof FdgError && error.code === 'CONFIG_CHANGED') throw error;

@@ -1,7 +1,7 @@
 import { writeProjection, projectionTarget } from './projection.js';
 import { cp, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { budgetReport, createAgentResolver, discoverFreeModels, resolveAgent, useFreeModels } from '../agent/index.js';
+import { budgetReport, createAgentResolver, resolveAgent, useFreeModels } from '../agent/index.js';
 import { applyTopics, collect, maintainArchive, previewRank, rankItems, recoverContent, relate } from '../content/index.js';
 import { type AgentResolver } from '../contracts/agent.js';
 import { FdgError, issue } from '../contracts/errors.js';
@@ -13,6 +13,7 @@ import { exportTarget, publish, targetFor, targetWorktree } from '../publishing/
 import type { Executor } from '../runs/index.js';
 import { backup, indexItems } from '../storage/index.js';
 import { checkpointStep } from './checkpoint.js';
+import { freeModelRoute } from './free-model-route.js';
 import { processContent } from './process-content.js';
 import type { OperationResult } from './result.js';
 
@@ -89,18 +90,9 @@ export const execute: Executor = async (config, ctx) => {
     }
     indexItems(store);
   }
-  let noFreeModels = false;
-  if (options['free-models'] && ['process', 'sync', 'relate'].includes(command)) {
-    result.freeModels = await step('free-models', () => discoverFreeModels(selected, store, new Date().toISOString(), signal));
-    noFreeModels = result.freeModels.models.length === 0;
-    if (noFreeModels) {
-      deferred = true;
-      result.retryAt = result.freeModels.until;
-      skipped.push({ reason: 'no_unused_free_models', retryAt: result.freeModels.until });
-    } else selected = useFreeModels(selected, result.freeModels);
-  }
-  if (['process', 'sync'].includes(command) && !noFreeModels) {
-    const processed = await processContent(config, selected, ctx, resolver, step);
+  const modelRoute = options['free-models'] ? freeModelRoute(selected, ctx, step, result, skipped) : undefined;
+  if (['process', 'sync'].includes(command)) {
+    const processed = await processContent(config, selected, ctx, resolver, step, modelRoute);
     selected = processed.selected; Object.assign(result, processed.result); issues.push(...processed.issues); skipped.push(...processed.skipped); progress += processed.progress; deferred ||= processed.deferred;
   } else if (command === 'rank')
     result.rank = await step('rank', () =>
@@ -108,9 +100,9 @@ export const execute: Executor = async (config, ctx) => {
         ? previewRank(selected, { source: text('source'), history: !!options.history })
         : rankItems(selected, store, { source: text('source'), history: !!options.history, signal }),
     );
-  else if (command === 'relate' && !noFreeModels) {
+  else if (command === 'relate') {
     result.relations = await step('relate', () =>
-      relate(selected, store, { resolveAgent: resolver, signal, retryFailed: !!options['retry-failed'] }),
+      relate(selected, store, { resolveAgent: resolver, modelRoute, signal, retryFailed: !!options['retry-failed'] }),
     );
   } else if (command === 'export')
     result.export = await step('export', () =>
@@ -236,7 +228,7 @@ export const execute: Executor = async (config, ctx) => {
   result.window = scope.window ?? null;
   result.requested = scope.requested ?? null;
   result.windowClipped = scope.windowClipped ?? false;
-  result.budgets = budgetReport(selected, store);
+  result.budgets = budgetReport(result.freeModels?.models.length ? useFreeModels(selected, result.freeModels) : selected, store);
   if (result.rank?.some((row) => row.status === 'deferred')) deferred = true;
   if (result.relations) {
     progress += command === 'relate' ? result.relations.judged : 0;
@@ -248,18 +240,16 @@ export const execute: Executor = async (config, ctx) => {
         evidence: { trust: 'untrusted', text: result.relations.configurationError },
       });
   }
-  const retries = [
-    ...(result.retryAt ? [{ retryAt: result.retryAt }] : []),
-    ...(deferred && result.freeModels ? [{ retryAt: result.freeModels.until }] : []),
-    ...store.maintenance.retries(new Date().toISOString(), new Date().toISOString()),
-    ...(result.collections ?? []).flatMap(row => 'retryAt' in row && row.retryAt ? [{ retryAt: row.retryAt }] : []),
-  ];
-  if (deferred)
-    result.retryAt =
-      retries
-        .map((row) => row.retryAt)
-        .filter(Boolean)
-        .sort()[0] ?? new Date(Date.now() + 86400000).toISOString().slice(0, 10) + 'T00:00:00.000Z';
+  if (deferred) {
+    const now = new Date(Date.now()).toISOString();
+    const retries = [
+      ...(result.freeModels ? [result.freeModels.until] : []),
+      ...store.maintenance.retries(now, now).map(row => row.retryAt),
+      ...(result.collections ?? []).flatMap(row => 'retryAt' in row && row.retryAt ? [row.retryAt] : []),
+    ];
+    const earliest = result.freeModels?.models.length === 0 ? result.freeModels.until : retries.sort()[0];
+    result.retryAt = earliest ? (earliest < now ? now : earliest) : new Date(Date.now() + 86400000).toISOString().slice(0, 10) + 'T00:00:00.000Z';
+  }
   const state = issues.length
     ? progress
       ? 'partial'

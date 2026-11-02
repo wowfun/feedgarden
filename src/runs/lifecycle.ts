@@ -1,4 +1,5 @@
 import { DateTime } from 'luxon';
+import { supportsModelRouting } from '../contracts/agent.js';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { closeSync, openSync } from 'node:fs';
@@ -107,6 +108,8 @@ function freeze(config: InstanceContext, store: Storage, options: RunOptions, po
   if (positionals[0] === 'topics' && positionals[1] === 'apply' && positionals[2]) positionals[2] = resolve(positionals[2]);
   if (positionals[0] === 'ui' && positionals[1] === 'clippings') positionals = [...positionals.slice(0, 3), ...positionals.slice(3).map(path => resolve(path))];
   const at = nowIso();
+  if (supportsModelRouting(positionals[0]!))
+    options['free-models'] ??= config.agent.backend === 'opencode' && !options.model && !options.effort && !options.fallback;
   if (options['free-models'] && config.agent.backend !== 'opencode')
     throw new FdgError('BAD_INPUT', '--free-models requires OpenCode');
   if (options.publish || positionals[0] === 'publish') {

@@ -9,14 +9,15 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 if (process.env.FEEDGARDEN_PEER_ENV) appendFileSync(process.env.FEEDGARDEN_PEER_ENV, JSON.stringify({ stage: process.argv.includes('--version') ? 'version' : process.argv.includes('serve') ? 'config' : 'acp', values: Object.fromEntries(['TWITTER_AUTH_TOKEN', 'TWITTER_CT0', 'GITHUB_TOKEN', 'FEEDGARDEN_AGENT_API_KEY', 'DEEPSEEK_API_KEY', 'CUSTOM_PROVIDER_AUTH'].map(name => [name, process.env[name]])) }) + '\n');
 if (process.argv.includes('--version')) { console.log('opencode v2.0.31'); process.exit(0); }
 const settings = process.env.FEEDGARDEN_PEER_CONFIG ? JSON.parse(readFileSync(process.env.FEEDGARDEN_PEER_CONFIG, 'utf8')) : {};
-if (process.argv.includes('models')) { console.log((settings.models ?? ['fixture/paid', 'fixture/first-free', 'fixture/second-free']).join('\n')); process.exit(0); }
+const catalog = settings.models ?? ['fixture/paid', 'fixture/first-free', 'fixture/second-free'];
+if (process.argv.includes('models')) { console.log(catalog.join('\n')); process.exit(0); }
 if (process.argv.includes('serve')) {
   const server = createServer((_request, response) => { response.setHeader('content-type', 'application/json'); response.end(settings.responseText ?? JSON.stringify(settings.documents ?? [{ type: 'document', info: settings.native ?? {} }])); });
   server.listen(0, '127.0.0.1', () => console.log(settings.announcement ?? JSON.stringify({ url: 'http://127.0.0.1:' + server.address().port })));
   process.stdin.resume(); process.stdin.on('end', () => server.close());
 } else {
 const options = [
-  { id: 'model', category: 'model', type: 'select', name: 'Model', currentValue: settings.model ?? 'deepseek/deepseek-flash', options: ['deepseek/deepseek-flash', 'fixture/other', 'fixture/no-effort'].map(value => ({ value, name: value })) },
+  { id: 'model', category: 'model', type: 'select', name: 'Model', currentValue: settings.model ?? 'deepseek/deepseek-flash', options: [...new Set(['deepseek/deepseek-flash', 'fixture/other', 'fixture/no-effort', ...catalog])].map(value => ({ value, name: value })) },
   { id: 'effort', category: 'thought_level', type: 'select', name: 'Effort', currentValue: settings.effort ?? 'high', options: ['default', 'off', 'low', 'high'].map(value => ({ value, name: value })) },
   { id: 'mode', category: 'mode', type: 'select', name: 'Agent', currentValue: 'build', options: [{ value: 'build', name: 'Build' }, { value: 'feedgarden', name: 'Feedgarden' }] },
 ];

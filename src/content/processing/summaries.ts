@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { configuredAgent, createAgentResolver, generateBatch, paidTask, pruneWorkspaces, recoverableAttempt, reportSkill, resolveAgent } from '../../agent/index.js';
-import { type AgentResolver, type AgentResult, type AgentRuntimeConfig, type ResolvedAgent, type SummaryInput } from '../../contracts/agent.js';
+import { type AgentResolver, type AgentResult, type AgentRuntimeConfig, type ModelRoute, type ResolvedAgent, type SummaryInput } from '../../contracts/agent.js';
 import type { Source } from '../../contracts/configuration.js';
 import { FdgError } from '../../contracts/errors.js';
 import type { Item } from '../../contracts/items.js';
@@ -68,7 +68,7 @@ export function* iterateAcceptedItems(store: Storage): IterableIterator<Accepted
   }
 }
 export function acceptedItems(store: Storage): AcceptedItem[] { return [...iterateAcceptedItems(store)]; }
-export async function summarize(config: InstanceContext, store: Storage, options: WindowOptions & { subscription?: string; admissionsOnlySources?: string[]; runId?: string; source?: string; rebuild?: boolean; refresh?: boolean; retryFailed?: boolean; signal?: AbortSignal; resolveAgent?: AgentResolver } = {}, generator: Generator = generateBatch, at = nowIso(), prepare: typeof enrichItem = enrichItem): Promise<{ generated: number; pending: number; failed: number; deferred: boolean; window: ItemWindow; eligibleCandidates: number | null; sourceErrors: { source: string; error: string }[]; jobErrors: { source: string; id: string; error: string }[] }> {
+export async function summarize(config: InstanceContext, store: Storage, options: WindowOptions & { subscription?: string; admissionsOnlySources?: string[]; runId?: string; source?: string; rebuild?: boolean; refresh?: boolean; retryFailed?: boolean; signal?: AbortSignal; resolveAgent?: AgentResolver; modelRoute?: ModelRoute } = {}, generator: Generator = generateBatch, at = nowIso(), prepare: typeof enrichItem = enrichItem): Promise<{ generated: number; pending: number; failed: number; deferred: boolean; window: ItemWindow; eligibleCandidates: number | null; sourceErrors: { source: string; error: string }[]; jobErrors: { source: string; id: string; error: string }[] }> {
   options.signal?.throwIfAborted();
   const resolver = createAgentResolver(options.resolveAgent ?? (generator === generateBatch ? resolveAgent : configuredAgent));
   const agents = new Map<string, ResolvedAgent>();
@@ -173,9 +173,11 @@ export async function summarize(config: InstanceContext, store: Storage, options
     // An inherited identity still has to be refreshed when eligible accepted
     // copies exist, since a changed model/effort/version can invalidate them.
     if (!hasEligibleItems(source)) continue;
+    const route = options.modelRoute ? await options.modelRoute(source.id) : { ...agentRuntime(config), ...source.agent };
+    if (!route) { deferred = true; continue; }
     const skillHash = skillHashes.get(source.id)!;
     let agent: ResolvedAgent;
-    try { agent = await resolver({ ...agentRuntime(config), ...source.agent }, options.signal); }
+    try { agent = await resolver(route, options.signal); }
     catch (error) {
       options.signal?.throwIfAborted(); store.assertLease();
       if (error instanceof FdgError && ['CONFIG_CHANGED', 'RUN_SUPERSEDED'].includes(error.code)) throw error;

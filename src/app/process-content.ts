@@ -1,7 +1,7 @@
 import { writeProjection } from './projection.js';
 import { DateTime } from 'luxon';
 import { rankItems, relate, relationRevision, summarize } from '../content/index.js';
-import { type AgentResolver } from '../contracts/agent.js';
+import { type AgentResolver, type ModelRoute } from '../contracts/agent.js';
 import { sourceSchema } from '../contracts/configuration.js';
 import { issue } from '../contracts/errors.js';
 import type { InstanceContext } from '../instance/index.js';
@@ -12,7 +12,7 @@ import type { OperationResult } from './result.js';
 
 import type { RunContext } from '../runs/index.js';
 import type { CheckpointStep } from './checkpoint.js';
-export async function processContent(config: InstanceContext, selected: InstanceContext, ctx: RunContext, resolver: AgentResolver, step: CheckpointStep) {
+export async function processContent(config: InstanceContext, selected: InstanceContext, ctx: RunContext, resolver: AgentResolver, step: CheckpointStep, modelRoute?: ModelRoute) {
   const { scope, store, signal } = ctx, options = scope.options;
   const text = (key: string) => typeof options[key] === 'string' ? options[key] as string : undefined;
   const subscription = text('subscription')?.split('/').at(-1);
@@ -70,6 +70,7 @@ export async function processContent(config: InstanceContext, selected: Instance
       store,
       {
         resolveAgent: resolver,
+        modelRoute,
         subscription,
         admissionsOnlySources,
         runId: ctx.id,
@@ -101,6 +102,7 @@ export async function processContent(config: InstanceContext, selected: Instance
     () =>
       relate(processing, store, {
         resolveAgent: resolver,
+        modelRoute,
         signal,
         retryFailed: !!options['retry-failed'],
         at: scope.at,

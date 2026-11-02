@@ -42,9 +42,11 @@ The pin covers only the repository origin. A redirect or pack download from anot
 
 **Symptom/cause:** a run reports consecutive ACP runtime/transport failures, but the recorded attempt contains OpenCode's `Free usage limit reached` error. OpenCode 2.2.5 was observed returning this as a JSON-RPC internal error without HTTP status. This is distinct from Feedgarden's local daily call budget.
 
-**Remedy:** inspect the attempt error before retrying. The adapter recognizes the specific generation protocol error; generic stderr, artifact text and arbitrary “switch model” messages must not select another model. Check the installed OpenCode model catalog rather than guessing IDs. With user-authorized alternatives, use `--fallback`; when the user requests unused free models, use `--free-models` as described in SKILL.md. Stop repeatedly calling a blocked model and retain successful work.
+**Remedy:** inspect the attempt error before retrying. The adapter recognizes the specific generation protocol error; generic stderr, artifact text and arbitrary “switch model” messages must not select another model. OpenCode's default unused-free-model policy discovers the installed catalog and tries its authorized ordered list; do not guess model IDs. Honor explicit routing overrides. Configured-candidate `--fallback` still requires the user's selection. Stop repeatedly calling a blocked model and retain successful work.
 
-**Verified:** typed fallback, catalog order, instance-day usage filtering, resume and an empty candidate list have regression coverage. Live processing skipped already-used models and generated summaries with another catalog candidate. A provider's actual quota reset remains unknown unless it supplies one; the next instance midnight only renews eligibility under the unused-model selection policy.
+If the list is empty or exhausted, save the run ID and retry time. Resume at `retryAt` while the original scope is still current. The ordered list is reused within the same instance day. On a later instance day, pending work discovers a fresh list.
+
+**Verified:** regression tests resume an exhausted summary run and an exhausted relation run across instance midnight. Earlier live processing skipped already-used models and generated summaries with another catalog candidate. Provider quota reset times require separate provider evidence.
 
 If all authorized models are blocked, continue serial `collect --source ID --since WINDOW_START --detach` for remaining eligible sources, then export and publish accepted progress when requested. Report those sources as collected but unprocessed. Later processing must retain the original frozen day. Do not wait through unknown provider cooldowns or raise budgets implicitly.
 

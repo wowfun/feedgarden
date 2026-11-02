@@ -9,20 +9,23 @@ export interface FreeModelSelection {
   timezone: string; day: string; since: string; until: string;
   models: string[]; skippedUsed: string[];
 }
+export function freeModelWindow(timezone: string, at: string) {
+  const start = DateTime.fromISO(at).setZone(timezone).startOf('day');
+  return { timezone, day: start.toISODate()!, since: start.toUTC().toISO()!, until: start.plus({ days: 1 }).toUTC().toISO()! };
+}
 export async function discoverFreeModels(config: InstanceContext, store: Pick<ReadStorage, 'models'>,
   at: string, signal?: AbortSignal, list = openCodeModels): Promise<FreeModelSelection> {
   if (config.agent.backend !== 'opencode') throw new FdgError('BAD_INPUT', '--free-models requires OpenCode');
-  const day = DateTime.fromISO(at).setZone(config.timezone).startOf('day');
-  const since = day.toUTC().toISO()!, until = day.plus({ days: 1 }).toUTC().toISO()!;
+  const window = freeModelWindow(config.timezone, at);
   const catalog = [...new Set((await list(config.agent, config.paths.agents, signal))
     .filter(model => /^[^\s/#]+\/[^\s#]*free$/.test(model)))];
   const used = new Set<string>();
-  for (const { model } of store.models.usedBetween(since, until)) {
+  for (const { model } of store.models.usedBetween(window.since, window.until)) {
     let identity: unknown;
     try { identity = JSON.parse(model); } catch { used.add(model); continue; }
     if (Array.isArray(identity) && identity[0] === 'opencode' && typeof identity[2] === 'string') used.add(identity[2]);
   }
-  return { timezone: config.timezone, day: day.toISODate()!, since, until,
+  return { ...window,
     models: catalog.filter(model => !used.has(model)), skippedUsed: catalog.filter(model => used.has(model)) };
 }
 
@@ -31,7 +34,7 @@ export function useFreeModels(config: InstanceContext, selection: FreeModelSelec
   const model = selection.models[0]!, candidates = selection.models.slice(1).map(model => ({
     model, account: config.agent.account, maxDailyCalls: config.agent.maxDailyCalls,
   }));
-  // Selection is an explicit run override; native defaults must not carry an
+  // Selection overrides configured routing; native defaults must not carry an
   // effort or source-specific model into a newly discovered route.
   return withExecutionPolicy({ ...config,
     agent: { ...config.agent, model, effort: undefined, candidates },

@@ -43,6 +43,7 @@ const booleanOptions = [
   'publish',
   'fallback',
   'free-models',
+  'no-free-models',
   'refresh',
   'rebuild',
   'retry-failed',
@@ -108,6 +109,11 @@ export function validateCommand({ command, positionals, options }: CommandReques
     for (const key of Object.keys(options))
       if (!allowed.has(key))
         throw new FdgError('BAD_INPUT', 'Unsupported option for ' + known.path + ': --' + key);
+    if (options['no-free-models']) {
+      if (options['free-models']) throw new FdgError('BAD_INPUT', 'Choose --free-models or --no-free-models');
+      options['free-models'] = false;
+      delete options['no-free-models'];
+    }
     if (options.format && !['json', 'markdown', 'jekyll'].includes(str('format')!))
       throw new FdgError('BAD_INPUT', '--format must be json, markdown or jekyll');
     if (options['free-models'] && (options.model || options.effort))

@@ -13,5 +13,5 @@ const { values, positionals } = parseArgs({
 const [, id, token] = positionals;
 if (!id || !token || !values.config || !values['data-dir']) throw new Error('Invalid worker launch');
 const config = parse(readFileSync(values.config, 'utf8'));
-acknowledgeWorker(join(values['data-dir'], 'feedgarden.sqlite'), { id, token, instanceId: config.instanceId, pid: process.pid }, pid => { try { process.kill(pid, 0); return true; } catch { return false; } });
+acknowledgeWorker(join(values['data-dir'], 'feedgarden.sqlite'), { id, token, instanceId: config.instanceId, pid: process.pid, resume: positionals[3] === 'resume' }, pid => { try { process.kill(pid, 0); return true; } catch { return false; } });
 await import('./cli.js');

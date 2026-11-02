@@ -15,7 +15,7 @@ export function maintenanceRepository(db: Database) {
     activeLease: (at: string): { expires: string } | undefined => statement("SELECT expires FROM job_lease WHERE expires>?").get(at) as { expires: string } | undefined,
     retries: (jobsAt: string, modelsAt: string): { retryAt: string }[] => statement("SELECT next_at retryAt FROM feed_jobs WHERE state='pending' AND next_at>? UNION SELECT retry_at FROM fdg_model_cooldowns WHERE retry_at>?").all(jobsAt, modelsAt) as { retryAt: string }[],
     scheduledRun: (key: string): { id: string; state: string } | undefined => statement("SELECT id,state FROM fdg_runs WHERE json_extract(scope,'$.options.scheduledKey')=? ORDER BY created_at DESC LIMIT 1").get(key) as { id: string; state: string } | undefined,
-    queuedPid: (pid: number, id: string) => statement("UPDATE fdg_runs SET pid=? WHERE id=? AND state='queued'").run(pid, id),
+    queuedPid: (pid: number, id: string) => statement("UPDATE fdg_runs SET pid=? WHERE id=? AND state='queued' AND heartbeat IS NULL AND pid IS NULL").run(pid, id),
   };
 }
 export type MaintenanceRepository = ReturnType<typeof maintenanceRepository>;

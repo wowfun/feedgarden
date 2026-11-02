@@ -8,6 +8,7 @@ export type { Generator } from './processing/summaries.js';
 export { transcriptChunks, transcriptStep } from './processing/transcript.js';
 export { renderArchivedMedia, renderItem } from './projection/render.js';
 export { recoverContent, writeSite } from './projection/site.js';
+export { parseFrontmatter } from './frontmatter.js';
 export { initializePublications } from './publications.js';
 export { candidatePairs, corePublicationIndex, corePublications, publication, publications, recommendationManifest, relate, relationRevision } from './relations.js';
 export type { Publication } from './relations.js';

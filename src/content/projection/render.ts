@@ -1,4 +1,4 @@
-import { parse } from 'yaml';
+import { parseFrontmatter } from '../frontmatter.js';
 import type { AcceptedItem } from '../../contracts/content.js';
 import { embedKind } from '../../platform/media.js';
 import { safeUrl } from '../../platform/url.js';
@@ -21,9 +21,9 @@ export function renderArchivedMedia(markdown: string, locale: 'en' | 'zh-CN'): s
   catch { return markdown; } // Quarantined or authored files keep their exact bytes.
 }
 function upgradeArchivedMedia(markdown: string, locale: 'en' | 'zh-CN'): string {
-  const front = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  const front = parseFrontmatter(markdown);
   if (!front) return markdown;
-  const fields = parse(front[1]!);
+  const { fields } = front;
   if (!fields || fields.content_type !== 'post' || typeof fields.source_url !== 'string') return markdown;
   let rendered = markdown;
   const section = /\n## (?:Images and video|图片与视频)\r?\n\r?\n([\s\S]*?)\s*$/.exec(markdown);

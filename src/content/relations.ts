@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { parse } from 'yaml';
+import { parseFrontmatter, type Frontmatter } from './frontmatter.js';
 import { configuredAgent, resolveAgent } from '../agent/index.js';
 import { type AgentResolver, type ResolvedAgent } from '../contracts/agent.js';
 import { FdgError } from '../contracts/errors.js';
@@ -28,16 +28,16 @@ export function recentPublication(date: string | number, at = nowIso()): boolean
   const value = typeof date === 'number' ? date : Date.parse(date), now = Date.parse(at);
   return Number.isFinite(value) && value <= now && value > now - WINDOW;
 }
-export function publication(path: string, markdown: string, at: string | null = nowIso()): Publication | undefined {
+export function publication(path: string, markdown: string, at: string | null = nowIso(), parsed?: Frontmatter): Publication | undefined {
   if (!path.endsWith('.md') || path.split('/').some(part => part.startsWith('_') || part.startsWith('.'))) return;
-  const front = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(markdown);
-  if (!front) return;
   try {
-    const fields = parse(front[1]!);
-    if (!fields || fields.publish !== true || fields.content_type !== 'post' || typeof fields.title !== 'string') return;
-    const date = Date.parse(fields.date);
+    const front = parsed ?? parseFrontmatter(markdown);
+    if (!front) return;
+    const { fields } = front;
+    if (fields.publish !== true || fields.content_type !== 'post' || typeof fields.title !== 'string') return;
+    const date = Date.parse(String(fields.date));
     if (!Number.isFinite(date) || at !== null && !recentPublication(date, at)) return;
-    const body = markdown.slice(front[0].length).split(/\n## (?:Media|媒体)\r?\n/)[0]!;
+    const body = markdown.slice(front.end).split(/\n## (?:Media|媒体)\r?\n/)[0]!;
     const text = (fields.title + '\n' + (fields.description ?? '') + '\n' + body).normalize('NFKC').replace(/\s+/g, ' ').trim().slice(0, 4000);
     const url = typeof fields.source_url === 'string' ? safeUrl(fields.source_url) : '';
     return { path, title: fields.title, text, url, date, hash: hash({ text, date, url }) };

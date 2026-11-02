@@ -5,7 +5,8 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { parse } from 'yaml';
 import type { InstanceContext } from '../../instance/index.js';
 import { resource } from '../../platform/resources.js';
-import { frontmatter, renderArchivedMedia, renderItem } from './render.js';
+import { renderArchivedMedia, renderItem } from './render.js';
+import { indexPage, localeManifest } from './navigation.js';
 
 import { assertExportDirectory } from '../../instance/index.js';
 import { atomicWrite } from '../../platform/files.js';
@@ -19,7 +20,7 @@ import { itemPath, iterateAcceptedItems } from '../processing/summaries.js';
 import { archivedPublications, publicationScope, publicationSignature, recordPublications, type PublishedIdentity } from '../publications.js';
 import { activeRelations, corePublications, publication, recentPublication, recommendationManifest, relationRevision, type Publication } from '../relations.js';
 import { reconcileSelection, selectionPolicy } from '../selection/select.js';
-import { loadTopics, topicTagAliases } from '../topics.js';
+import { loadTopics } from '../topics.js';
 
 interface ContentJournal { destination: string; staging: string; previous: string; publications?: PublishedIdentity[] }
 export async function recoverContent(config: InstanceContext, store: Storage): Promise<void> {
@@ -121,32 +122,12 @@ export async function writeSite(config: InstanceContext, store: Storage, signal?
     }
     for (const locale of ['en', 'zh-CN'] as const) {
       const prefix = locale === 'zh-CN' ? '_translations/zh-CN/' : '';
-      const manifest = JSON.parse(manifests[locale === 'en' ? 0 : 1]!);
-      manifest.tag_labels = Object.fromEntries([['source/clippings', manifest.tag_labels?.['source/clippings'] ?? 'Clippings'], ...config.sources.map(source => ['source/' + source.id, manifest.tag_labels?.['source/' + source.id] ?? source.name]), ...registry.topics.map(topic => ['topics/' + topic.id, topic.name[locale]])]);
-      manifest.hidden_tags = registry.topics.filter(topic => topic.hidden).map(topic => 'topics/' + topic.id).sort();
-      manifest.tag_aliases = topicTagAliases(registry);
       const manifestPath = prefix + '_locale.yml';
-      if (!preserveManifest || !existsSync(join(staging, manifestPath))) await write(manifestPath, JSON.stringify(manifest, null, 2));
-      else {
-        // Keep custom messages and tags, but configuration owns source/topic
-        // labels and topic visibility even when a fresh DB imports stale output.
-        const preserved = parse(await readFile(join(staging, manifestPath), 'utf8'));
-        const reconciled = {
-          ...preserved,
-          tag_labels: { ...preserved.tag_labels, ...manifest.tag_labels },
-          hidden_tags: [...new Set([...(preserved.hidden_tags ?? []).filter((tag: string) => !tag.startsWith('topics/')), ...manifest.hidden_tags])].sort(),
-          tag_aliases: { ...preserved.tag_aliases, ...manifest.tag_aliases }
-        };
-        if (JSON.stringify(reconciled) !== JSON.stringify(preserved)) await write(manifestPath, JSON.stringify(reconciled, null, 2));
-      }
-      if (!existsSync(join(staging, prefix + 'index.md'))) await write(prefix + 'index.md', frontmatter({ publish: true, content_type: 'page', title: 'Feedgarden' }));
-      for (const tab of collectionTabs(config.sources)) {
-        const title = tab.title[locale];
-        await write(prefix + tab.source + '/index.md', frontmatter({
-          publish: true, content_type: 'page', title,
-          tab: locale === 'en' ? { id: tab.id, order: tab.order, topics: ['source/' + tab.source], layout: 'archive' } : { label: title }
-        }) + '# ' + title + '\n');
-      }
+      const previous = preserveManifest && existsSync(join(staging, manifestPath)) ? parse(await readFile(join(staging, manifestPath), 'utf8')) : undefined;
+      const manifest = localeManifest(JSON.parse(manifests[locale === 'en' ? 0 : 1]!), previous, config.sources, registry, locale);
+      if (JSON.stringify(manifest) !== JSON.stringify(previous)) await write(manifestPath, JSON.stringify(manifest, null, 2));
+      if (!existsSync(join(staging, prefix + 'index.md'))) await write(prefix + 'index.md', indexPage(locale));
+      for (const tab of collectionTabs(config.sources)) await write(prefix + tab.source + '/index.md', indexPage(locale, { id: tab.source }));
     }
     const archived = archivedPublications(store);
     for (const row of archived as Iterable<{ path: string; source: string; id: string; item: string; first_seen: string; en: string; zh: string; published: number }>) {

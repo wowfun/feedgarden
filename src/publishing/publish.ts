@@ -1,168 +1,135 @@
-import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir, readFile, rm } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
-import { applyTopics, loadTopics, mergeTopics } from '../content/index.js';
+import { join } from 'node:path';
 import { FdgError } from '../contracts/errors.js';
 import type { Target } from '../contracts/publishing.js';
-import { type Registry } from '../contracts/registry.js';
 import type { InstanceContext } from '../instance/index.js';
-import { atomicWrite } from '../platform/files.js';
-import { git } from '../platform/git.js';
-import { hash } from '../platform/hash.js';
-import { pinArtifact } from '../platform/retention.js';
-import type { Storage } from '../storage/index.js';
-import { checkout, owned } from './checkout.js';
-import { targetDiff } from './diff.js';
-import { exportTarget } from './export.js';
-import { ensureSafe } from './filesystem.js';
-import type { Manifest } from './targets.js';
-import { assertManagedPaths, ownerFile } from './targets.js';
-import { commit, confirmPush } from './transport.js';
-export async function publish(
-  config: InstanceContext,
-  store: Storage,
-  target: Target,
-  options: { dryRun?: boolean; signal?: AbortSignal } = {},
-) {
-  const current = await checkout(config, target, options.signal);
+import { configureGitDns, git } from '../platform/git.js';
+import { isAtomicWriteTemp } from '../platform/files.js';
+import { checkout } from './checkout.js';
+import { indexSession, inScope, materialize, mergeHead, names, scopePaths, selectIndex } from './snapshot.js';
+import { confirmPush, remoteHead } from './transport.js';
+import { validateSnapshot } from './validate.js';
+import { changeSummary } from './summary.js';
+
+type PublicationReceipt = { targetId: string; worktree: string } & Awaited<ReturnType<typeof changeSummary>> & (
+  | { dryRun: true; head: string | null; baseTree: string; tree: string; diffStat: string; commit?: never; confirmed?: never }
+  | { dryRun?: false; commit: string | null; confirmed: true }
+);
+
+/** A remote file/directory replacement can obstruct a different literal path. */
+function pathOverlap(incoming: string[]) {
+  const files = new Set(incoming), directories = new Set<string>();
+  function* parents(path: string) {
+    for (let end = path.indexOf('/'); end !== -1; end = path.indexOf('/', end + 1)) yield path.slice(0, end);
+  }
+  for (const file of files) for (const parent of parents(file)) directories.add(parent);
+  return (local: string) => {
+    const path = local.replace(/\/$/, '');
+    if (files.has(path) || directories.has(path)) return true;
+    for (const parent of parents(path)) if (files.has(parent)) return true;
+    return false;
+  };
+}
+
+/** Publish current files. Generation and summary storage are deliberately absent. */
+export async function publish(config: InstanceContext, target: Target, options: { dryRun?: boolean; signal?: AbortSignal } = {}): Promise<PublicationReceipt> {
+  const { signal } = options, current = await checkout(config, target, signal), root = current.root;
+  const session = await indexSession(root, join(config.paths.cache, 'git-validation'), !!options.dryRun, signal);
+  const { run, originalRun } = session;
+  let install = false, preserve: string[] = [];
   try {
-    owned(config, target, current.manifest, current.files);
-    const durable = join(config.paths.targets, target.id),
-      baselineFile = join(durable, 'baseline.json');
-    const pendingFile = join(durable, 'pending-push.json');
-    if (!options.dryRun && existsSync(pendingFile)) {
-      const pending = JSON.parse(await readFile(pendingFile, 'utf8'));
-      let confirmed = current.head === pending.commit;
-      if (!confirmed && current.head)
-        try {
-          await git(['merge-base', '--is-ancestor', pending.commit, 'HEAD'], current.root, options.signal);
-          confirmed = true;
-        } catch { }
-      if (confirmed) {
-        store.assertLease();
-        await atomicWrite(
-          baselineFile,
-          JSON.stringify({ commit: pending.commit, manifest: pending.manifest, topics: pending.topics }),
-        );
-        for (const change of pending.changes ?? [])
-          if (change.action === 'delete')
-            store.maintenance.clearDeletion(target.id, change.path);
-        await atomicWrite(
-          join(durable, 'receipt.json'),
-          JSON.stringify({ commit: pending.commit, confirmedAt: new Date().toISOString(), recovered: true }),
-        );
-        await rm(pendingFile);
-        if (typeof pending.checkout === 'string' && dirname(resolve(pending.checkout)) === resolve(config.paths.cache, 'publish'))
-          await pinArtifact(pending.checkout, false, config.instanceId);
+    const unresolved = names(await originalRun(['diff', '--name-only', '--diff-filter=U', '-z']));
+    if (unresolved.length) throw new FdgError('GIT_CONFLICT', 'Resolve and git add the conflicted paths: ' + unresolved.join(', '));
+    let head = current.head, merging = await mergeHead(root);
+    const base = head ? await run(['rev-parse', head + '^{tree}']) : await run(['hash-object', '-w', '-t', 'tree', '--stdin'], '');
+    await run(['read-tree', base]);
+    // Enumerate both sides of renames and every Git link, independent of the
+    // user's display preferences. These paths will be used to restore the index.
+    const pathDiff = ['diff', '--ignore-submodules=none', '--no-renames', '--name-only', '-z'];
+    const staged = names(await originalRun([...pathDiff, '--cached', base]));
+    // Continuing a resolved ordinary merge includes its remote changes outside
+    // the publication scope, while keeping unrelated staging out of the commit.
+    const mergePaths = merging && head ? names(await run([...pathDiff, await run(['merge-base', head, merging]), merging])) : [];
+    if (mergePaths.length) {
+      await run(['update-index', '--force-remove', '-z', '--stdin'], mergePaths.join('\0') + '\0');
+      const entries = selectIndex(await originalRun(['ls-files', '--stage', '-z']), mergePaths);
+      if (entries) await run(['update-index', '-z', '--index-info'], entries);
+    }
+    const mergingPaths = new Set(mergePaths);
+    preserve = staged.filter(path => !inScope(path, target) && !mergingPaths.has(path));
+    const scope = ['--', ...scopePaths(target)];
+    const tracked = names(await run(['ls-files', '--cached', '-z', ...scope]));
+    const additions = names(await run(['ls-files', '--others', '--exclude-standard', '-z', ...scope])).filter(path => !isAtomicWriteTemp(path));
+    // Honor an explicit git add -f, even if the new path is normally ignored.
+    const stagedAdditions = names(await originalRun([...pathDiff, '--cached', '--diff-filter=A', base, ...scope]))
+      .filter(path => existsSync(join(root, path)));
+    const files = new Set([...tracked, ...additions, ...stagedAdditions]);
+    if (files.size) await run(['add', '-f', '-A', '--pathspec-from-file=-', '--pathspec-file-nul'], [...files].join('\0') + '\0');
+    const tree = await run(['write-tree']);
+    const summary = await changeSummary(root, base, tree, target, signal);
+    const snapshot = join(session.directory, 'snapshot');
+    await materialize(root, tree, target, snapshot, signal);
+    await validateSnapshot(config, target, snapshot, signal);
+    if (options.dryRun) return { targetId: target.id, worktree: root, head: head ?? null, baseTree: base, tree, ...summary,
+      diffStat: await run(['diff', '--shortstat', base, tree, ...scope]), dryRun: true };
+
+    async function commitTree(nextTree: string, parent: string | undefined, mergeParent?: string) {
+      signal?.throwIfAborted();
+      const parents = [parent, mergeParent].flatMap(oid => oid ? ['-p', oid] : []);
+      const commit = await run(['-c', 'user.name=Feedgarden', '-c', 'user.email=feedgarden@localhost', 'commit-tree', nextTree, ...parents, '-m', mergeParent ? 'Merge publication changes' : 'Publish feed updates']);
+      await run(['update-ref', '-m', 'feedgarden: publish validated tree', 'HEAD', commit, parent ?? '0'.repeat(commit.length)]);
+      install = true;
+      if (mergeParent) await run(['merge', '--quit']);
+      return commit;
+    }
+    if (tree !== base || merging) {
+      head = await commitTree(tree, head, merging);
+      merging = undefined;
+    }
+
+    await configureGitDns(target.repository, root, signal);
+    let remote = await remoteHead(root, target, git, signal);
+    if (remote) {
+      await run(['fetch', '--no-tags', 'origin', target.branch]);
+      remote = await run(['rev-parse', 'FETCH_HEAD']);
+      const common = head && remote !== head ? await run(['merge-base', head, remote]) : head;
+      if (remote !== common) {
+        const overlapsIncoming = pathOverlap(names(await run([...pathDiff, common ?? base, remote])));
+        const overlap = preserve.filter(overlapsIncoming);
+        if (overlap.length) throw new FdgError('GIT_LOCAL_CHANGES', 'Remote changes overlap unrelated staged paths: ' + overlap.join(', '));
+        install = true;
+        try { await run(['-c', 'user.name=Feedgarden', '-c', 'user.email=feedgarden@localhost', 'merge', '--no-overwrite-ignore', ...(head ? ['--no-ff', '--no-commit'] : ['--ff-only']), 'FETCH_HEAD']); }
+        catch (error) {
+          const conflicts = names(await run(['diff', '--name-only', '--diff-filter=U', '-z']));
+          if (conflicts.length) throw new FdgError('GIT_CONFLICT', 'Resolve and git add the conflicted paths, then publish again: ' + conflicts.join(', '));
+          if (error instanceof FdgError && error.code === 'GIT_FAILED') {
+            const dirty = names(await run(pathDiff));
+            const untracked = names(await run(['ls-files', '--others', '--directory', '--no-empty-directory', '-z']));
+            const blocked = [...dirty, ...untracked].filter(overlapsIncoming);
+            if (blocked.length) throw new FdgError('GIT_LOCAL_CHANGES', 'Remote changes overlap local working files: ' + blocked.join(', '));
+          }
+          throw error;
+        }
+        if (!head) head = await run(['rev-parse', 'HEAD']);
+        merging = await mergeHead(root);
       }
-    }
-    const baseline = existsSync(baselineFile) ? JSON.parse(await readFile(baselineFile, 'utf8')) : undefined;
-    if (baseline?.manifest.generation && baseline.manifest.generation !== current.manifest?.generation)
-      throw new FdgError('TARGET_ADOPTION_REQUIRED', 'Target ownership generation changed');
-    const topicKey = target.auxiliaryFiles.includes('config/topics.json')
-      ? '@/config/topics.json'
-      : 'topics.json';
-    for (const [path, entry] of Object.entries(current.manifest?.entries ?? {})) {
-      if (!current.files[path])
-        throw new FdgError('REMOTE_CHANGED', 'Remote managed file was removed: ' + path);
-      if (path !== topicKey && hash(current.files[path]) !== entry.hash)
-        throw new FdgError('REMOTE_CHANGED', 'Remote managed file changed: ' + path);
-    }
-    if (current.files[topicKey]) {
-      const remote = JSON.parse(current.files[topicKey]!.toString()) as Registry;
-      if (baseline?.topics) {
-        const merged = mergeTopics(baseline.topics, await loadTopics(config.feed.topics), remote);
-        if (!options.dryRun) await applyTopics(config.feed.topics, merged);
-        else if (hash(merged) !== hash(await loadTopics(config.feed.topics)))
-          throw new FdgError(
-            'TOPICS_MERGE_REQUIRED',
-            'Remote topics need reconciliation before preview; use topics apply with --remote-base',
-          );
+      const mergedTree = await run(['write-tree']);
+      // Compare modes and object IDs at the scope roots. A display diff can
+      // hide a newly merged submodule, which must invalidate the trusted build.
+      const scopedTree = (revision: string) => run(['ls-tree', '-z', revision, ...scope]);
+      const changedSnapshot = mergedTree !== tree && await scopedTree(mergedTree) !== await scopedTree(tree);
+      if (changedSnapshot) {
+        const merged = join(session.directory, 'merged');
+        await materialize(root, mergedTree, target, merged, signal);
+        await validateSnapshot(config, target, merged, signal);
       }
+      if (merging) head = await commitTree(mergedTree, head, merging);
     }
-    const exported = await exportTarget(config, store, target, { signal: options.signal });
-    const { entries, changes } = targetDiff(current.files, current.manifest, exported.entries, topicKey);
-    for (const path of target.auxiliaryFiles) {
-      if (path !== 'config/topics.json')
-        throw new FdgError('CONFIG_INVALID', 'Only config/topics.json is a supported auxiliary generated file');
-      const key = '@/' + path,
-        body = await readFile(config.feed.topics);
-      if (current.files[key] && !current.manifest?.entries[key])
-        throw new FdgError('PATH_CONFLICT', 'Unowned auxiliary file occupies target: ' + path);
-      entries[key] = { hash: hash(body) };
-      if (!current.files[key] || hash(current.files[key]) !== entries[key]!.hash)
-        changes.push({ path: key, action: current.files[key] ? 'update' : 'add' });
-    }
-    for (const row of store.maintenance.deletions(target.id)) {
-      if (!entries[row.path])
-        throw new FdgError('PATH_CONFLICT', 'Deletion does not belong to the target manifest');
-      changes.push({ path: row.path, action: 'delete' });
-      delete entries[row.path];
-    }
-    if (options.dryRun) return { targetId: target.id, head: current.head ?? null, changes, dryRun: true };
-    options.signal?.throwIfAborted();
-    store.assertLease();
-    for (const change of changes) {
-      const path = change.path,
-        full = await ensureSafe(
-          current.root,
-          path.startsWith('@/') ? path.slice(2) : target.managedPrefix + '/' + path,
-        );
-      if (change.action === 'delete') await rm(full);
-      else {
-        await mkdir(dirname(full), { recursive: true });
-        await copyFile(path.startsWith('@/') ? config.feed.topics : join(exported.output, path), full);
-      }
-    }
-    const manifest: Manifest = {
-      version: 1,
-      instanceId: config.instanceId,
-      targetId: target.id,
-      generation: current.manifest?.generation ?? randomUUID(),
-      namespace: current.manifest?.namespace ?? randomUUID(),
-      entries,
-    };
-    await atomicWrite(join(current.prefix, ownerFile), JSON.stringify(manifest, null, 2));
-    await git(['add', '--', target.managedPrefix, ...target.auxiliaryFiles], current.root, options.signal);
-    const changed = await git(['diff', '--cached', '--name-only'], current.root, options.signal);
-    assertManagedPaths(changed.split('\n').filter(Boolean), target.managedPrefix, target.auxiliaryFiles);
-    if (!changed) return { targetId: target.id, commit: current.head, changes: [], confirmed: true };
-    if (target.format === 'jekyll') {
-      const { buildTarget } = await import('../ui/index.js');
-      await buildTarget(config, target, exported.output, options.signal);
-    }
-    options.signal?.throwIfAborted();
-    store.assertLease();
-    const sha = await commit(current.root, 'Update Feedgarden content', options.signal);
-    await pinArtifact(current.root);
-    await atomicWrite(
-      pendingFile,
-      JSON.stringify({
-        commit: sha,
-        expectedHead: current.head,
-        manifest,
-        checkout: current.root,
-        changes,
-        topics: await loadTopics(config.feed.topics),
-      }),
-    );
-    store.assertLease();
-    options.signal?.throwIfAborted();
-    await confirmPush(current.root, target, current.head, sha, git, options.signal);
-    await atomicWrite(
-      baselineFile,
-      JSON.stringify({ commit: sha, manifest, topics: await loadTopics(config.feed.topics) }),
-    );
-    await atomicWrite(
-      join(durable, 'receipt.json'),
-      JSON.stringify({ commit: sha, confirmedAt: new Date().toISOString(), changes }),
-    );
-    for (const change of changes)
-      if (change.action === 'delete')
-        store.maintenance.clearDeletion(target.id, change.path);
-    await rm(pendingFile);
-    await pinArtifact(current.root, false);
-    return { targetId: target.id, commit: sha, changes, confirmed: true };
-  } finally { await current.dispose(); }
+    if (!head) return { targetId: target.id, worktree: root, commit: null, ...summary, confirmed: true };
+    if (head !== remote) await confirmPush(root, target, remote, head, git, signal);
+    return { targetId: target.id, worktree: root, commit: head, ...summary, confirmed: true };
+  } finally {
+    try { if (install) await session.install(preserve); }
+    finally { await session.dispose(); }
+  }
 }

@@ -267,7 +267,7 @@ test('explicit asset and empty selections fail while full scans skip attachments
   }
   assert.equal(existsSync(f.config.paths.state), false);
   const configPath = join(f.root, 'config.json');
-  await writeFile(configPath, JSON.stringify({ version: 3, instanceId:'00000000-0000-4000-8000-000000000001', feed:f.config.feed,storage:f.config.storage, targets:[{id:'site',repository:'unused',format:'jekyll',output:f.config.feed.directory}], agent: {}, sources: [{ id: 'news', name: 'News', intervalHours: 1, streams: [{ id: 'main', routes: [{ id: 'feed', kind: 'feed' }] }] }] }));
+  await writeFile(configPath, JSON.stringify({ version: 3, instanceId:'00000000-0000-4000-8000-000000000001', feed:f.config.feed,storage:f.config.storage, targets:[{id:'site',repository:'unused',format:'jekyll',worktree:f.root,managedPrefix:'content'}], agent: {}, sources: [{ id: 'news', name: 'News', intervalHours: 1, streams: [{ id: 'main', routes: [{ id: 'feed', kind: 'feed' }] }] }] }));
   for (const path of [assets, join(assets, 'note.md'), empty]) {
     const result = spawnSync(process.execPath, ['--import', loader, fetchCli, 'ui','clippings','fetch', '--config', configPath, '--dry-run', path], { cwd: f.root, encoding: 'utf8' });
     assert.equal(result.status, 1, result.stderr);
@@ -311,7 +311,7 @@ test('manifest URL-key mismatch fails before downloading or rewriting the articl
 test('custom CLI config and multiple paths report partial failure in a durable run', async t => {
   const f = await fixture(t), other = join(f.clips, 'local.md'), configPath = join(f.root, 'custom.json');
   await writeFile(f.article, '![private](http://127.0.0.1/image)'); await writeFile(other, '![local](assets/existing.png)');
-  await writeFile(configPath, JSON.stringify({ version: 3, instanceId:'00000000-0000-4000-8000-000000000001', feed:f.config.feed,storage:f.config.storage, targets:[{id:'site',repository:'unused',format:'jekyll',output:f.config.feed.directory}], agent: {}, sources: [{ id: 'news', name: 'News', intervalHours: 1, streams: [{ id: 'main', routes: [{ id: 'feed', kind: 'feed' }] }] }] }));
+  await writeFile(configPath, JSON.stringify({ version: 3, instanceId:'00000000-0000-4000-8000-000000000001', feed:f.config.feed,storage:f.config.storage, targets:[{id:'site',repository:'unused',format:'jekyll',worktree:f.root,managedPrefix:'content'}], agent: {}, sources: [{ id: 'news', name: 'News', intervalHours: 1, streams: [{ id: 'main', routes: [{ id: 'feed', kind: 'feed' }] }] }] }));
   const initialized=loadInstance({config:configPath}),store=new Store(initialized.config.paths.database);initializeInstance(store,initialized.config);store.close();
   const cli = spawnSync(process.execPath, ['--import', loader, fetchCli, 'ui','clippings','fetch', '--config', configPath, f.article, other], { encoding: 'utf8', cwd: f.root });
   assert.equal(cli.status, 3,cli.stdout);const response=JSON.parse(cli.stdout);assert.ok(response.runId);assert.ok(response.result.clippings.some((row:any)=>row.status==='unchanged'));assert.match(cli.stdout,/non-public/);

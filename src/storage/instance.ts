@@ -20,7 +20,6 @@ export function initializeInstance(session: Storage, config: Pick<InstanceContex
       CREATE TABLE IF NOT EXISTS fdg_run_tasks(run_id TEXT NOT NULL,source TEXT NOT NULL,id TEXT NOT NULL,version TEXT NOT NULL,PRIMARY KEY(run_id,source,id));
       CREATE TABLE IF NOT EXISTS fdg_inbox(source TEXT NOT NULL,id TEXT NOT NULL,data TEXT NOT NULL,saved_at TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'pending',PRIMARY KEY(source,id));
       INSERT OR IGNORE INTO fdg_subscriptions SELECT source,id,json_extract(data,'$.stream') FROM items;
-      CREATE TABLE IF NOT EXISTS fdg_deletions(target TEXT NOT NULL,path TEXT NOT NULL,PRIMARY KEY(target,path));
       CREATE TABLE IF NOT EXISTS fdg_ingest(seq INTEGER PRIMARY KEY AUTOINCREMENT,source TEXT NOT NULL,id TEXT NOT NULL,UNIQUE(source,id));
       INSERT OR IGNORE INTO fdg_ingest(source,id) SELECT source,id FROM items ORDER BY first_seen,source,id;
       CREATE TRIGGER IF NOT EXISTS fdg_ingest_insert AFTER INSERT ON items BEGIN INSERT OR IGNORE INTO fdg_ingest(source,id) VALUES(NEW.source,NEW.id); END;

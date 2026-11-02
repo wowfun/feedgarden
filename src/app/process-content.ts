@@ -1,5 +1,6 @@
+import { writeProjection } from './projection.js';
 import { DateTime } from 'luxon';
-import { rankItems, relate, relationRevision, summarize, writeSite } from '../content/index.js';
+import { rankItems, relate, relationRevision, summarize } from '../content/index.js';
 import { type AgentResolver } from '../contracts/agent.js';
 import { sourceSchema } from '../contracts/configuration.js';
 import { issue } from '../contracts/errors.js';
@@ -106,7 +107,7 @@ export async function processContent(config: InstanceContext, selected: Instance
       }),
     acceptedRevision,
   );
-  await step('render', () => writeSite(processing, store, signal), hash({ acceptedRevision, relations: relationRevision(store), at: scope.at }));
+  await step('render', () => writeProjection(processing, store, signal, !!options.rebuild), hash({ acceptedRevision, relations: relationRevision(store), at: scope.at }));
   progress += result.relations.judged;
   deferred ||= result.relations.deferred || result.relations.pending > 0;
   if (result.relations.configurationError)

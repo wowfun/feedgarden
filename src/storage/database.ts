@@ -8,7 +8,6 @@ import { iso } from '../contracts/time.js';
 import { hash } from '../platform/hash.js';
 import type { HostCoordinator } from '../platform/http/contracts.js';
 import { nowIso } from '../platform/time.js';
-import { adoptArchives, type Adoption } from './adoption.js';
 import { importArchiveSnapshot, maintainArchiveSnapshot, validateArchivePost, validateArchiveReservation, type ArchiveImport, type ArchiveMaintenance } from './archive-writes.js';
 import * as contentWrites from './content-writes.js';
 import { initializeSharedTables } from './instance-schema.js';
@@ -215,7 +214,6 @@ export class DatabaseSession {
   moveSelections(source: string, rows: { id: string; day: string }[]) { contentWrites.moveSelections(this, source, rows); }
   recordRankings(rows: contentWrites.RankingEvidence[], snapshot?: { source: string; stream: string; window: string; at: string }, signal?: AbortSignal) { contentWrites.recordRankings(this, rows, snapshot, signal); }
   replaceRelations(rows: Parameters<typeof contentWrites.replaceRelations>[1]) { contentWrites.replaceRelations(this, rows); }
-  adoptArchives(input: Adoption) { adoptArchives(this, input); }
   totalChanges(): number { return this.db.prepare('SELECT total_changes() n').get().n; }
   modelCallRecords(): { model: string; status: string; usage: string | null }[] { return this.db.prepare('SELECT model,status,usage FROM agent_calls').all(); }
   quickCheck() { return this.db.pragma('quick_check'); }

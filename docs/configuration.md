@@ -17,10 +17,10 @@ Empty or relative XDG variables use the specification defaults. Invalid Windows 
 
 An explicit workspace uses `.local/feedgarden/{data,state,cache}` beneath its config directory. `storage.dataDir` or `--data-dir` overrides data only; relative values resolve against the config directory. An override neither moves nor initializes data. Config and database instance UUIDs must match.
 
-- Data: SQLite, raw evidence, topics, budgets, `workspaces/agents`, `recovery`, `targets`, `backups`, `tools`, `runtime`, and `secrets/runner.env`.
+- Data: SQLite, raw evidence, topics, budgets, `workspaces/agents`, `recovery`, persistent Git `repositories/`, `backups`, `tools`, `runtime`, and `secrets/runner.env`.
 - State: run logs, diagnostics, generated scheduler files and validation evidence.
-- Cache: temporary downloads, publish checkouts and isolated UI builds. Recovery never depends on cache alone.
-- Core output defaults to `data/exports/core`; target outputs default to `data/exports/TARGET`. Explicit output paths resolve against the config directory. Published trees must never be a private data directory.
+- Cache: temporary downloads, Git validation snapshots and isolated UI builds. Recovery never depends on cache alone.
+- Core output defaults to `data/exports/core`. Targets use `worktree` (relative to the config directory), or a persistent ordinary checkout at `data/repositories/TARGET`. `managedPrefix` and `auxiliaryFiles` restrict writing and committing, not content ownership. These repositories are not temporary caches. Standalone export retains `--output` and `--format`; `export --target` takes both from its target and rejects those overrides. Content paths must not overlap private instance data.
 
 `instance paths` only computes paths. `doctor`, `status` and `items` use read-only SQLite connections; they never initialize or migrate a store. `runner.env` is parsed as KEY=value data, never executed as a shell script. Existing process environment values take precedence. Credentials remain local and are redacted from logs/results.
 
@@ -87,7 +87,7 @@ FEEDGARDEN_DNS_OVER_HTTPS=https://cloudflare-dns.com/dns-query
 
 This optional setting replaces system DNS only for validated public HTTP destinations. The resolver request uses the existing HTTP(S) proxy environment, normal TLS verification and no redirects; A and AAAA results still undergo the same public-address checks before connections are pinned. It uses the [Cloudflare/Google JSON API](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-https/make-api-requests/dns-json/), with a ten-second timeout and a bounded cache no longer than the answer TTL or 60 seconds. Resolver failures do not fall back to system DNS. Leave the setting absent to use system DNS. Do not allow private/Fake-IP destinations or disable TLS to work around DNS interception.
 
-Disposable publication checkouts also resolve HTTP(S) remotes through this setting and pass the result to Git's checkout-local `http.curloptResolve`; the repository URL and TLS identity stay unchanged. Git's configured proxy policy still applies (an HTTP proxy may resolve its CONNECT destination itself). `targets inspect` loads the same instance environment as workers. For a network-specific Git override, `runner.env` may select an instance-local `GIT_CONFIG_GLOBAL` file that includes the user's existing Git configuration; do not modify the user's global file or persist resolved IP addresses there.
+Publication worktrees also resolve HTTP(S) remotes through this setting and pass the result to Git's checkout-local `http.curloptResolve`. Git connects using the configured repository URL and TLS identity. Git's configured proxy policy still applies (an HTTP proxy may resolve its CONNECT destination itself). `targets inspect` loads the same instance environment as workers. For a network-specific Git override, `runner.env` may select an instance-local `GIT_CONFIG_GLOBAL` file that includes the user's existing Git configuration. Store resolved addresses only in the worktree's Git configuration.
 
 Git's pin covers only the configured repository origin. Redirects or pack downloads using another host or port use Git's normal DNS/proxy route and may still encounter Fake-IP failures. Unlike source collection, Git transport does not perform Feedgarden's validation and pinning for every redirect.
 

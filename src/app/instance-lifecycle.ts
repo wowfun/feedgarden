@@ -156,7 +156,6 @@ export async function upgrade(selection: Selection, options: { dryRun?: boolean;
             format: 'jekyll',
             managedPrefix: 'content',
             auxiliaryFiles: ['config/topics.json'],
-            output: resolve(base, old.feed?.directory ?? 'content'),
           },
         ]
         : [],

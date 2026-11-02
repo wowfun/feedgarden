@@ -31,7 +31,7 @@ export function assertExportDirectory(paths: InstancePaths, output: string): voi
       'workspaces',
       'backups',
       'recovery',
-      'targets',
+      'targets', // Legacy private receipts may still be present here.
       'runtime',
       'tools',
       'secrets',

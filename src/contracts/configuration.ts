@@ -49,7 +49,7 @@ export const agentSchema = z.union([
 export const targetSchema = z.object({
   id: slug, repository: z.string().min(1), branch: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_./-]*$/).default('main'),
   format: z.enum(['json', 'markdown', 'jekyll']).default('markdown'), managedPrefix: z.string().default('feed'),
-  auxiliaryFiles: z.array(z.string()).default([]), output: z.string().optional(),
+  auxiliaryFiles: z.array(z.string()).default([]), worktree: z.string().min(1).optional(),
   ui: z.object({
     title: z.string().min(1).max(200).optional(), description: z.string().max(1000).optional(), lang: z.enum(['en', 'zh-CN']).optional(),
     url: z.url().refine(value => ['http:', 'https:'].includes(new URL(value).protocol), 'UI URL must use HTTP(S)').optional(),
@@ -58,7 +58,7 @@ export const targetSchema = z.object({
   }).strict().optional(),
 }).strict().superRefine((target, ctx) => {
   for (const path of [target.managedPrefix, ...target.auxiliaryFiles]) {
-    if (!path || path === '.' || path.startsWith('/') || /[:\\]/.test(path) || path.split('/').some(part => ['..', '.', '.git', ''].includes(part))) ctx.addIssue({ code: 'custom', message: 'Target paths must be non-root portable relative paths' });
+    if (!path || path === '.' || path.startsWith('/') || /[:\\\0]/.test(path) || path.split('/').some(part => ['..', '.', '.git', ''].includes(part.toLowerCase()))) ctx.addIssue({ code: 'custom', message: 'Target paths must be non-root portable relative paths' });
   }
   if (target.branch.includes('..') || target.branch.endsWith('/') || target.branch.includes('@{')) ctx.addIssue({ code: 'custom', message: 'Invalid branch' });
 });

@@ -306,9 +306,9 @@ try {
         await editConfig(paths.configFile, ['sources'], sources);
         result = { updated: true, historyRetained: true };
       }
-    } else if (command === 'targets' && action !== 'adopt') {
+    } else if (command === 'targets') {
       const { inspectTarget } = await import('../publishing/index.js');
-      const { targetFor } = await import('../publishing/index.js');
+      const { targetFor, targetWorktree } = await import('../publishing/index.js');
       if (action === 'list') result = config.targets;
       else if (action === 'inspect') result = await inspectTarget(config, targetFor(config, arg));
       else if (action === 'add') {
@@ -316,6 +316,7 @@ try {
           id: arg,
           repository: str('repository'),
           branch: str('branch'),
+          worktree: str('worktree'),
           format: str('format'),
           managedPrefix: str('prefix') ?? (str('format') === 'jekyll' ? 'content' : 'feed'),
           auxiliaryFiles: str('format') === 'jekyll' ? ['config/topics.json'] : [],
@@ -334,13 +335,13 @@ try {
         str('output'),
       );
     else if (command === 'ui' && action === 'clippings' && options['dry-run']) {
-      const { targetFor } = await import('../publishing/index.js');
+      const { targetFor, targetWorktree } = await import('../publishing/index.js');
       const target = targetFor(config, str('target'));
       const { fetchClippings } = await import('../ui/index.js');
       result = await fetchClippings(
         {
           ...config,
-          feed: { ...config.feed, directory: target.output ?? join(paths.dataDir, 'exports', target.id) },
+          feed: { ...config.feed, directory: join(targetWorktree(config, target), target.managedPrefix) },
         },
         {
           paths: positionals.slice(3),
@@ -419,9 +420,11 @@ try {
                 'RUN_SUPERSEDED',
                 'AUTH_REQUIRED',
                 'CONFIG_INVALID',
-                'TARGET_ADOPTION_REQUIRED',
                 'UNSAFE_PATH',
                 'PATH_CONFLICT',
+                'GIT_CONFLICT',
+                'GIT_LOCAL_CHANGES',
+                'CONTENT_INVALID',
               ].includes(i.code),
             ),
           });

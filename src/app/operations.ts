@@ -1,14 +1,15 @@
+import { writeProjection, projectionTarget } from './projection.js';
 import { cp, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { budgetReport, createAgentResolver, discoverFreeModels, resolveAgent, useFreeModels } from '../agent/index.js';
-import { applyTopics, collect, maintainArchive, previewRank, rankItems, recoverContent, relate, writeSite } from '../content/index.js';
+import { applyTopics, collect, maintainArchive, previewRank, rankItems, recoverContent, relate } from '../content/index.js';
 import { type AgentResolver } from '../contracts/agent.js';
 import { FdgError, issue } from '../contracts/errors.js';
 import type { InstanceContext } from '../instance/index.js';
 import { withExecutionPolicy } from '../instance/index.js';
 import { atomicWrite } from '../platform/files.js';
 import { hash } from '../platform/hash.js';
-import { adoptTarget, exportTarget, publish, reconcileTargetTopics, targetFor } from '../publishing/index.js';
+import { exportTarget, publish, targetFor, targetWorktree } from '../publishing/index.js';
 import type { Executor } from '../runs/index.js';
 import { backup, indexItems } from '../storage/index.js';
 import { checkpointStep } from './checkpoint.js';
@@ -63,7 +64,7 @@ export const execute: Executor = async (config, ctx) => {
   let progress = 0,
     deferred = false;
   const step = checkpointStep(ctx);
-  await recoverContent(selected, store);
+  if (command !== 'publish' && !projectionTarget(selected)) await recoverContent(selected, store);
   if (['collect', 'sync'].includes(command)) {
     result.collections = await step('collect', () =>
       collect(
@@ -124,15 +125,7 @@ export const execute: Executor = async (config, ctx) => {
     const file = scope.positionals[2];
     if (!file) throw new FdgError('BAD_INPUT', 'topics apply requires a registry file');
     const registry = JSON.parse(await readFile(file, 'utf8'));
-    if (options['remote-base'])
-      await reconcileTargetTopics(
-        selected,
-        targetFor(selected, text('target')),
-        text('remote-base')!,
-        registry,
-        signal,
-      );
-    else await applyTopics(selected.feed.topics, registry, undefined, signal);
+    await applyTopics(selected.feed.topics, registry, undefined, signal);
     result.topics = { applied: true };
     progress++;
   } else if (command === 'archives') {
@@ -145,10 +138,6 @@ export const execute: Executor = async (config, ctx) => {
       path,
       signal,
     );
-    if (scope.positionals[1] === 'remove')
-      for (const target of selected.targets.filter((t) => !options.target || t.id === options.target))
-        for (const name of [path, '_translations/zh-CN/' + path])
-          store.maintenance.deletePath(target.id, name);
     progress++;
   } else if (command === 'backup') {
     const paths = selected.paths,
@@ -156,23 +145,13 @@ export const execute: Executor = async (config, ctx) => {
     await mkdir(destination, { recursive: true });
     result.database = await backup(store, paths.backups);
     await cp(paths.configFile, join(destination, 'feedgarden.jsonc'));
-    for (const name of ['workspaces', 'recovery', 'targets']) {
+    for (const name of ['workspaces', 'recovery', 'repositories']) {
       const from = join(paths.dataDir, name);
       await cp(from, join(destination, name), { recursive: true }).catch((e) => {
         if (e.code !== 'ENOENT') throw e;
       });
     }
     result.pendingArtifacts = destination;
-    progress++;
-  } else if (command === 'targets' && scope.positionals[1] === 'adopt') {
-    result.adoption = await adoptTarget(
-      selected,
-      store,
-      targetFor(selected, scope.positionals[2]),
-      text('expected-head') ?? '',
-      !!options.takeover,
-      signal,
-    );
     progress++;
   } else if (command === 'backend') {
     const { run } = await import('../platform/process/execute.js'),
@@ -204,7 +183,7 @@ export const execute: Executor = async (config, ctx) => {
     progress++;
   } else if (command === 'ui') {
     const target = targetFor(selected, text('target')),
-      content = target.output ?? join(selected.paths.dataDir, 'exports', target.id);
+      content = join(targetWorktree(selected, target), target.managedPrefix);
     if (scope.positionals[1] === 'clippings') {
       const { fetchClippings } = await import('../ui/index.js');
       result.clippings = await fetchClippings(
@@ -232,23 +211,17 @@ export const execute: Executor = async (config, ctx) => {
       progress++;
     }
   }
-  if (['rank', 'relate', 'topics', 'archives'].includes(command)) await writeSite(selected, store, signal);
+  if (['rank', 'relate', 'topics', 'archives'].includes(command)) await writeProjection(selected, store, signal);
   if (command === 'publish' || options.publish) {
     const targets = options.target ? [targetFor(selected, text('target'))] : selected.targets;
     if (!targets.length) throw new FdgError('BAD_INPUT', 'No publication targets configured');
     result.targets = [];
     for (const target of targets) {
       try {
-        const projection = await exportTarget(selected, store, target, { signal });
-        const revision = hash([
-          projection.entries,
-          store.maintenance.orderedDeletions(target.id),
-        ]);
-        const receipt = await step(
-          'publish:' + target.id,
-          () => publish(selected, store, target, { dryRun: !!options['dry-run'], signal }),
-          revision,
-        );
+        if (command !== 'publish') await exportTarget(selected, store, target, { rebuild: !!options.rebuild, signal });
+        // Git makes retries idempotent. Never replay a cached publication result
+        // after a user edits files or resolves a merge conflict.
+        const receipt = await publish(selected, target, { dryRun: !!options['dry-run'], signal });
         result.targets.push(receipt);
         if ('confirmed' in receipt && receipt.confirmed) progress++;
       } catch (error) {

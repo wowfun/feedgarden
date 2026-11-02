@@ -10,7 +10,7 @@ Feedgarden has an installable CLI core and an optional Jekyll UI. The two TypeSc
 | `sources/` | Channel discovery, query-only reads, collectors, parsers and raw source enrichment |
 | `content/` | Explicit admission, selection, summaries/transcripts, archives, relations and projections |
 | `agent/` | Model clients, backend processes, paid attempts, quota/cooldown handling and owned workspaces |
-| `publishing/` | Target inspection, export, adoption, pure diffing, Git commit/push confirmation and topic reconciliation |
+| `publishing/` | Persistent Git worktrees, incremental export, immutable validation snapshots, scoped commits, merge and push confirmation |
 | `ui/` | Trusted Jekyll builds, static serving and Clippings media handling |
 | `storage/` | SQLite schema, typed repositories, atomic writes, snapshots, backups, search and transport coordination |
 | `platform/` | Files, hashes, clocks, concurrency, process execution, Git and validated HTTP transport |
@@ -44,9 +44,9 @@ Configuration schemas are pure contracts. `instance/paths.ts` computes directori
 
 Application writers receive `Storage`; status, search and doctor receive `ReadStorage`. Neither interface exposes SQLite connections or prepared statements. Repository methods have typed arguments and rows. The concrete session, statement cache and SQL clauses remain inside `storage/`. Tests that seed legacy databases or inject storage faults use the explicit fixture adapter in `tests/support/`.
 
-Storage operations commit summary acceptance, batch attempts, source admissions, selection changes, ranking evidence, archive import/maintenance, target adoption and run claims atomically. Archive scans retain immutable bytes in a disk-backed snapshot. Filesystem journals still protect swaps across database and content-tree updates. Lease checks and conflict rechecks occur at the commit boundary. Prepared statements are cached lazily, including on read-only sessions, so large candidate sets do not incur per-row preparation and legacy stores can still be inspected before explicit upgrade.
+Storage operations commit summary acceptance, batch attempts, source admissions, selection changes, ranking evidence, archive import/maintenance and run claims atomically. Archive scans retain immutable bytes in a disk-backed snapshot. Filesystem journals still protect swaps across database and content-tree updates. Lease checks and conflict rechecks occur at the commit boundary. Prepared statements are cached lazily, including on read-only sessions, so large candidate sets do not incur per-row preparation and legacy stores can still be inspected before explicit upgrade.
 
-The SQLite schema, persisted run scope, cache recipes, output routes and bilingual Markdown format are unchanged by modularization. A golden fixture captured from the pre-refactor sources verifies summary/task/selection hashes, reserved paths and rendered bytes. No data migration is introduced for this directory change.
+Modularization preserved the SQLite schema, persisted run scope, cache recipes and output routes. Generated Markdown carries optional `feed_source` and `feed_source_id` identity hints. Export recognizes identical live Git blobs during its working-tree scan. A new identity can require inspecting older versions to distinguish a new item from a deleted one. A golden fixture verifies summary, task and selection hashes, reserved paths and rendered bytes.
 
 ## Acquisition, processing and publication
 
@@ -54,6 +54,6 @@ Source adapters receive only channel state, discovery state and HTTP capabilitie
 
 Model transport and attempt accounting are separate modules. Typed model errors and task contracts are shared without a client/attempt dependency cycle. Content recipes remain independent of routing. Interrupted artifacts and accepted caches retain their existing recovery and retry behavior.
 
-Publication operates in an owned checkout. Inspection, export, adoption, diffing, push confirmation and topic merging have separate implementations. Owner manifests, generations, identity reservations, hashes and deletion intents still determine the diff. Uncertain pushes retain their durable receipts; confirmation checks fetched history before retrying. UI builds use bundled trusted dependencies in isolated staging.
+Publication uses an ordinary persistent worktree and never reads summary storage to generate content. An alternate Git index captures the exact scoped tree for validation and commit; unrelated staging is preserved. Local commits are followed by fetch, normal merge, merged-tree validation and a non-forced push of the validated commit. Conflicts remain in the worktree and index. Uncertain pushes are recovered using local commits and remote ancestry. Incremental generation derives identity hints and item numbers from current files and Git history; no per-file publication manifest is persisted. UI builds use bundled trusted dependencies in isolated staging.
 
 The root worker acknowledges its launch through `storage/worker.ts` before importing the CLI. Its handshake closure contains only that module and the SQLite adapter. Moving sources does not change copied durable runtimes, packaged skills, model tool resources or configuration locations. Package smoke tests exercise pnpm/npm installation and execution, detached startup and skill registration.

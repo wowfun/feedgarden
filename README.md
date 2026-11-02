@@ -63,11 +63,10 @@ The checked-in `feedgarden.jsonc` is the existing site's **v2 upgrade input**, n
 fdg instance upgrade --workspace /absolute/workspace --dry-run
 fdg instance upgrade --workspace /absolute/workspace
 fdg targets inspect site --workspace /absolute/workspace
-fdg targets adopt site --expected-head FULL_SHA --workspace /absolute/workspace
 fdg sync --publish --detach --workspace /absolute/workspace
 ```
 
-Publication uses an isolated checkout and a target owner manifest. Nonempty unowned content requires explicit adoption; a foreign owner also requires `--takeover`. Missing local files never mean deletion. Success means a confirmed Git push; deployment remains separate. Generic Markdown/JSON targets require Git only. Jekyll targets use bundled, frozen dependencies and an isolated build.
+Targets use ordinary persistent Git worktrees, optionally selected with `targets add --worktree PATH`. Content belongs to the repository. Run `export --target ID` to add accepted summaries, then `publish --target ID` to validate, commit and synchronize current files. Manual edits and deletions are preserved; only `export --rebuild` updates identifiable generated items. `sync --publish` performs both steps. Git handles conflicts and history. Success means a confirmed push; deployment remains separate. Jekyll validation uses bundled dependencies in an isolated build.
 
 ## Documentation
 

@@ -1,33 +1,67 @@
 # Targets and publication
 
-Publication is opt-in. Setup creates no target. Configure a stable target ID with a repository, branch, format (`json`, `markdown`, `jekyll`) and non-root managed prefix. Generic targets default to `feed/`; a migrated Jekyll target uses `content/` with `config/topics.json` explicitly listed as an auxiliary managed file. The caller's cwd, origin and FETCH_HEAD are irrelevant.
+Content is ordinary repository data. Valid Markdown or JSON can be published without a database record, configured source, instance marker or import. Setup creates no target.
+
+Configure a repository, branch, format (`json`, `markdown`, `jekyll`) and a non-root `managedPrefix`. `targets add --worktree PATH` selects an existing Git checkout on that branch with a matching `origin`. Without it, Feedgarden maintains a regular checkout at `dataDir/repositories/TARGET`; cache cleanup never removes it. `worktree` replaces target `output`. Relative worktree paths resolve against the instance config directory.
+
+For an existing configuration, remove `output` and optionally set `worktree` to the repository root, rather than the former export directory. Remove the old content ownership file once through Git. Existing item paths, commits, collection databases and summary caches remain intact; no adoption or compatibility mode is needed.
 
 ```sh
-fdg targets add notes --repository /absolute/repository.git --format markdown --prefix feed
+fdg targets add notes --repository /absolute/repository.git --worktree /absolute/checkout --format markdown --prefix feed
 fdg targets inspect notes
+fdg export --target notes
 fdg publish --target notes --dry-run
 fdg publish --target notes
 ```
 
-An empty managed prefix can be claimed by first publication. Existing unowned content is refused. After reviewing the fetched head, use `targets adopt ID --expected-head FULL_SHA`; add `--takeover` only to transfer a foreign owner. Adoption imports history, topic vocabulary and reserved paths/numbers, retaining unknown native identities as opaque content. Local identity/path conflicts, symlinks and special files are rejected. The successful adoption push establishes ownership; a new generation prevents the old owner from publishing.
+`targets inspect` reports the worktree, branch, origin and HEAD. `status` shows up to 100 working-tree paths, `statusCount` gives their total and `diffStat` summarizes the tracked scoped diff. Run `git status` or `git diff HEAD -- PATH` in that worktree for detail. The default checkout tracks its configured remote branch. An explicitly selected worktree keeps its existing upstream settings.
 
-The manifest lives inside the managed prefix and records instanceId, targetId, generation, numbering namespace, path identities and hashes. Data/targets/ID holds baselines, adopted bytes and receipts. Publication compares accepted exports with the fetched manifest and remote files. Missing local files remain remote. Only persistent explicit archive-removal intent authorizes deletion; remote removal/edit of another managed file stops publication. Unexpected identity changes or unowned path collisions are errors.
+Generic targets default to `feed/`. Jekyll targets default to `content/` and declare `config/topics.json` as an auxiliary file. These paths define the write and commit scope. Generation maintains the topic registry.
 
-Topic reconciliation uses the saved target baseline. For a deliberate conflict resolution, apply a complete validated registry with `topics apply FILE --target ID --remote-base FULL_SHA`. The SHA belongs to that target's fetched branch.
+## Generation
 
-Before each ordinary push the expected remote head and lease are rechecked. There is no force push. Network-ambiguous pushes retain pending receipts; a retry checks whether the remote already contains the commit. Each target has an independent run checkpoint. A partial/deferred processing run may publish valid existing work, and retries do not repush completed target checkpoints. A confirmed Git push is the publication endpoint; Pages deployment is reported independently.
+`export --target ID` uses that target's worktree and format. Standalone `export --output DIR --format markdown` remains available; those overrides cannot accompany `--target`.
+
+Generation adds files individually. Existing items, authored files and Git-tracked deletions remain intact. `export --rebuild` explicitly updates or restores identifiable generated items at their existing paths. New items carry `feed_source` and `feed_source_id` frontmatter (JSON exports retain `item.source` and `item.id`); these are generation hints, never publishing credentials. Legacy source/discussion links identify items when unambiguous. Unknown or ambiguous items are preserved and reserve their numbers.
+
+`item-N` numbering comes from the current directory and Git history, including deleted files, rather than instance database numbering. Use complete repository history to retain all old numbering. Concurrent clones can allocate the same path; Git then reports an ordinary add/add conflict. Standalone directories outside Git have no deletion history.
+
+Export streams historical paths to reserve numbers. A live article with identical bytes at the same path accounts for that Git blob during the current export. Unresolved identities and rebuilds may still require reading every remaining historical version, including old articles identifiable only by a source link. Default export stops this scan once it finds every missing identity.
+
+A bilingual item is written one file at a time. An interrupted export or a same-name collision can leave only one translation. Default export preserves a missing translation because it may have been deleted intentionally. Inspect both paths and save any manual edits before running `fdg export --target ID --rebuild` to regenerate a recognizable pair. If an incomplete file has lost its identity, inspect and move it aside before rebuilding.
+
+Locale labels, indexes and recommendations use the final content directory, including external content. Existing topic definitions are retained and missing definitions appended. `topics apply FILE` validates and edits the instance's local vocabulary. Repository topics merge through Git like other files; there is no remote topic baseline or independent reconciliation protocol.
+
+## Publishing and recovery
+
+`publish` does not generate content. It validates the worktree's current files, commits only the content prefix and declared auxiliary files, fetches the configured branch, merges normally, validates the merged result and pushes the validated commit without force. `sync --publish` and `process --publish` explicitly export before publishing. Daily Skill workflows also export first.
+
+An alternate Git index freezes the exact tree that is validated and committed. The real index is locked during publication. Unrelated staged changes, including renames, stay in the index. Edits made during validation stay in the worktree. Git ignore rules apply to new untracked files. To include an ignored file deliberately, stage it with `git add -f`. Feedgarden also skips untracked atomic-write leftovers named `<filename>.<UUIDv4>.tmp`. Ordinary authored `.tmp` files can be published.
+
+A dry run validates the local snapshot and returns `baseTree`, `tree` and `diffStat`. Run `git diff BASE_TREE TREE` in the reported worktree to inspect its exact patch. Initial access may create the default clone. On both dry runs and real publishes, `changes` lists up to 100 local paths and `changeCount` reports the full local count before fetching or merging. A real publish returns the final confirmed commit, including any merged remote changes.
+
+Validation covers the complete scoped snapshot, including a full trusted UI build for Jekyll and for dry runs. Merges that change scoped files require a second full validation; changes entirely outside that scope reuse the already-validated snapshot. This keeps cross-page links, locale configuration and manually authored content covered without trusting an earlier commit merely because it exists in Git. Object reads are batched by byte size, and format validation does not load media files into memory.
+
+Conflicts remain in the normal working files and index, with concrete paths in the error. Resolve them, run `git add` on those paths, and publish again. A merged result that fails validation also remains available for correction. Overlapping unrelated local changes stop the merge without discarding them. Git commands can inspect, commit or abort a pending merge as usual.
+
+Interrupted pushes leave local commits intact. Retry publication to fetch and inspect remote ancestry; an already-delivered commit is not duplicated. No per-file publication manifest, deletion queue, baseline or pending-push receipt is needed. After a killed process, use normal Git recovery; remove an abandoned index lock only after confirming no process still uses it. Old publication receipts are ignored. Private collection databases, summary caches and Skill runtime integrity receipts are unchanged.
+
+Validation scratch directories use the existing runtime cache retention mechanism. A subsequent publish removes marked, inactive scratch directories older than seven days; active runs, unmarked directories and persistent repository clones are retained.
+
+A confirmed push completes publication. Pages deployment and live-site checks are separate.
+
+Instance backups copy the default checkouts under `dataDir/repositories/`, including working files and Git object stores. Backup size grows with repository history. Worktrees configured outside the instance data directory use their own backup arrangements.
 
 ## Optional Jekyll UI
 
-Jekyll targets require Git, Ruby 4.0.x and Bundler. Builds use the bundled Gemfile/Gemfile.lock and a fixed theme template, with frozen bundle settings in an isolated cache/ui staging directory. Target dependency files may differ and are preserved. Target plugins, hooks, scripts and custom build commands are never executed.
+Jekyll targets require Git, Ruby 4.0.x and Bundler. Validation copies the Git snapshot into an isolated directory and uses the bundled Gemfile, lockfile and template with frozen dependencies. Target Gemfiles, plugins and build scripts are preserved and never executed by this build.
 
-The target's optional `ui` object supports `title`, `description`, `lang` (`en` or `zh-CN`), an HTTP(S) `url`, `baseurl` and boolean `features` (`search`, `feed`, `tags`, `graph`, `relations`, `previews`, `outline`, `favorites`). These presentation settings overlay the bundled template. Arbitrary Jekyll configuration, plugin lists and executable hooks are rejected. The template includes bilingual routes, feed facets and shared Clippings content.
+The optional `ui` object supports `title`, `description`, `lang`, HTTP(S) `url`, `baseurl` and boolean `features` (`search`, `feed`, `tags`, `graph`, `relations`, `previews`, `outline`, `favorites`). Arbitrary executable build configuration is rejected.
 
 ```sh
-fdg export --target site --rebuild
 fdg ui build --target site
 fdg ui serve --target site --port 4000
 fdg ui clippings fetch --target site --all --dry-run
 ```
 
-The repository Pages workflow and `pnpm run dev:site:build` are developer validation/deployment paths for the existing checked-in site. They are not consumer runtime dependencies. Theme version changes remain separate from the CLI refactor.
+The repository Pages workflow and `pnpm run dev:site:build` validate the checked-in site separately from consumer publication.

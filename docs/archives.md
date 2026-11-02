@@ -15,7 +15,7 @@ This exclusion persists through later collection, ranking and summary refresh/re
 
 ## Import and dry-run isolation
 
-Archive import runs once per database, including when adopting an earlier directory-based import marker. Changing `feed.directory` changes the publication destination and reuses private snapshots, selections and exclusions; it does not import that directory over the database or create another import backup. Use the explicit archive maintenance commands for revisions. Malformed YAML or media URLs leave the complete affected Markdown file unchanged and do not stop other files from rendering. Archive paths must stay inside the output directory; Unicode, spaces and dots in ordinary filenames remain supported.
+Archive import runs once per database, including when adopting an earlier directory-based import marker. Changing `feed.directory` changes the private core projection destination and reuses private snapshots, selections and exclusions; it does not import that directory over the database or create another import backup. Use the explicit archive maintenance commands for revisions. Malformed YAML or media URLs leave the complete affected Markdown file unchanged and do not stop other files from rendering. Archive paths must stay inside the output directory; Unicode, spaces and dots in ordinary filenames remain supported.
 
 Dry-run isolation copies the complete SQLite database and may read/import the complete content tree into its temporary workspace. Archive import stages immutable bytes in a temporary SQLite snapshot, keeping file/identity metadata and the file or bilingual pair being processed in JavaScript memory. Temporary disk use and elapsed time still scale with the archive size. The validated snapshot enters the private database in one transaction after the backup; failed imports roll back and remove their temporary snapshot. Archive identities and reserved-number conflicts are checked before the first import backup, and backup and commit retain their lease checks.
 
@@ -29,3 +29,5 @@ Archive maintenance scans only the requested file or bilingual pair once initial
 
 - [Daily ranking](ranking.md)
 - [Runner operations](operations.md)
+
+Target worktrees use a separate incremental export. They are not reconstructed from these private archive snapshots. Edit or delete target files directly and publish with Git; archive maintenance does not enqueue remote deletions.

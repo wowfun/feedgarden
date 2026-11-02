@@ -93,6 +93,22 @@ async function checkConsumer(name, tarball, skillFiles, packed) {
   config.sources = [];
   await writeFile(configFile, JSON.stringify(config));
   assert.equal(cli('doctor').state, 'completed');
+  const contract = cli('help', '--json');
+  assert.ok(!contract.commands.some(command => command.path === 'targets adopt'));
+  assert.ok(contract.commands.find(command => command.path === 'targets add').options.includes('worktree'));
+  assert.deepEqual(contract.commands.find(command => command.path === 'topics apply').options, ['detach']);
+  const remote = join(consumer, 'remote.git'), worktree = join(consumer, 'publication');
+  await mkdir(remote); await mkdir(join(worktree, 'feed'), { recursive: true });
+  run('git', ['init', '--bare', '--initial-branch=main'], remote, env);
+  run('git', ['init', '--initial-branch=main'], worktree, env);
+  run('git', ['remote', 'add', 'origin', remote], worktree, env);
+  await writeFile(join(worktree, 'feed/manual.md'), 'Authored content without a database identity\n');
+  assert.equal(cli('targets', 'add', 'installed', '--repository', remote, '--worktree', worktree).state, 'completed');
+  assert.equal(cli('targets', 'inspect', 'installed').result.worktree, worktree);
+  assert.equal(cli('export', '--target', 'installed').result.export.output, join(worktree, 'feed'));
+  assert.equal(cli('publish', '--target', 'installed', '--dry-run').result.targets[0].dryRun, true);
+  assert.equal(cli('publish', '--target', 'installed').result.targets[0].confirmed, true);
+  assert.equal(run('git', ['show', 'main:feed/manual.md'], remote, env).trim(), 'Authored content without a database identity');
   const detached = cli('process', '--detach');
   assert.ok(detached.runId);
   const next = detached.nextActions[0],
@@ -145,6 +161,7 @@ async function checkConsumer(name, tarball, skillFiles, packed) {
       npx: name === 'npm',
       pnpmDlx: name === 'pnpm',
       portableParser: true,
+      gitPublication: true,
       urlMetacharacters: true,
     }),
   );

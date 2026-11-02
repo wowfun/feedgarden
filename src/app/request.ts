@@ -23,11 +23,10 @@ const stringOptions = [
   'target',
   'output',
   'format',
+  'worktree',
   'repository',
   'branch',
   'prefix',
-  'expected-head',
-  'remote-base',
   'legacy-base',
   'platform',
   'channel',
@@ -52,7 +51,6 @@ const booleanOptions = [
   'save',
   'latest',
   'unfinished',
-  'takeover',
   'all',
 ] as const;
 

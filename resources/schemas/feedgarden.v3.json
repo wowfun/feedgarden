@@ -74,8 +74,9 @@
               "type": "string"
             }
           },
-          "output": {
-            "type": "string"
+          "worktree": {
+            "type": "string",
+            "minLength": 1
           },
           "ui": {
             "type": "object",

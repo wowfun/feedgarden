@@ -9,9 +9,9 @@ export function storagePaths(paths: InstancePaths) {
   return {
     ...paths, root, state, cache, database: join(root, 'feedgarden.sqlite'), transport: join(root, 'transport.sqlite'),
     runner: join(root, 'runner'), maintenance: join(root, 'maintenance'), recovery,
-    contentJournal: join(recovery, 'content-journal.json'), topicRemoteBase: join(recovery, 'topic-remote-base.json'),
-    publishConflict: join(recovery, 'publish-conflict.json'), workspaces, agents: join(workspaces, 'agents'),
-    backups, archiveBackups: join(backups, 'archives'), targets: join(root, 'targets'), runtime: join(root, 'runtime'),
+    contentJournal: join(recovery, 'content-journal.json'),
+    workspaces, agents: join(workspaces, 'agents'),
+    backups, archiveBackups: join(backups, 'archives'), runtime: join(root, 'runtime'),
     twitterEnvironment: join(root, 'tools', 'twitter-cli'), twitterSource: join(root, 'tools', 'twitter-cli-source'),
     scheduler: join(state, 'scheduler'), runnerEnvironment: join(root, 'secrets', 'runner.env'), validation: join(state, 'validation'),
   };

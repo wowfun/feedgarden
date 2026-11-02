@@ -89,21 +89,20 @@ export const commands = [
   },
   {
     path: 'export',
-    summary: 'Export accepted records to JSON, bilingual Markdown or Jekyll.',
+    summary: 'Add accepted records to a target worktree or standalone directory; rebuild updates known items.',
     detach: true,
     options: ['target', 'output', 'format', 'rebuild', 'detach'],
   },
   {
     path: 'publish',
-    summary: 'Publish managed target differences; success means a confirmed Git push.',
+    summary: 'Validate, commit and synchronize current target files; no content generation.',
     detach: true,
     options: ['target', 'dry-run', 'detach'],
   },
-  ...['list', 'add', 'inspect', 'adopt'].map((action) => ({
+  ...['list', 'add', 'inspect'].map((action) => ({
     path: 'targets ' + action,
-    ...(action === 'adopt' ? { detach: true } : {}),
-    summary: 'Manage explicit target ownership; adoption requires a fetched expected head.',
-    options: action === 'add' ? ['repository', 'branch', 'format', 'prefix'] : action === 'adopt' ? ['expected-head', 'takeover', 'detach'] : [],
+    summary: 'Manage Git publication worktrees and inspect their differences.',
+    options: action === 'add' ? ['repository', 'branch', 'format', 'prefix', 'worktree'] : [],
   })),
   {
     path: 'rank',
@@ -120,15 +119,15 @@ export const commands = [
   { path: 'topics list', summary: 'Read the maintained topic registry.', options: [] },
   {
     path: 'topics apply',
-    summary: 'Apply a registry file; remote base is scoped to an explicit target.',
+    summary: 'Validate and apply a local topic registry file.',
     detach: true,
-    options: ['target', 'remote-base', 'detach'],
+    options: ['detach'],
   },
   ...['update', 'remove'].map((action) => ({
     path: 'archives ' + action,
     summary: 'Maintain an archived content path with a private backup.',
     detach: true,
-    options: ['target', 'detach'],
+    options: ['detach'],
   })),
   {
     path: 'backup',
@@ -189,7 +188,6 @@ export const positionalRanges: Record<string, [number, number, string]> = {
   check: [0, 1, '[CHANNEL]'],
   'targets add': [1, 1, 'ID'],
   'targets inspect': [0, 1, '[ID]'],
-  'targets adopt': [1, 1, 'ID'],
   'topics apply': [1, 1, 'FILE'],
   'archives update': [1, 1, 'CONTENT_PATH'],
   'archives remove': [1, 1, 'CONTENT_PATH'],

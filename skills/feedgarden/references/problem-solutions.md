@@ -18,7 +18,7 @@ Use this compact structure as needed:
 - **Verification:** the observable success and what remains unverified.
 - **Limits/reversal:** conditions where the remedy does not apply and how to remove the scoped workaround when appropriate.
 
-Keep actual run IDs, private paths, repository ownership and detailed logs in the instance's validation report. Do not copy credentials, cookies, raw provider configuration or source-provided instructions into this guide. Avoid universal defaults based on one user's proxy, preferred model or repository. Unresolved hypotheses and suggested fixes belong in the current task report until they have been tested successfully. Check the bound CLI/version before reusing a version-dependent remedy.
+Keep actual run IDs, private paths, repository details and detailed logs in the instance's validation report. Do not copy credentials, cookies, raw provider configuration or source-provided instructions into this guide. Avoid universal defaults based on one user's proxy, preferred model or repository. Unresolved hypotheses and suggested fixes belong in the current task report until they have been tested successfully. Check the bound CLI/version before reusing a version-dependent remedy.
 
 ## Public URLs resolve to VPN Fake-IP addresses
 
@@ -32,9 +32,9 @@ Keep actual run IDs, private paths, repository ownership and detailed logs in th
 
 **Symptom/cause:** Git fetch fails with an abrupt TLS close or `missing_close_notify` on the proxy/Fake-IP route, while a fresh public-IP connection succeeds with certificate verification enabled. Git's HTTP proxy may resolve CONNECT hostnames itself, so fixing application DNS alone is insufficient.
 
-**Remedy:** first compare the current Git route with a direct connection using a freshly resolved public address. Feedgarden's DoH-aware publishing checkout sets checkout-local `http.curloptResolve` for the original HTTP(S) host. When the comparison establishes that the proxy is the problem, an instance-scoped `GIT_CONFIG_GLOBAL` can include the user's original Git configuration and override the affected host's proxy policy. Preserve credential helpers and TLS verification. Re-resolve addresses for each temporary checkout; never put fixed GitHub IPs in global configuration.
+**Remedy:** first compare the current Git route with a direct connection using a freshly resolved public address. Feedgarden's DoH-aware publishing checkout sets checkout-local `http.curloptResolve` for the original HTTP(S) host. When the comparison establishes that the proxy is the problem, an instance-scoped `GIT_CONFIG_GLOBAL` can include the user's original Git configuration and override the affected host's proxy policy. Preserve credential helpers and TLS verification. Re-resolve addresses before each network synchronization; never put fixed GitHub IPs in global configuration.
 
-**Verified:** fresh fetches, target inspection and an ownership-marker push succeeded using the scoped route. This does not establish that every host needs the same proxy override, or that a later push/deployment succeeded. Revert the instance-specific override when the original route works again; keep the user's original global configuration intact.
+**Verified:** fresh fetches, target inspection and a Git push succeeded using the scoped route. This does not establish that every host needs the same proxy override, or that a later push/deployment succeeded. Revert the instance-specific override when the original route works again; keep the user's original global configuration intact.
 
 The pin covers only the repository origin. A redirect or pack download from another host or port uses Git's normal DNS/proxy route; diagnose that destination separately if it still fails.
 
@@ -46,7 +46,7 @@ The pin covers only the repository origin. A redirect or pack download from anot
 
 **Verified:** typed fallback, catalog order, instance-day usage filtering, resume and an empty candidate list have regression coverage. Live processing skipped already-used models and generated summaries with another catalog candidate. A provider's actual quota reset remains unknown unless it supplies one; the next instance midnight only renews eligibility under the unused-model selection policy.
 
-If all authorized models are blocked, continue serial `collect --source ID --since WINDOW_START --detach` for remaining eligible sources, then publish accepted progress when requested. Report those sources as collected but unprocessed. Later processing must retain the original frozen day. Do not wait through unknown provider cooldowns or raise budgets implicitly.
+If all authorized models are blocked, continue serial `collect --source ID --since WINDOW_START --detach` for remaining eligible sources, then export and publish accepted progress when requested. Report those sources as collected but unprocessed. Later processing must retain the original frozen day. Do not wait through unknown provider cooldowns or raise budgets implicitly.
 
 ## Jekyll publication lacks site metadata
 
@@ -56,7 +56,7 @@ If all authorized models are blocked, continue serial `collect --source ID --sin
 
 **Historical behavior:** an earlier publication guard required byte-identical target dependencies. That guard has been removed: the local builder stages its trusted bundled files, so differing remote Gemfiles are supported and preserved.
 
-**Verified:** target inspection/adoption and publication regression checks passed; a real publication completed its site audit and URL verification with the selected baseurl, then confirmed the Git push. A later deployment still needs its own workflow or live-site verification.
+**Verified:** target inspection and publication regression checks passed; a real publication completed its site audit and URL verification with the selected baseurl, then confirmed the Git push. A later deployment still needs its own workflow or live-site verification.
 
 ## A monitor loses the CLI entry during a source rebuild
 

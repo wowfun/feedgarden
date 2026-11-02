@@ -24,9 +24,9 @@ export async function confirmPush(
   signal?: AbortSignal,
 ): Promise<void> {
   if ((await remoteHead(root, target, transport, signal)) !== expected)
-    throw new FdgError('REMOTE_CHANGED', 'Remote advanced; fetch and recompute the target diff');
+    throw new FdgError('REMOTE_CHANGED', 'Remote advanced; publish again to fetch and merge its changes');
   try {
-    await transport(['push', 'origin', 'HEAD:refs/heads/' + target.branch], root, signal);
+    await transport(['push', 'origin', commit + ':refs/heads/' + target.branch], root, signal);
   } catch (error) {
     try {
       signal?.throwIfAborted();
@@ -42,26 +42,9 @@ export async function confirmPush(
     } catch {
       throw new FdgError(
         'PUSH_UNCONFIRMED',
-        'Push result could not be confirmed; preserve the receipt and inspect remote head',
+        'Push result could not be confirmed; local commits are retained. Inspect the remote or publish again',
       );
     }
     throw error;
   }
-}
-export async function commit(root: string, message: string, signal?: AbortSignal): Promise<string> {
-  await git(
-    [
-      '-c',
-      'user.name=Feedgarden',
-      '-c',
-      'user.email=feedgarden@localhost',
-      'commit',
-      '--quiet',
-      '-m',
-      message,
-    ],
-    root,
-    signal,
-  );
-  return git(['rev-parse', 'HEAD'], root, signal);
 }

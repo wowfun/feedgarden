@@ -63,11 +63,10 @@ fdg status RUN_ID --wait-seconds 10
 fdg instance upgrade --workspace /absolute/workspace --dry-run
 fdg instance upgrade --workspace /absolute/workspace
 fdg targets inspect site --workspace /absolute/workspace
-fdg targets adopt site --expected-head FULL_SHA --workspace /absolute/workspace
 fdg sync --publish --detach --workspace /absolute/workspace
 ```
 
-发布使用独立 checkout 和目标 owner manifest。非空且未受管的目标需要显式接管；外来 owner 还需 `--takeover`。本地缺少文件不代表删除。发布完成指 Git 推送已确认，部署状态另行验证。通用 Markdown/JSON 目标只需 Git；Jekyll 构建使用包内固定依赖及隔离目录。
+目标使用持久的普通 Git 工作区，可通过 `targets add --worktree PATH` 选择已有工作区。内容属于仓库，无需登记实例归属。先用 `export --target ID` 新增已接受摘要，再用 `publish --target ID` 校验、提交并同步当前文件；`sync --publish` 串联两步。默认生成保留人工修改和删除，`export --rebuild` 才更新可识别的生成条目。历史和冲突由 Git 处理。发布完成指推送已确认，部署状态另行验证。Jekyll 校验使用包内依赖及隔离构建目录。
 
 ## 文档
 

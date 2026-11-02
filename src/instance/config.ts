@@ -26,9 +26,9 @@ export function loadInstance(selection: Selection = {}): { config: InstanceConte
   if (!result.success) throw new FdgError('CONFIG_INVALID', result.error.message);
   const config = result.data, paths = instancePaths(selection, config.storage);
   config.feed = { directory: resolve(paths.configDir, raw.feed?.directory ?? join(paths.dataDir, 'exports', 'core')), topics: resolve(paths.configDir, raw.feed?.topics ?? join(paths.dataDir, 'topics.json')), ...(config.feed.locales ? { locales: resolve(paths.configDir, config.feed.locales) } : {}) };
-  config.targets = config.targets.map(target => ({ ...target, repository: /^(?:[a-z][a-z0-9+.-]*:\/\/|[^/\\]+@[^:]+:)/i.test(target.repository) || target.repository.startsWith('-') || /^(ext|file):/i.test(target.repository) ? target.repository : resolve(paths.configDir, target.repository), ...(target.output ? { output: resolve(paths.configDir, target.output) } : {}) }));
+  config.targets = config.targets.map(target => ({ ...target, repository: /^(?:[a-z][a-z0-9+.-]*:\/\/|[^/\\]+@[^:]+:)/i.test(target.repository) || target.repository.startsWith('-') || /^(ext|file):/i.test(target.repository) ? target.repository : resolve(paths.configDir, target.repository), ...(target.worktree ? { worktree: resolve(paths.configDir, target.worktree) } : {}) }));
   assertExportDirectory(paths, config.feed.directory);
-  for (const target of config.targets) if (target.output) assertExportDirectory(paths, target.output);
+  for (const target of config.targets) if (target.worktree) assertExportDirectory(paths, join(target.worktree, target.managedPrefix));
   return { config: createInstanceContext(config, paths), paths };
 }
 export function loadConfig(file?: string): InstanceContext { return loadInstance(file ? { config: file } : {}).config; }

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import type { TaskGenerator } from '../../src/agent/index.js';
 import { artifactRepairFeedback,pruneWorkspaces } from '../../src/agent/index.js';
-import { acceptedItems,applyTopics,eligible,initializePublications,itemPath,iterateAcceptedItems,loadTopics,maintainArchive,mergeTopics,recoverContent,renderItem,summarize,transcriptStep,writeSite,type Generator } from '../../src/content/index.js';
+import { acceptedItems,applyTopics,eligible,initializePublications,itemPath,iterateAcceptedItems,loadTopics,maintainArchive,recoverContent,renderItem,summarize,transcriptStep,writeSite,type Generator } from '../../src/content/index.js';
 import type { Item } from '../../src/contracts/items.js';
 import { type Registry } from '../../src/contracts/registry.js';
 import { validateArtifact,validateRegistry } from '../../src/contracts/topics.mjs';
@@ -16,7 +16,6 @@ import { resource } from '../../src/platform/resources.js';
 import { publicationScope, publicationSignature } from '../../src/content/publications.js';
 import { ModelError } from '../../src/contracts/model-errors.js';
 import { corePublications } from '../../src/content/index.js';
-import { assertManagedPaths } from '../../src/publishing/index.js';
 import { date,parseFollowBuilders } from '../../src/sources/index.js';
 import Database from '../../src/storage/sqlite.js';
 import { testContext } from '../support/context.js';
@@ -831,11 +830,6 @@ for(const legacy of [false,true]) test(legacy?'legacy content journals recover e
    await recoverContent(f.config,f.store);
   }finally{await f.cleanup();}
  }
-});
-test('three-way topic merge admits independent additions and rejects same-ID conflicts and unmanaged publication paths',()=>{
- const b=registry,l={version:1 as const,topics:[topic,{...topic,id:'models',name:{en:'Models','zh-CN':'模型'}}]},r={version:1 as const,topics:[topic,{...topic,id:'research',name:{en:'Research','zh-CN':'研究'}}]};assert.equal(mergeTopics(b,l,r).topics.length,3);
- assert.throws(()=>mergeTopics(b,{...b,topics:[{...topic,description:'Local'}]},{...b,topics:[{...topic,description:'Remote'}]}),/coding/);
- assertManagedPaths(['content/one/2026-10/09/item-1.md','config/topics.json']);assert.throws(()=>assertManagedPaths(['README.md']));assert.throws(()=>assertManagedPaths(['reports/old.md']));
 });
 test('legacy schema is refused without changing its contents',async()=>{
  const f=await fixture();try{const legacy=join(f.root,'legacy.sqlite');await f.store.backup(legacy);const db=new Database(legacy);db.exec('DROP TABLE feed_meta; DROP TABLE feed_excluded; DROP TABLE feed_jobs; DROP TABLE feed_summaries; DROP TABLE feed_cache; DROP TABLE feed_batches; PRAGMA user_version=2;');db.close();assert.throws(()=>new Store(legacy),/Unsupported legacy database schema/);const raw=new Database(legacy);assert.equal(raw.pragma('user_version',{simple:true}),2);raw.close();

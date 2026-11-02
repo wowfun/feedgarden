@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import type { Registry, Topic } from '../contracts/registry.js';
+import type { Registry } from '../contracts/registry.js';
 import { normalizedName, validateRegistry } from '../contracts/topics.mjs';
 import { atomicWrite } from '../platform/files.js';
 import { hash } from '../platform/hash.js';
@@ -28,19 +28,4 @@ export async function applyTopics(path: string, next: Registry, expectedHash?: s
   const valid = assertTopicUpdate(previous, next);
   if (hash(previous) === hash(valid)) return;
   await atomicWrite(path, JSON.stringify(valid, null, 2) + '\n', signal);
-}
-export function mergeTopics(base: Registry, local: Registry, remote: Registry): Registry {
-  const indexed = [base, local, remote].map(registry => new Map(validateRegistry(registry).topics.map(topic => [topic.id, topic])));
-  const ids = new Set([...base.topics, ...local.topics, ...remote.topics].map(topic => topic.id));
-  const topics: Topic[] = [], conflicts: string[] = [];
-  for (const id of ids) {
-    const b = indexed[0]!.get(id), l = indexed[1]!.get(id), r = indexed[2]!.get(id);
-    if (b && (!l || !r)) { conflicts.push(id); continue; }
-    const hb = hash(b ?? null), hl = hash(l ?? null), hr = hash(r ?? null);
-    if (hl !== hb && hr !== hb && hl !== hr) { conflicts.push(id); continue; }
-    const next = hl === hb ? r : l;
-    if (next) topics.push(next);
-  }
-  if (conflicts.length) throw new Error('Topic merge conflicts: ' + conflicts.join(', '));
-  return assertTopicUpdate(base, { version: 1, topics });
 }

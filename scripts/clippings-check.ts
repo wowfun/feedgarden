@@ -1,3 +1,4 @@
+import { openSiteControls,verifyNavigationLayout,type NavigationLayout } from './navigation-layout.js';
 import { chromium,expect,type Page } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdir,readFile,writeFile } from 'node:fs/promises';
@@ -5,14 +6,16 @@ import { join,resolve } from 'node:path';
 import { checkArchiveExport } from './archive-export-check.js';
 import { staticServer } from './static-server.js';
 
-export async function checkClippings(root: string, output: string, fixture: boolean): Promise<void> {
+export async function checkClippings(root: string, output: string, fixture: boolean, expectedLayout: NavigationLayout): Promise<NavigationLayout> {
   root = resolve(root); await mkdir(output, { recursive: true });
   const server = staticServer(root, '/feedgarden');
   await new Promise<void>(done => server.listen(0, '127.0.0.1', done));
   const address = server.address(); assert.ok(address && typeof address !== 'string');
   const origin = 'http://127.0.0.1:' + address.port, browser = await chromium.launch({ headless: true });
+  let renderedLayout: NavigationLayout | undefined;
   const ready = async (page: Page) => {
     await page.waitForFunction(() => document.querySelector('[data-paged-archive]') && !document.querySelector('[data-paged-archive]')!.hasAttribute('aria-busy') && document.querySelector('[data-archive-page-status]')?.textContent && document.querySelector('[data-archive-status]')?.textContent === '');
+    renderedLayout = verifyNavigationLayout(await page.locator('body').getAttribute('data-navigation-layout'), expectedLayout);
   };
   const evidence: unknown[] = [];
   try {
@@ -25,7 +28,7 @@ export async function checkClippings(root: string, output: string, fixture: bool
       page.on('pageerror', error => errors.push(error.message));
       const prefix = '/feedgarden/' + (locale === 'en' ? '' : 'zh-CN/'), other = locale === 'en' ? 'zh-CN' : 'en';
       await page.goto(origin + prefix); await ready(page);
-      const ids = await page.locator('.site-header [data-navigation-id]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-navigation-id')));
+      const ids = await page.locator('.site-navigation [data-navigation-id]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-navigation-id')));
       assert.ok(ids.includes('home'), 'Home navigation must be present');
       assert.ok(ids.indexOf('clippings') > ids.indexOf('home'));
       if (ids.includes('podcasts')) assert.ok(ids.indexOf('clippings') < ids.indexOf('podcasts'));
@@ -81,11 +84,13 @@ export async function checkClippings(root: string, output: string, fixture: bool
         await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('https://sinputer.top/feedgarden/assets/vault/clippings/assets/animated.gif');
         await expect(page.locator('.translation-fallback')).toHaveCount(0);
         await expect(page.locator('[data-page-actions] [data-favorite-toggle]')).toHaveAttribute('aria-pressed', 'true');
+        await openSiteControls(page);
         await page.locator('[data-language-switcher] summary').click();
         await page.locator(`[data-language-switcher] a[lang="${other}"]`).click();
         await expect(page.locator('html')).toHaveAttribute('lang', other);
         await expect(page.locator('.note-content')).toContainText('共享正文 051');
         await expect(page.locator('.translation-fallback')).toHaveCount(0);
+        verifyNavigationLayout(await page.locator('body').getAttribute('data-navigation-layout'), expectedLayout);
         await page.screenshot({ path: join(output, `shared-article-${locale}-${width}.png`) });
         await page.goto(origin + prefix + 'favorites/'); await ready(page);
         await expect(page.locator('.blog-ledger__main strong')).toHaveText(['Clipping 051']);
@@ -103,5 +108,7 @@ export async function checkClippings(root: string, output: string, fixture: bool
       await context.close();
     }
     await writeFile(join(output, 'checks.json'), JSON.stringify(evidence, null, 2) + '\n');
+    assert.ok(renderedLayout);
+    return renderedLayout;
   } finally { await browser.close(); await new Promise<void>(done => server.close(() => done())); }
 }

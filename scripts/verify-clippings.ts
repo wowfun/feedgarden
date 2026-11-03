@@ -8,19 +8,22 @@ import { checkClippings } from './clippings-check.js';
 import { developmentConfig } from './development-config.js';
 import { validationDirectory } from './validation-paths.js';
 import { validationTheme } from './validation-theme.js';
+import { parseNavigationLayout,previewNavigationConfig,type NavigationLayout } from './navigation-layout.js';
 
-const { values } = parseArgs({ options: { config: { type: 'string' }, gem: { type: 'string' }, help: { type: 'boolean' } } });
-if (values.help) { console.log('Usage: pnpm run verify:clippings [--config FILE] [--gem PATH]\nBuild and check isolated content copies with the frozen published theme by default, or an explicit local gem. No database or publication access.'); process.exit(0); }
+const { values } = parseArgs({ options: { config: { type: 'string' }, gem: { type: 'string' }, 'navigation-layout': { type: 'string' }, help: { type: 'boolean' } } });
+if (values.help) { console.log('Usage: pnpm run verify:clippings [--config FILE] [--gem PATH] [--navigation-layout top|sidebar]\nBuild and check isolated content copies with the frozen published theme by default, or an explicit local gem. --navigation-layout overrides only the isolated copy. No database or publication access.'); process.exit(0); }
+const navigationLayout = parseNavigationLayout(values['navigation-layout']);
 const project = process.cwd(), base = join(validationDirectory(developmentConfig(values.config)), 'clippings');
 await mkdir(base, { recursive: true });
 const root = await mkdtemp(join(base, 'run-'));
 const environment = validationEnvironment();
 const builder = await validationTheme(root, values.gem);
-const config = parse(await readFile('.github/jekyll-obsidian.yml', 'utf8'));
+const config = previewNavigationConfig(parse(await readFile('.github/jekyll-obsidian.yml', 'utf8')), navigationLayout);
 // Use the real site configuration, disabling external analytics and comments in validation.
 delete config.website.analytics;
 delete config.website.comments;
 const builds: Record<string, string> = {};
+const navigationLayouts: Record<string, NavigationLayout> = {};
 for (const name of ['fixture', 'production-copy']) {
   const host = join(root, name);
   await mkdir(join(host, '.github'), { recursive: true });
@@ -56,8 +59,8 @@ for (const name of ['fixture', 'production-copy']) {
       assert.equal(search.documents.length, 54);
     }
   }
-  await checkClippings(output, join(root, name + '-browser'), name === 'fixture');
+  navigationLayouts[name] = await checkClippings(output, join(root, name + '-browser'), name === 'fixture', config.website.navigation?.layout ?? 'top');
 }
 await run(process.execPath, ['--import', 'tsx', 'scripts/visual-check.ts', ...(values.config ? ['--config', values.config] : [])], project, { ...environment, FEEDGARDEN_VISUAL_ROOT: builds['production-copy']!, FEEDGARDEN_VALIDATION_DIR: join(root, 'production-regression') });
-await writeFile(join(root, 'results.json'), JSON.stringify({ theme: builder.identity, builds, browserChecks: 'passed', productionData: 'content copy only; no database opened' }, null, 2) + '\n');
+await writeFile(join(root, 'results.json'), JSON.stringify({ theme: builder.identity, navigationLayouts, builds, browserChecks: 'passed', productionData: 'content copy only; no database opened' }, null, 2) + '\n');
 console.log('Clippings validation passed: ' + root);

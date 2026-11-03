@@ -60,6 +60,8 @@ jobs:
         if: steps.changes.outputs.mode != 'docs'
       - run: pnpm exec playwright install --with-deps --only-shell chromium
         if: steps.changes.outputs.mode != 'docs'
+      - run: pnpm run test:browser
+        if: steps.changes.outputs.mode != 'docs'
       - run: pnpm run test:visual
         if: steps.changes.outputs.mode != 'docs'
       - name: Verify Clippings with the published theme

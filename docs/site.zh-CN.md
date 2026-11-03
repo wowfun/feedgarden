@@ -2,7 +2,7 @@
 
 导航栏提供播客、GitHub、arXiv 独立栏目。源仍在配置中时，禁用采集不会移除其历史栏目；删除来源配置后，不再生成或保护相应栏目索引。
 
-[Clippings](clippings.zh-CN.md) 位于首页和播客之间，手工维护的条目同时显示在首页，中英文界面共用一份正文。该能力已由固定的 0.3.3 正式版本支持，验证方式见[开发说明](development.md#local-clippings-validation)。
+[Clippings](clippings.zh-CN.md) 位于首页和播客之间，手工维护的条目同时显示在首页，中英文界面共用一份正文。该能力已由固定的 0.3.4 正式版本支持，验证方式见[开发说明](development.md#local-clippings-validation)。
 
 Clippings 的来源筛选标签取自各语言 `config/locales/*.json` 中的 `tag_labels["source/clippings"]`，无需增加采集来源配置。
 
@@ -16,6 +16,12 @@ Feedgarden 开启 `website.home.hide_tab_sources: true`，首页默认排除播�
 
 首页的“全部”、来源及主题计数、日期导航、分页、导出均使用当前来源范围。导出弹窗打开时继承页面状态，弹窗内调整不改变页面 URL。无 JavaScript 时，默认首页内容与计数仍正确，栏目及文章链接可正常访问。
 
-来源与主题筛选设置由已锁定的 `jekyll-obsidian-site` 0.3.3 正式版本支持。两套主题还会在滚动超过一屏后显示“回到顶部”按钮。
+来源与主题筛选设置由已锁定的 `jekyll-obsidian-site` 0.3.4 正式版本支持。两套主题还会在滚动超过一屏后显示“回到顶部”按钮。
 
 [English](site.md) · [主题治理](topics.zh-CN.md)
+
+## 左侧导航本地预览
+
+Feedgarden 使用已发布的 0.3.4 主题，将站点标识、栏目、语言、配色和 GitHub 操作放入左侧栏，窄屏通过左侧抽屉访问。搜索按钮在桌面和手机上均显示于顶栏。归档页顶栏依次排列搜索、平铺阅读和导出按钮，搜索紧挨平铺阅读左侧。消费者模板也设置为 `website.navigation.layout: sidebar`，上游主题默认仍为 `top`。运行验证和打开预览的命令见[开发说明](development.md#local-sidebar-preview)。
+
+两个验证命令均支持 `--navigation-layout top|sidebar`，默认使用已发布依赖；开发上游功能时可选用 `--gem` 指定本地包。参数只覆盖隔离副本的布局，保留其他导航设置；省略参数则沿用原站点配置。验证会核对实际渲染布局，并按 `builds` 中的构建名称写入 `results.json.navigationLayouts`。结果记录正式版本及依赖包组的 SHA-256，选用本地包时则记录 gem 的 SHA-256。这些操作不修改正式配置、消费者模板、依赖锁文件和原始内容。

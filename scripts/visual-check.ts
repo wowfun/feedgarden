@@ -1,3 +1,4 @@
+import { openSiteControls,closeSiteControls } from './navigation-layout.js';
 import { chromium,expect,type Page } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdir,readFile,writeFile } from 'node:fs/promises';
@@ -63,8 +64,10 @@ try{
     checks.push({locale,size,disclosure:key,keyboard:'expand and collapse passed'});
    }
   }
-  const repository=page.locator('.site-header .site-action--github');assert.equal(await repository.getAttribute('href'),'https://github.com/wowfun/feedgarden');assert.equal(await repository.locator('svg').count(),1);assert.equal(await repository.getAttribute('aria-label'),locale==='en'?'Open Feedgarden on GitHub':'在 GitHub 上打开 Feedgarden');await repository.click({trial:true});
-  for(const action of await page.locator('.site-header .site-actions button, .site-header .site-actions summary').all()){if(await action.isVisible()){assert.ok(await action.getAttribute('aria-label'));assert.ok(await action.getAttribute('title'));assert.ok(await action.locator('svg').count());}}
+  await openSiteControls(page);
+  const repository=page.locator('.site-actions .site-action--github');assert.equal(await repository.getAttribute('href'),'https://github.com/wowfun/feedgarden');assert.equal(await repository.locator('svg').count(),1);assert.equal(await repository.getAttribute('aria-label'),locale==='en'?'Open Feedgarden on GitHub':'在 GitHub 上打开 Feedgarden');await repository.click({trial:true});
+  for(const action of await page.locator('.site-actions button, .site-actions summary').all()){if(await action.isVisible()){assert.ok(await action.getAttribute('aria-label'));assert.ok(await action.getAttribute('title'));assert.ok(await action.locator('svg').count());}}
+  await closeSiteControls(page);
   const rows=page.locator('[data-filter-item]'),count=await rows.count();assert.ok(count<=50);if(fixture)assert.equal(count,50);
   const pager=page.locator('[data-archive-pagination]'),pages=Number(await pager.locator('input').getAttribute('max'));
   if(pages>1){assert.equal(await pager.locator('[data-archive-page-numbers] a').count(),Math.min(5,pages));await pager.locator('a[data-archive-page="2"]').click();await ready(page);assert.match(page.url(),/page=2/);await pager.locator('input').fill('1');await pager.locator('input').press('Enter');await ready(page);assert.equal(new URL(page.url()).searchParams.has('page'),false);await pager.scrollIntoViewIfNeeded();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:join(output,artifactPrefix+'pagination-'+locale+'-'+size+'.png')});await page.evaluate(()=>window.scrollTo(0,0));}
@@ -99,7 +102,8 @@ try{
    const exported=await checkArchiveExport(page,root,output,artifactPrefix+'export-'+locale+'-'+size,locale);checks.push({locale,size,exported,exportContent:'all published bodies present in archive order'});
    const detail=await rows.first().locator('.blog-ledger__main').getAttribute('href');assert.ok(detail);await page.goto(new URL(detail,origin).href);assert.equal(await page.locator('h1').count(),1);const markdown=await page.locator('[data-markdown-url]').getAttribute('data-markdown-url');assert.ok(markdown);assert.equal((await page.request.get(origin+markdown)).status(),200);assert.equal(await page.locator('.note-source-url a').count(),1);assert.ok(await page.locator('[data-note-tags] [data-note-facet="source"]').count());assert.ok(await page.locator('[data-note-tags] [data-note-facet="topic"]').count());
    assert.ok(await page.evaluate(()=>{const tags=document.querySelector('[data-note-tags]')!,source=document.querySelector('.note-source-url')!,body=document.querySelector('.note-content')!;return !!(tags.compareDocumentPosition(source)&Node.DOCUMENT_POSITION_FOLLOWING)&&!!(source.compareDocumentPosition(body)&Node.DOCUMENT_POSITION_FOLLOWING)&&tags.getBoundingClientRect().bottom<=source.getBoundingClientRect().top&&source.getBoundingClientRect().bottom<=body.getBoundingClientRect().top;}));
-   if(size==='desktop')assert.ok((await page.locator('.note-content').boundingBox())!.width>=880);
+   // Reserve the sidebar's 240px from the existing 880px desktop reading-width floor.
+   if(size==='desktop')assert.ok((await page.locator('.note-content').boundingBox())!.width >= (await page.locator('body').getAttribute('data-navigation-layout') === 'sidebar' ? 880 - 240 : 880));
    if(fixture){assert.ok(await page.locator('.note-content > p').count()>=2);assert.equal(await page.locator('.note-content img[src="https://example.invalid/fixture-diagram.svg"]').count(),1);assert.equal(await page.locator('.note-content video source[src="https://example.invalid/fixture-video.mp4"]').count(),1);assert.ok(await page.locator('.note-content a[href="https://example.invalid/fixture-diagram.svg"]').count());assert.ok(await page.locator('.note-content a[href="https://example.invalid/fixture-video.mp4"]').count());}
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:join(output,artifactPrefix+'item-'+locale+'-'+size+'.png')});
    const favorite=page.locator('[data-page-actions] [data-favorite-toggle]');await favorite.click();await expect(favorite).toHaveAttribute('aria-pressed','true');
@@ -122,11 +126,12 @@ try{
    await page.goBack();await ready(page);assert.match(await page.locator('[data-archive-page-status]').textContent()??'',/51/);await page.goForward();await ready(page);assert.match(await page.locator('[data-archive-page-status]').textContent()??'',/101/);
    if(size==='mobile'){await page.locator('[data-dialog-open="context"]:visible').click();}
    const day=page.locator('[data-day-filter-option][data-filter-day="2026-09-30"]:visible').first();await day.click();await ready(page);assert.equal(await rows.count(),1);if(size==='mobile')await page.keyboard.press('Escape');
+   await openSiteControls(page);
    await page.locator('[data-language-switcher] summary').click();const other=locale==='en'?'zh-CN':'en';await page.locator('[data-language-switcher] a[lang="'+other+'"]').click();await ready(page);assert.equal(await page.locator('html').getAttribute('lang'),other);assert.match(page.url(),/day=2026-09-30/);assert.equal(await rows.count(),1);
    await page.goto(origin+prefix+'?source=missing&source=missing&page=invalid');await ready(page);assert.equal(await rows.count(),0);assert.ok(page.url().endsWith('?source=missing'));await page.locator('[data-archive-clear]').click();await ready(page);assert.equal(await rows.count(),50);
    await page.screenshot({path:join(output,artifactPrefix+'filters-'+locale+'-'+size+'.png')});
   }
-  const collections=await page.locator('.site-header [data-navigation-id="clippings"] > a, .site-header [data-navigation-id="podcasts"] > a, .site-header [data-navigation-id="github"] > a, .site-header [data-navigation-id="arxiv"] > a').evaluateAll(links=>links.map(link=>({id:link.parentElement!.getAttribute('data-navigation-id')!,href:link.getAttribute('href')!})));
+  const collections=await page.locator('.site-navigation [data-navigation-id="clippings"] > a, .site-navigation [data-navigation-id="podcasts"] > a, .site-navigation [data-navigation-id="github"] > a, .site-navigation [data-navigation-id="arxiv"] > a').evaluateAll(links=>links.map(link=>({id:link.parentElement!.getAttribute('data-navigation-id')!,href:link.getAttribute('href')!})));
   if(!fixture)assert.deepEqual(collections.map(c=>c.id).sort(),['arxiv','clippings','github','podcasts']);
   for(const collection of collections){
    const url=new URL(collection.href,origin);assert.equal(url.origin,origin);assert.equal((await page.goto(url.href))?.status(),200);await ready(page);

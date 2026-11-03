@@ -6,6 +6,8 @@ baseurl: ""
 website:
   source: content
   theme: minimal
+  navigation:
+    layout: sidebar
   content:
     publish_by_default: [clippings]
     directories:

@@ -70,7 +70,11 @@
     "topics/compilers": "编译器",
     "topics/neuroscience": "神经科学",
     "topics/databases": "数据库",
-    "topics/environment": "环境"
+    "topics/environment": "环境",
+    "topics/hiring": "招聘",
+    "topics/version-control": "版本控制",
+    "topics/operating-systems": "操作系统",
+    "topics/prediction-markets": "预测市场"
   },
   "messages": {
     "footer_sites": "站点",
@@ -389,6 +393,10 @@
     "compilers": "topics/compilers",
     "neuroscience": "topics/neuroscience",
     "databases": "topics/databases",
-    "environment": "topics/environment"
+    "environment": "topics/environment",
+    "hiring": "topics/hiring",
+    "version-control": "topics/version-control",
+    "operating-systems": "topics/operating-systems",
+    "prediction-markets": "topics/prediction-markets"
   }
 }

@@ -1,4 +1,99 @@
 {
   "version": 1,
-  "items": {}
+  "items": {
+    "hackernews/2026-11/03/item-13.md": [
+      {
+        "path": "reddit/2026-11/03/item-44.md",
+        "expires_at": "2026-11-05T22:26:53.000Z"
+      },
+      {
+        "path": "reddit/2026-11/03/item-23.md",
+        "expires_at": "2026-11-05T21:25:39.000Z"
+      },
+      {
+        "path": "reddit/2026-11/03/item-19.md",
+        "expires_at": "2026-11-05T20:18:26.000Z"
+      },
+      {
+        "path": "reddit/2026-11/03/item-13.md",
+        "expires_at": "2026-11-05T19:15:33.000Z"
+      }
+    ],
+    "reddit/2026-11/03/item-19.md": [
+      {
+        "path": "hackernews/2026-11/03/item-13.md",
+        "expires_at": "2026-11-05T20:18:26.000Z"
+      },
+      {
+        "path": "reddit/2026-11/03/item-13.md",
+        "expires_at": "2026-11-05T19:15:33.000Z"
+      }
+    ],
+    "hackernews/2026-11/03/item-21.md": [
+      {
+        "path": "reddit/2026-11/03/item-2.md",
+        "expires_at": "2026-11-05T16:25:22.000Z"
+      }
+    ],
+    "reddit/2026-11/03/item-2.md": [
+      {
+        "path": "hackernews/2026-11/03/item-21.md",
+        "expires_at": "2026-11-05T16:25:22.000Z"
+      },
+      {
+        "path": "hackernews/2026-11/03/item-5.md",
+        "expires_at": "2026-11-05T16:25:22.000Z"
+      }
+    ],
+    "hackernews/2026-11/03/item-5.md": [
+      {
+        "path": "reddit/2026-11/03/item-5.md",
+        "expires_at": "2026-11-05T16:40:29.000Z"
+      },
+      {
+        "path": "reddit/2026-11/03/item-2.md",
+        "expires_at": "2026-11-05T16:25:22.000Z"
+      }
+    ],
+    "reddit/2026-11/03/item-5.md": [
+      {
+        "path": "hackernews/2026-11/03/item-5.md",
+        "expires_at": "2026-11-05T16:40:29.000Z"
+      }
+    ],
+    "reddit/2026-11/03/item-13.md": [
+      {
+        "path": "hackernews/2026-11/03/item-13.md",
+        "expires_at": "2026-11-05T19:15:33.000Z"
+      },
+      {
+        "path": "reddit/2026-11/03/item-19.md",
+        "expires_at": "2026-11-05T19:15:33.000Z"
+      }
+    ],
+    "reddit/2026-11/03/item-10.md": [
+      {
+        "path": "reddit/2026-11/03/item-6.md",
+        "expires_at": "2026-11-05T17:13:47.000Z"
+      }
+    ],
+    "reddit/2026-11/03/item-6.md": [
+      {
+        "path": "reddit/2026-11/03/item-10.md",
+        "expires_at": "2026-11-05T17:13:47.000Z"
+      }
+    ],
+    "reddit/2026-11/03/item-44.md": [
+      {
+        "path": "hackernews/2026-11/03/item-13.md",
+        "expires_at": "2026-11-05T22:26:53.000Z"
+      }
+    ],
+    "reddit/2026-11/03/item-23.md": [
+      {
+        "path": "hackernews/2026-11/03/item-13.md",
+        "expires_at": "2026-11-05T21:25:39.000Z"
+      }
+    ]
+  }
 }

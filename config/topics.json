@@ -768,6 +768,50 @@
       "aliases": [],
       "deprecated": false,
       "hidden": false
+    },
+    {
+      "id": "hiring",
+      "name": {
+        "en": "Hiring",
+        "zh-CN": "招聘"
+      },
+      "description": "Job postings, hiring threads and employment opportunities, including recurring monthly 'Who is hiring?' forums.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": false
+    },
+    {
+      "id": "version-control",
+      "name": {
+        "en": "Version Control",
+        "zh-CN": "版本控制"
+      },
+      "description": "Version control systems, Git scaling, source control management and repository infrastructure.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": false
+    },
+    {
+      "id": "operating-systems",
+      "name": {
+        "en": "Operating Systems",
+        "zh-CN": "操作系统"
+      },
+      "description": "Operating system releases, updates, user interfaces and platform changes.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": false
+    },
+    {
+      "id": "prediction-markets",
+      "name": {
+        "en": "Prediction Markets",
+        "zh-CN": "预测市场"
+      },
+      "description": "Platforms and contracts for trading on the outcomes of future events, including their regulation, legality and social effects.",
+      "aliases": [],
+      "deprecated": false,
+      "hidden": false
     }
   ]
 }

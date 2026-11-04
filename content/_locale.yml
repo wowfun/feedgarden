@@ -70,7 +70,11 @@
     "topics/compilers": "Compilers",
     "topics/neuroscience": "Neuroscience",
     "topics/databases": "Databases",
-    "topics/environment": "Environment"
+    "topics/environment": "Environment",
+    "topics/hiring": "Hiring",
+    "topics/version-control": "Version Control",
+    "topics/operating-systems": "Operating Systems",
+    "topics/prediction-markets": "Prediction Markets"
   },
   "messages": {
     "footer_sites": "Sites",
@@ -254,6 +258,10 @@
     "compilers": "topics/compilers",
     "neuroscience": "topics/neuroscience",
     "databases": "topics/databases",
-    "environment": "topics/environment"
+    "environment": "topics/environment",
+    "hiring": "topics/hiring",
+    "version-control": "topics/version-control",
+    "operating-systems": "topics/operating-systems",
+    "prediction-markets": "topics/prediction-markets"
   }
 }

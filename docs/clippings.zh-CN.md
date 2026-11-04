@@ -77,4 +77,4 @@ bundle exec ruby -Itest test/compiler/published_markdown_test.rb
 
 ## 本地主题验证
 
-共享内容和 Web Clipper 元数据已由固定的 `jekyll-obsidian-site` 0.3.3 正式版本支持。运行 `pnpm run verify:clippings` 即可使用已发布依赖验证。开发上游功能时，可按[开发说明](development.md#local-clippings-validation)显式选择隔离的本地主题包；验证不修改生产数据库、依赖锁文件或已部署站点。
+共享内容和 Web Clipper 元数据已由固定的 `jekyll-obsidian-site` 0.3.4 正式版本支持。运行 `pnpm run verify:clippings` 即可使用已发布依赖验证。开发上游功能时，可按[开发说明](development.md#local-clippings-validation)显式选择隔离的本地主题包；验证不修改生产数据库、依赖锁文件或已部署站点。

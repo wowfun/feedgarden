@@ -77,4 +77,4 @@ bundle exec ruby -Itest test/compiler/published_markdown_test.rb
 
 ## Local theme validation
 
-Shared content and Web Clipper metadata are supported by the pinned `jekyll-obsidian-site` 0.3.3 release. Run `pnpm run verify:clippings` with the published dependency. For upstream development, [Development](development.md#local-clippings-validation) describes the explicit local-package override. Validation does not change the production database, dependency lock or deployed site.
+Shared content and Web Clipper metadata are supported by the pinned `jekyll-obsidian-site` 0.3.4 release. Run `pnpm run verify:clippings` with the published dependency. For upstream development, [Development](development.md#local-clippings-validation) describes the explicit local-package override. Validation does not change the production database, dependency lock or deployed site.

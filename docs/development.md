@@ -28,7 +28,7 @@ Developer `verify:scale` and `dev:site:build` use the root Gemfile/Gemfile.lock.
 
 ## Local Clippings validation
 
-Clippings uses shared-content and Web Clipper support from the pinned `jekyll-obsidian-site` 0.3.3 release, including `published`/`source`, directory tags, published Markdown image URLs and the footer API.
+Clippings uses shared-content and Web Clipper support from the pinned `jekyll-obsidian-site` 0.3.4 release, including `published`/`source`, directory tags, published Markdown image URLs and the footer API.
 
 Both verifiers default to the frozen published dependency in `Gemfile` and `Gemfile.lock`; they need no theme checkout or personal-site directory. CI runs them for every non-docs change and retains their screenshots, exports and result records with the visual-validation artifact.
 
@@ -46,16 +46,29 @@ Push-Location .references/jekyll-obsidian/website
 pnpm run build
 bundle exec ruby scripts/package.rb --skip-assets
 Pop-Location
-pnpm run verify:clippings --gem .references/jekyll-obsidian/pkg/jekyll-obsidian-site-0.3.3.gem
+pnpm run verify:clippings --gem .references/jekyll-obsidian/pkg/jekyll-obsidian-site-0.3.4.gem
 ```
 
 The package filename uses the upstream checkout's version; adjust it if that version changes. The local artifact is identified by its SHA-256, not treated as a new published release. Published-mode results instead record the locked version and bundle SHA-256. The verifier installs it into a fresh gem home under `.local/feedgarden/state/validation/clippings/run-*/`, reusing installed runtime dependencies without downloading or replacing the normal theme. It builds a copy of the current content and a 52-clipping fixture, runs desktop/mobile checks in both languages, and saves screenshots, Markdown exports and `results.json`. Existing site browser checks run against the real-content copy as well. No production database is opened, no collected content is rendered, and nothing is published. The real-content check accepts an empty or populated Clippings tab; the synthetic fixture exercises pagination and content interactions.
 
 The fixture also covers local inline/reference images, Copy page clipboard content and absolute attachment URLs in exports. The current real article is checked for hosted image loading and absence of requests to its original image host. Run the manual image-fetch and preservation tests with `node --import tsx --test --test-concurrency=1 tests/ui/fetch-clippings.test.ts tests/ui/clippings.test.ts`; see [Clippings](clippings.md#fetch-and-host-images-manually) for usage. Image fetching is never part of the verifier or production build.
 
+## Local sidebar preview
+
+The pinned 0.3.4 release supports `website.navigation.layout: top|sidebar` in both themes. Feedgarden and its consumer template use `sidebar`; the upstream default remains `top`. Preview either layout with the published dependency:
+
+```powershell
+pnpm run verify:clippings --navigation-layout sidebar
+pnpm run verify:footer --navigation-layout sidebar
+$preview = Get-Content .local/feedgarden/state/validation/footer/current.json -Raw | ConvertFrom-Json
+pnpm run dev:site:serve --root $preview.builds.'feedgarden-minimal' --baseurl /feedgarden --port 58002
+```
+
+Open `http://127.0.0.1:58002/feedgarden/`. Both verifiers accept `--navigation-layout top|sidebar` with the published dependency or an optional `--gem` for upstream development. The override merges into each isolated host copy and preserves other navigation settings. Omitting it keeps the host's configured layout. Both verifiers check the rendered layout against the configuration, then record it under `results.json.navigationLayouts`, keyed by the corresponding `builds` entry. This also supports paired sites with different configured layouts. Receipts identify the published version and bundle SHA-256, or the local gem SHA-256 when selected. These commands leave production configuration, consumer templates, dependency locks and authored content unchanged. See [中文说明](site.zh-CN.md#左侧导航本地预览).
+
 ## Footer navigation and two-site previews
 
-`website.footer.links` in `.github/jekyll-obsidian.yml` links to Sinputer's Site. The Chinese override is an explicit full URL. Contacts and navigation are rendered by the upstream theme on every page. The footer API is supported by the pinned 0.3.3 release.
+`website.footer.links` in `.github/jekyll-obsidian.yml` links to Sinputer's Site. The Chinese override is an explicit full URL. Contacts and navigation are rendered by the upstream theme on every page. The footer API is supported by the pinned 0.3.4 release.
 
 Without `--personal-site`, `verify:footer` validates Feedgarden alone. The optional second host uses its own configuration and content with the same selected theme package. Contact counts, language routes and base paths come from each host configuration; `--port` and `--personal-port` override the preview ports (58002 and 58000).
 
@@ -89,6 +102,8 @@ FEEDGARDEN_VISUAL_ROOT=.local/feedgarden/state/validation/fixture/.jekyll-obsidi
 ```
 
 `build` compiles and typechecks the same TypeScript project. Use `pnpm run typecheck` when you only need diagnostics without emitted files. The fixture browser command above uses POSIX environment syntax; in PowerShell, set `$env:FEEDGARDEN_VISUAL_ROOT` and `$env:FEEDGARDEN_VISUAL_FIXTURE` before running `pnpm run test:visual`, then remove both variables. `pnpm run verify:agent` is a separate paid live check, not part of CI.
+
+`pnpm run test:browser` checks the preview dialog helpers after Chromium is installed. These tests live in `tests/browser/`; the ordinary Node test suite runs without a browser installation.
 
 ## CI scope and deployment
 

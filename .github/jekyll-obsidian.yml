@@ -6,6 +6,8 @@ baseurl: /feedgarden
 website:
   source: content
   theme: minimal
+  navigation:
+    layout: sidebar
   repository: wowfun/feedgarden
   edit_branch: main
   footer:

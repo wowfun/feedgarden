@@ -10,12 +10,14 @@ import { checkFooterPages } from './footer-check.js';
 import { staticServer } from './static-server.js';
 import { validationDirectory } from './validation-paths.js';
 import { validationTheme } from './validation-theme.js';
+import { parseNavigationLayout,previewNavigationConfig,verifyNavigationLayout,type NavigationLayout } from './navigation-layout.js';
 
-const { values } = parseArgs({ options: { config: { type: 'string' }, gem: { type: 'string' }, 'personal-site': { type: 'string' }, port: { type: 'string' }, 'personal-port': { type: 'string' }, help: { type: 'boolean' } } });
+const { values } = parseArgs({ options: { config: { type: 'string' }, gem: { type: 'string' }, 'navigation-layout': { type: 'string' }, 'personal-site': { type: 'string' }, port: { type: 'string' }, 'personal-port': { type: 'string' }, help: { type: 'boolean' } } });
 if (values.help) {
-  console.log('Usage: pnpm run verify:footer [--config FILE] [--gem PATH] [--personal-site PATH] [--port 58002] [--personal-port 58000]\nVerify isolated content copies with the frozen published theme by default, or an explicit local gem. Optional second site enables paired previews. No database or publication access.');
+  console.log('Usage: pnpm run verify:footer [--config FILE] [--gem PATH] [--navigation-layout top|sidebar] [--personal-site PATH] [--port 58002] [--personal-port 58000]\nVerify isolated content copies with the frozen published theme by default, or an explicit local gem. Optional second site enables paired previews. --navigation-layout overrides only the isolated copy. No database or publication access.');
   process.exit(0);
 }
+const navigationLayout = parseNavigationLayout(values['navigation-layout']);
 function port(value: string | undefined, fallback: number): number {
   if (value === undefined) return fallback;
   const result = Number(value);
@@ -35,12 +37,13 @@ const base = join(validationDirectory(developmentConfig(values.config)), 'footer
 await mkdir(base, { recursive: true });
 const root = await mkdtemp(join(base, 'run-')), builder = await validationTheme(root, values.gem);
 const builds: Record<string, string> = {}, evidence: unknown[] = [], audits: unknown[] = [];
+const navigationLayouts: Record<string, NavigationLayout> = {};
 
 const browser = await chromium.launch({ headless: true });
 try {
   for (const site of sites) {
     const host = join(root, site.name);
-    const config = structuredClone(site.config);
+    const config = previewNavigationConfig(site.config, navigationLayout);
     config.url = `http://127.0.0.1:${site.port}`;
     delete config.website.analytics;
     delete config.website.comments;
@@ -65,6 +68,7 @@ try {
         const dom = new JSDOM(await readFile(file, 'utf8'));
         try {
           const document = dom.window.document;
+          navigationLayouts[`${site.name}-${theme}`] = verifyNavigationLayout(document.body.getAttribute('data-navigation-layout'), config.website.navigation?.layout ?? 'top');
           const route = site.baseurl + '/' + relative.replace(/index\.html$/, '');
           if (article && !articleRoutes[locale]) articleRoutes[locale] = route;
           const home = site.baseurl + '/' + (locale === (config.lang ?? 'en') ? '' : locale + '/');
@@ -104,7 +108,8 @@ try {
             const response = await page.goto(origin + route);
             assert.equal(response?.status(), status, `Unexpected preview status: ${site.name}/${theme} ${route}`);
             await expect(page.locator('html')).toHaveAttribute('lang', locale);
-            await expect(page.locator('.site-header')).toHaveCount(1);
+            verifyNavigationLayout(await page.locator('body').getAttribute('data-navigation-layout'), navigationLayouts[`${site.name}-${theme}`]!);
+            await expect(page.locator('.site-navigation')).toHaveCount(1);
             await expect(page.locator('footer.site-footer')).toHaveCount(1);
             if (kind === 'not-found') {
               const errorPage = new JSDOM(await readFile(join(output, locale === (config.lang ?? 'en') ? '' : locale, '404.html'), 'utf8'));
@@ -146,7 +151,7 @@ try {
             if (await page.locator('.translation-fallback').count()) await expect(page.locator('.translation-fallback')).not.toBeVisible({ timeout: 6000 });
             const screenshot = `${site.name}-${theme}-${locale}-${width}-${scheme}-${index}.png`;
             await page.screenshot({ path: join(root, screenshot) });
-            evidence.push({ site: site.name, theme, locale, width, scheme, route, status, kind, screenshot, checks: 'explicit localized URLs, unique contacts, responsive columns, 44px touch height, focus, no overflow or toolbar overlap' });
+            evidence.push({ site: site.name, theme, locale, width, scheme, route, status, kind, screenshot, checks: 'rendered navigation layout, explicit localized URLs, unique contacts, responsive columns, 44px touch height, focus, no overflow or toolbar overlap' });
           }
           await context.close();
         }
@@ -155,6 +160,6 @@ try {
     }
   }
 } finally { await browser.close(); }
-await writeFile(join(root, 'results.json'), JSON.stringify({ theme: builder.identity, builds, audits, evidence }, null, 2) + '\n');
-await writeFile(join(base, 'current.json'), JSON.stringify({ root, builds }, null, 2) + '\n');
+await writeFile(join(root, 'results.json'), JSON.stringify({ theme: builder.identity, navigationLayouts, builds, audits, evidence }, null, 2) + '\n');
+await writeFile(join(base, 'current.json'), JSON.stringify({ root, navigationLayouts, builds }, null, 2) + '\n');
 console.log('Footer validation passed: ' + root);
